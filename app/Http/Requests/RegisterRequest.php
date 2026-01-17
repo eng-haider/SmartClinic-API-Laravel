@@ -24,7 +24,12 @@ class RegisterRequest extends FormRequest
             'phone' => 'required|string|unique:users,phone',
             'email' => 'nullable|email|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
-            'role' => 'nullable|in:admin,doctor,nurse,receptionist,user',
+            
+            // Clinic information (required for clinic_super_doctor registration)
+            'clinic_name' => 'required|string|max:255',
+            'clinic_address' => 'required|string|max:500',
+            'clinic_phone' => 'nullable|string|max:50',
+            'clinic_email' => 'nullable|email|max:255',
         ];
     }
 
@@ -41,6 +46,8 @@ class RegisterRequest extends FormRequest
             'password.required' => 'Password is required',
             'password.min' => 'Password must be at least 8 characters',
             'password.confirmed' => 'Password confirmation does not match',
+            'clinic_name.required' => 'Clinic name is required',
+            'clinic_address.required' => 'Clinic address is required',
         ];
     }
 }

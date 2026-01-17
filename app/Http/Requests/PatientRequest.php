@@ -22,23 +22,32 @@ class PatientRequest extends FormRequest
         $patientId = $this->route('patient')?->id;
 
         return [
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'email' => 'nullable|email|unique:patients,email' . ($patientId ? ",$patientId" : ''),
-            'phone' => 'required|string|unique:patients,phone' . ($patientId ? ",$patientId" : ''),
-            'date_of_birth' => 'required|date|before:today',
-            'gender' => 'required|in:male,female,other',
-            'address' => 'nullable|string|max:500',
-            'city' => 'nullable|string|max:100',
-            'state' => 'nullable|string|max:100',
-            'postal_code' => 'nullable|string|max:20',
-            'country' => 'nullable|string|max:100',
-            'blood_type' => 'nullable|in:O+,O-,A+,A-,B+,B-,AB+,AB-',
-            'allergies' => 'nullable|string|max:500',
-            'medical_history' => 'nullable|string|max:1000',
-            'emergency_contact_name' => 'nullable|string|max:255',
-            'emergency_contact_phone' => 'nullable|string|max:20',
+            'name' => 'required|string|max:255',
+            'age' => 'nullable|integer|min:0|max:150',
+            'phone' => 'nullable|string|max:33',
+            'systemic_conditions' => 'nullable|string|max:255',
+            'sex' => 'nullable|integer|in:1,2', // 1=Male, 2=Female
+            'address' => 'nullable|string|max:255',
+            'notes' => 'nullable|string',
+            'birth_date' => 'nullable|date|before:today',
+            'rx_id' => 'nullable|string|max:255',
+            'note' => 'nullable|string',
+            'from_where_come_id' => 'nullable|exists:from_where_comes,id',
+            'identifier' => 'nullable|string|max:255',
+            'credit_balance' => 'nullable|integer',
+            'credit_balance_add_at' => 'nullable|date',
         ];
+    }
+
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'doctor_id' => auth()->id(),
+            'clinics_id' => auth()->user()->clinic_id ?? auth()->user()->clinics_id ?? null,
+        ]);
     }
 
     /**
@@ -47,14 +56,13 @@ class PatientRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'first_name.required' => 'First name is required',
-            'last_name.required' => 'Last name is required',
-            'phone.required' => 'Phone number is required',
-            'phone.unique' => 'This phone number is already registered',
-            'email.unique' => 'This email is already registered',
-            'date_of_birth.required' => 'Date of birth is required',
-            'date_of_birth.before' => 'Date of birth must be in the past',
-            'gender.required' => 'Gender is required',
+            'name.required' => 'Patient name is required',
+            'from_where_come_id.exists' => 'Selected referral source does not exist',
+            'age.integer' => 'Age must be a number',
+            'age.min' => 'Age cannot be negative',
+            'age.max' => 'Age must be less than 150',
+            'sex.in' => 'Sex must be 1 (Male) or 2 (Female)',
+            'birth_date.before' => 'Birth date must be in the past',
         ];
     }
 }

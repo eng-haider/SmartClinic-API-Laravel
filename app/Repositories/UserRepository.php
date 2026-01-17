@@ -3,12 +3,11 @@
 namespace App\Repositories;
 
 use App\Models\User;
-use App\Repositories\Contracts\UserRepositoryInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Spatie\QueryBuilder\QueryBuilder;
 
-class UserRepository implements UserRepositoryInterface
+class UserRepository
 {
     /**
      * Get the query builder instance

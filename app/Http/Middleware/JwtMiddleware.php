@@ -4,21 +4,14 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Tymon\JwtAuth\Exceptions\JwtException;
-use Tymon\JwtAuth\Facades\JwtAuth;
+use Tymon\JWTAuth\Facades\JWTAuth;
+use Tymon\JWTAuth\Exceptions\JWTException;
 
 class JwtMiddleware
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Illuminate\Http\Response|\Illuminate\Http\RedirectResponse)  $next
-     * @return \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse
-     */
     public function handle(Request $request, Closure $next)
     {
         try {
-            // Check if token exists in Authorization header
             if (!$request->hasHeader('Authorization')) {
                 return response()->json([
                     'success' => false,
@@ -26,15 +19,16 @@ class JwtMiddleware
                 ], 401);
             }
 
-            // Parse and validate token
-            JwtAuth::parseToken()->authenticate();
-        } catch (JwtException $e) {
+            JWTAuth::parseToken()->authenticate();
+        } catch (JWTException $e) {
+
             return response()->json([
                 'success' => false,
                 'message' => 'Token invalid or expired',
                 'error' => $e->getMessage(),
             ], 401);
         } catch (\Exception $e) {
+
             return response()->json([
                 'success' => false,
                 'message' => 'Authentication failed',

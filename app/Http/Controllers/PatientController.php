@@ -4,17 +4,24 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\PatientRequest;
 use App\Http\Resources\PatientResource;
-use App\Services\PatientService;
+use App\Repositories\PatientRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class PatientController extends Controller
 {
     /**
      * Create a new controller instance
      */
-    public function __construct(private PatientService $patientService)
+    public function __construct(private PatientRepository $patientRepository)
     {
+        $this->middleware('permission:view-clinic-patients')->only(['index']);
+        $this->middleware('permission:create-patient')->only(['store']);
+        $this->middleware('permission:view-clinic-patients')->only(['show']);
+        $this->middleware('permission:edit-patient')->only(['update']);
+        $this->middleware('permission:delete-patient')->only(['destroy']);
+        $this->middleware('permission:search-patient')->only(['searchByPhone', 'searchByEmail']);
     }
 
     /**
@@ -30,7 +37,11 @@ class PatientController extends Controller
         ]);
 
         $perPage = $request->input('per_page', 15);
-        $patients = $this->patientService->getAllPatients($filters, $perPage);
+        
+        // Get clinic_id based on user role
+        $clinicId = $this->getClinicIdByRole();
+        
+        $patients = $this->patientRepository->getAllWithFilters($filters, $perPage, $clinicId);
 
         return response()->json([
             'success' => true,
@@ -53,7 +64,7 @@ class PatientController extends Controller
     public function store(PatientRequest $request): JsonResponse
     {
         try {
-            $patient = $this->patientService->createPatient($request->validated());
+            $patient = $this->patientRepository->create($request->validated());
 
             return response()->json([
                 'success' => true,
@@ -73,7 +84,8 @@ class PatientController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $patient = $this->patientService->getPatient($id);
+        $clinicId = $this->getClinicIdByRole();
+        $patient = $this->patientRepository->getById($id, $clinicId);
 
         if (!$patient) {
             return response()->json([
@@ -95,7 +107,7 @@ class PatientController extends Controller
     public function update(PatientRequest $request, int $id): JsonResponse
     {
         try {
-            $patient = $this->patientService->updatePatient($id, $request->validated());
+            $patient = $this->patientRepository->update($id, $request->validated());
 
             return response()->json([
                 'success' => true,
@@ -116,7 +128,7 @@ class PatientController extends Controller
     public function destroy(int $id): JsonResponse
     {
         try {
-            $this->patientService->deletePatient($id);
+            $this->patientRepository->delete($id);
 
             return response()->json([
                 'success' => true,
@@ -135,7 +147,8 @@ class PatientController extends Controller
      */
     public function searchByPhone(string $phone): JsonResponse
     {
-        $patient = $this->patientService->searchByPhone($phone);
+        $clinicId = $this->getClinicIdByRole();
+        $patient = $this->patientRepository->getByPhone($phone, $clinicId);
 
         if (!$patient) {
             return response()->json([
@@ -156,7 +169,8 @@ class PatientController extends Controller
      */
     public function searchByEmail(string $email): JsonResponse
     {
-        $patient = $this->patientService->searchByEmail($email);
+        $clinicId = $this->getClinicIdByRole();
+        $patient = $this->patientRepository->getByEmail($email, $clinicId);
 
         if (!$patient) {
             return response()->json([
@@ -170,5 +184,22 @@ class PatientController extends Controller
             'message' => 'Patient found',
             'data' => new PatientResource($patient),
         ]);
+    }
+
+    /**
+     * Get clinic ID based on user role.
+     * Super admin sees all, others see only their clinic.
+     */
+    private function getClinicIdByRole(): ?int
+    {
+        $user = Auth::user();
+        
+        // Super admin can see all patients from all clinics
+        if ($user->hasRole('super_admin')) {
+            return null;
+        }
+        
+        // All other roles (clinic_super_doctor, doctor, secretary) see only their clinic
+        return $user->clinic_id;
     }
 }

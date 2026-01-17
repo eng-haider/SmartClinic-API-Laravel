@@ -3,14 +3,13 @@
 namespace App\Repositories;
 
 use App\Models\Patient;
-use App\Repositories\Contracts\PatientRepositoryInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Spatie\QueryBuilder\QueryBuilder;
 use Spatie\QueryBuilder\Filters\Filter;
 use Spatie\QueryBuilder\Sorts\Sort;
 
-class PatientRepository implements PatientRepositoryInterface
+class PatientRepository
 {
     /**
      * Get the query builder instance
@@ -56,39 +55,31 @@ class PatientRepository implements PatientRepositoryInterface
     /**
      * Get all patients with filters and pagination
      */
-    public function getAllWithFilters(array $filters, int $perPage = 15): LengthAwarePaginator
+    public function getAllWithFilters(array $filters, int $perPage = 15, ?int $clinicId = null): LengthAwarePaginator
     {
-        $builder = $this->queryBuilder();
-
-        // Apply search filter
-        if (!empty($filters['search'])) {
-            $search = $filters['search'];
-            $builder->where(function ($query) use ($search) {
-                $query->where('first_name', 'like', "%{$search}%")
-                    ->orWhere('last_name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%");
-            });
+        $query = $this->queryBuilder();
+        
+        // Filter by clinic if provided
+        if ($clinicId !== null) {
+            $query->where('clinics_id', $clinicId);
         }
-
-        // Apply date range filters
-        if (!empty($filters['from_date'])) {
-            $builder->whereDate('created_at', '>=', $filters['from_date']);
-        }
-
-        if (!empty($filters['to_date'])) {
-            $builder->whereDate('created_at', '<=', $filters['to_date']);
-        }
-
-        return $builder->paginate($perPage);
+        
+        return $query->paginate($perPage);
     }
 
     /**
      * Get patient by ID
      */
-    public function getById(int $id): ?Patient
+    public function getById(int $id, ?int $clinicId = null): ?Patient
     {
-        return $this->query()->find($id);
+        $query = $this->query();
+        
+        // Filter by clinic if provided
+        if ($clinicId !== null) {
+            $query->where('clinics_id', $clinicId);
+        }
+        
+        return $query->find($id);
     }
 
     /**
@@ -132,17 +123,31 @@ class PatientRepository implements PatientRepositoryInterface
     /**
      * Get patient by phone
      */
-    public function getByPhone(string $phone): ?Patient
+    public function getByPhone(string $phone, ?int $clinicId = null): ?Patient
     {
-        return $this->query()->where('phone', $phone)->first();
+        $query = $this->query()->where('phone', $phone);
+        
+        // Filter by clinic if provided
+        if ($clinicId !== null) {
+            $query->where('clinics_id', $clinicId);
+        }
+        
+        return $query->first();
     }
 
     /**
      * Get patient by email
      */
-    public function getByEmail(string $email): ?Patient
+    public function getByEmail(string $email, ?int $clinicId = null): ?Patient
     {
-        return $this->query()->where('email', $email)->first();
+        $query = $this->query()->where('email', $email);
+        
+        // Filter by clinic if provided
+        if ($clinicId !== null) {
+            $query->where('clinics_id', $clinicId);
+        }
+        
+        return $query->first();
     }
 
     /**

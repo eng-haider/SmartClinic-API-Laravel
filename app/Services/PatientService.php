@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\Patient;
-use App\Repositories\Contracts\PatientRepositoryInterface;
+use App\Repositories\PatientRepository;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class PatientService
@@ -11,7 +11,7 @@ class PatientService
     /**
      * Create a new service instance
      */
-    public function __construct(private PatientRepositoryInterface $patientRepository)
+    public function __construct(private PatientRepository $patientRepository)
     {
     }
 

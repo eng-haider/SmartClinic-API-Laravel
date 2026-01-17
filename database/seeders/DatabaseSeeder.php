@@ -17,50 +17,43 @@ class DatabaseSeeder extends Seeder
     {
         // Seed roles and permissions first
         $this->call(RoleAndPermissionSeeder::class);
+        
+        // Seed clinics before creating users
+        $this->call(ClinicSeeder::class);
 
-        // Create test user with admin role
-        $admin = User::factory()->create([
-            'name' => 'Admin User',
-            'email' => 'admin@example.com',
+        // Create test user with super_admin role
+        $superAdmin = User::factory()->create([
+            'name' => 'Super Admin',
+            'email' => 'superadmin@example.com',
             'phone' => '201001111111',
-            'role' => 'admin',
         ]);
-        $admin->assignRole('admin');
+        $superAdmin->assignRole('super_admin');
+
+        // Create clinic super doctor user
+        $clinicSuperDoctor = User::factory()->create([
+            'name' => 'Clinic Super Doctor',
+            'email' => 'clinicsuperdoctor@example.com',
+            'phone' => '201002222222',
+            'clinic_id' => 1,
+        ]);
+        $clinicSuperDoctor->assignRole('clinic_super_doctor');
 
         // Create doctor user
         $doctor = User::factory()->create([
             'name' => 'Doctor User',
             'email' => 'doctor@example.com',
-            'phone' => '201002222222',
-            'role' => 'doctor',
+            'phone' => '201003333333',
+            'clinic_id' => 1,
         ]);
         $doctor->assignRole('doctor');
 
-        // Create nurse user
-        $nurse = User::factory()->create([
-            'name' => 'Nurse User',
-            'email' => 'nurse@example.com',
-            'phone' => '201003333333',
-            'role' => 'nurse',
-        ]);
-        $nurse->assignRole('nurse');
-
-        // Create receptionist user
-        $receptionist = User::factory()->create([
-            'name' => 'Receptionist User',
-            'email' => 'receptionist@example.com',
+        // Create secretary user
+        $secretary = User::factory()->create([
+            'name' => 'Secretary User',
+            'email' => 'secretary@example.com',
             'phone' => '201004444444',
-            'role' => 'receptionist',
+            'clinic_id' => 1,
         ]);
-        $receptionist->assignRole('receptionist');
-
-        // Create regular user
-        $user = User::factory()->create([
-            'name' => 'Regular User',
-            'email' => 'user@example.com',
-            'phone' => '201005555555',
-            'role' => 'user',
-        ]);
-        $user->assignRole('user');
+        $secretary->assignRole('secretary');
     }
 }

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
-use Tymon\JwtAuth\Contracts\JWTSubject;
+use Tymon\JWTAuth\Contracts\JWTSubject;
 
 class User extends Authenticatable implements JWTSubject
 {
@@ -23,7 +23,7 @@ class User extends Authenticatable implements JWTSubject
         'email',
         'password',
         'phone',
-        'role',
+        'clinic_id',
         'is_active',
     ];
 
@@ -58,7 +58,7 @@ class User extends Authenticatable implements JWTSubject
      *
      * @return mixed
      */
-    public function getJwtIdentifier()
+    public function getJWTIdentifier()
     {
         return $this->getKey();
     }
@@ -68,11 +68,67 @@ class User extends Authenticatable implements JWTSubject
      *
      * @return array
      */
-    public function getJwtCustomClaims()
+    public function getJWTCustomClaims()
     {
         return [
             'email' => $this->email,
             'role' => $this->role,
         ];
+    }
+
+    /**
+     * Get the cases assigned to the doctor.
+     */
+    public function cases()
+    {
+        return $this->hasMany(MedicalCase::class, 'doctor_id');
+    }
+
+    /**
+     * Get the recipes created by the doctor.
+     */
+    public function recipes()
+    {
+        return $this->hasMany(Recipe::class, 'doctors_id');
+    }
+
+    /**
+     * Get the reservations assigned to the doctor.
+     */
+    public function reservations()
+    {
+        return $this->hasMany(Reservation::class, 'doctor_id');
+    }
+
+    /**
+     * Get the recipe items created by the doctor.
+     */
+    public function recipeItems()
+    {
+        return $this->hasMany(RecipeItem::class, 'doctors_id');
+    }
+
+    /**
+     * Get the bills assigned to the doctor.
+     */
+    public function bills()
+    {
+        return $this->hasMany(Bill::class, 'doctor_id');
+    }
+
+    /**
+     * Get the clinic that the user belongs to.
+     */
+    public function clinic()
+    {
+        return $this->belongsTo(Clinic::class);
+    }
+
+    /**
+     * Get all of the user's images (profile picture, documents, etc.).
+     */
+    public function images()
+    {
+        return $this->morphMany(Image::class, 'imageable');
     }
 }

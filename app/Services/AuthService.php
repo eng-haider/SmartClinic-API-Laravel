@@ -3,17 +3,20 @@
 namespace App\Services;
 
 use App\Models\User;
-use App\Repositories\Contracts\UserRepositoryInterface;
+use App\Models\Clinic;
+use App\Models\ClinicSetting;
+use App\Repositories\UserRepository;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Hash;
-use Tymon\JwtAuth\Facades\JwtAuth;
+use Illuminate\Support\Facades\DB;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthService
 {
     /**
      * Create a new service instance
      */
-    public function __construct(private UserRepositoryInterface $userRepository)
+    public function __construct(private UserRepository $userRepository)
     {
     }
 
@@ -23,7 +26,7 @@ class AuthService
     public function register(array $data): array
     {
         // Check if email exists
-        if ($this->userRepository->emailExists($data['email'])) {
+        if (!empty($data['email']) && $this->userRepository->emailExists($data['email'])) {
             throw new \Exception('Email already registered');
         }
 
@@ -32,24 +35,61 @@ class AuthService
             throw new \Exception('Phone already registered');
         }
 
-        // Hash password
-        $data['password'] = Hash::make($data['password']);
+        DB::beginTransaction();
+        
+        try {
+            // Create clinic first
+            $clinic = Clinic::create([
+                'name' => $data['clinic_name'],
+                'address' => $data['clinic_address'],
+                'phone' => $data['clinic_phone'] ?? null,
+                'email' => $data['clinic_email'] ?? null,
+            ]);
 
-        // Set default role if not provided
-        if (empty($data['role'])) {
-            $data['role'] = 'user';
+            // Create clinic settings
+            ClinicSetting::create([
+                'clinic_id' => $clinic->id,
+                'currency' => 'USD',
+                'timezone' => 'UTC',
+                'date_format' => 'Y-m-d',
+                'time_format' => 'H:i',
+            ]);
+
+            // Hash password
+            $userData = [
+                'name' => $data['name'],
+                'phone' => $data['phone'],
+                'email' => $data['email'] ?? null,
+                'password' => Hash::make($data['password']),
+                'clinic_id' => $clinic->id,
+            ];
+
+            // Always set role to clinic_super_doctor for registration
+            $roleName = 'clinic_super_doctor';
+
+            $user = $this->userRepository->create($userData);
+
+            // Assign role using Spatie
+            $user->assignRole($roleName);
+
+            // Refresh user to load relationships
+            $user->load('roles', 'clinic');
+
+            // Generate token
+            $token = JWTAuth::fromUser($user);
+
+            DB::commit();
+
+            return [
+                'user' => $user,
+                'clinic' => $clinic,
+                'token' => $token,
+                'message' => 'User and clinic registered successfully',
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
         }
-
-        $user = $this->userRepository->create($data);
-
-        // Generate token
-        $token = JwtAuth::fromUser($user);
-
-        return [
-            'user' => $user,
-            'token' => $token,
-            'message' => 'User registered successfully',
-        ];
     }
 
     /**
@@ -68,7 +108,7 @@ class AuthService
         }
 
         // Generate token
-        $token = JwtAuth::fromUser($user);
+        $token = JWTAuth::fromUser($user);
 
         return [
             'user' => $user,
@@ -83,7 +123,7 @@ class AuthService
     public function logout(): array
     {
         try {
-            JwtAuth::invalidate(JwtAuth::getToken());
+            JWTAuth::invalidate(JWTAuth::getToken());
             return ['message' => 'Logout successful'];
         } catch (\Exception $e) {
             throw new \Exception('Logout failed: ' . $e->getMessage());
@@ -96,7 +136,7 @@ class AuthService
     public function refreshToken(): array
     {
         try {
-            $token = JwtAuth::refresh(JwtAuth::getToken());
+            $token = JWTAuth::refresh(JWTAuth::getToken());
             return [
                 'token' => $token,
                 'message' => 'Token refreshed successfully',
@@ -111,7 +151,7 @@ class AuthService
      */
     public function me(): ?User
     {
-        return JwtAuth::user();
+        return JWTAuth::user();
     }
 
     /**

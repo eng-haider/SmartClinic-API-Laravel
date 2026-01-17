@@ -16,65 +16,47 @@ class RoleAndPermissionSeeder extends Seeder
         // Reset cached roles and permissions
         app()['cache']->forget('spatie.permission.cache');
 
-        // Define permissions
-        $permissions = [
-            // Patient permissions
-            'view-patients',
-            'create-patient',
-            'edit-patient',
-            'delete-patient',
-            'search-patient',
+        // Get roles from config
+        $config = config('rolesAndPermissions');
+        $roles = $config['roles'];
 
-            // User management permissions
-            'view-users',
-            'create-user',
-            'edit-user',
-            'delete-user',
-
-            // Permission management
-            'manage-permissions',
-            'manage-roles',
-        ];
-
-        // Create permissions
-        foreach ($permissions as $name) {
-            Permission::firstOrCreate(['name' => $name]);
+        // Extract permissions from roles
+        $allPermissions = [];
+        foreach ($roles as $roleData) {
+            if (isset($roleData['permissions'])) {
+                $allPermissions = array_merge($allPermissions, $roleData['permissions']);
+            }
         }
+        $allPermissions = array_unique($allPermissions);
 
-        // Define roles with their permissions
-        $roles = [
-            'admin' => $permissions, // All permissions
-            'doctor' => [
-                'view-patients',
-                'create-patient',
-                'edit-patient',
-                'search-patient',
-                'view-users',
-            ],
-            'nurse' => [
-                'view-patients',
-                'create-patient',
-                'edit-patient',
-                'search-patient',
-            ],
-            'receptionist' => [
-                'view-patients',
-                'create-patient',
-                'search-patient',
-            ],
-            'user' => [
-                'view-patients',
-                'search-patient',
-            ],
-        ];
+        // Create all permissions
+        $this->command->info('Creating permissions...');
+        foreach ($allPermissions as $permission) {
+            Permission::firstOrCreate(['name' => $permission]);
+            $this->command->info("  ✓ {$permission}");
+        }
 
         // Create roles and assign permissions
-        foreach ($roles as $roleName => $permissions) {
-            $role = Role::firstOrCreate(['name' => $roleName]);
+        $this->command->info("\nCreating roles and assigning permissions...");
+        foreach ($roles as $roleName => $roleData) {
+            $role = Role::firstOrCreate([
+                'name' => $roleName,
+            ]);
 
-            // Get permission models
-            $permissionModels = Permission::whereIn('name', $permissions)->get();
-            $role->syncPermissions($permissionModels);
+            if (isset($roleData['permissions'])) {
+                $role->syncPermissions($roleData['permissions']);
+                $this->command->info("  ✓ {$roleData['display_name']} ({$roleName}) - " . count($roleData['permissions']) . " permissions");
+            } else {
+                $this->command->info("  ✓ {$roleData['display_name']} ({$roleName})");
+            }
         }
+
+        $this->command->info("\n✓ Roles and permissions created successfully!");
+        $this->command->info("\nRoles created:");
+        $this->command->info("  1. Super Admin - Full access to all clinics");
+        $this->command->info("  2. Clinic Super Doctor - Manages their clinic (all patients, cases, bills)");
+        $this->command->info("  3. Doctor - Can see clinic patients but only their own cases and bills");
+        $this->command->info("  4. Secretary - Manages patients and reservations");
     }
 }
+
