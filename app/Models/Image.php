@@ -59,7 +59,14 @@ class Image extends Model
      */
     public function getUrlAttribute(): string
     {
-        return Storage::disk($this->disk)->url($this->path);
+        $storageUrl = Storage::disk($this->disk)->url($this->path);
+        
+        // If the URL is relative, prepend the app URL
+        if (!str_starts_with($storageUrl, 'http')) {
+            return rtrim(config('app.url'), '/') . '/' . ltrim($storageUrl, '/');
+        }
+        
+        return $storageUrl;
     }
 
     /**

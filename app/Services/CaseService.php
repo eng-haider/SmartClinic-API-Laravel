@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\Case as MedicalCase;
+use App\Models\CaseModel;
 use App\Repositories\CaseRepository;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -26,7 +26,7 @@ class CaseService
     /**
      * Get case by ID
      */
-    public function getCase(int $id): ?MedicalCase
+    public function getCase(int $id): ?CaseModel
     {
         $case = $this->caseRepository->getById($id);
         
@@ -40,7 +40,7 @@ class CaseService
     /**
      * Create a new case
      */
-    public function createCase(array $data): MedicalCase
+    public function createCase(array $data): CaseModel
     {
         // Validate relationships exist
         $this->validateCaseRelationships($data);
@@ -51,7 +51,7 @@ class CaseService
     /**
      * Update case
      */
-    public function updateCase(int $id, array $data): MedicalCase
+    public function updateCase(int $id, array $data): CaseModel
     {
         // Validate case exists
         $case = $this->getCase($id);

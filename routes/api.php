@@ -9,6 +9,15 @@ use App\Http\Controllers\ClinicExpenseController;
 use App\Http\Controllers\ClinicExpenseCategoryController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\RecipeController;
+use App\Http\Controllers\DoctorController;
+use App\Http\Controllers\NoteController;
+use App\Http\Controllers\ImageController;
+use App\Http\Controllers\Report\BillReportController;
+use App\Http\Controllers\Report\DashboardReportController;
+use App\Http\Controllers\Report\PatientReportController;
+use App\Http\Controllers\Report\CaseReportController;
+use App\Http\Controllers\Report\ReservationReportController;
+use App\Http\Controllers\Report\FinancialReportController;
 use Illuminate\Support\Facades\Route;
 
 // Public auth routes (no authentication required)
@@ -28,6 +37,7 @@ Route::middleware('jwt')->group(function () {
     Route::apiResource('patients', PatientController::class);
     Route::get('patients/search/phone/{phone}', [PatientController::class, 'searchByPhone'])->name('patients.search.phone');
     Route::get('patients/search/email/{email}', [PatientController::class, 'searchByEmail'])->name('patients.search.email');
+    Route::put('patients/{id}/tooth-details', [PatientController::class, 'updateToothDetails'])->name('patients.update-tooth-details');
 });
 
 // Protected case routes (JWT required)
@@ -74,4 +84,90 @@ Route::middleware('jwt')->group(function () {
     Route::get('clinic-expenses-statistics', [ClinicExpenseController::class, 'statistics'])->name('clinic-expenses.statistics');
     Route::get('clinic-expenses-unpaid', [ClinicExpenseController::class, 'unpaid'])->name('clinic-expenses.unpaid');
     Route::get('clinic-expenses-by-date-range', [ClinicExpenseController::class, 'byDateRange'])->name('clinic-expenses.by-date-range');
+});
+
+// Protected doctor routes (JWT required)
+Route::middleware('jwt')->group(function () {
+    Route::apiResource('doctors', DoctorController::class);
+    Route::get('doctors-active', [DoctorController::class, 'active'])->name('doctors.active');
+    Route::get('doctors/clinic/{clinicId}', [DoctorController::class, 'byClinic'])->name('doctors.by-clinic');
+    Route::get('doctors/search/email/{email}', [DoctorController::class, 'searchByEmail'])->name('doctors.search.email');
+    Route::get('doctors/search/phone/{phone}', [DoctorController::class, 'searchByPhone'])->name('doctors.search.phone');
+});
+
+// Protected note routes (JWT required)
+Route::middleware('jwt')->group(function () {
+    Route::apiResource('notes', NoteController::class);
+    Route::get('notes/{noteableType}/{noteableId}', [NoteController::class, 'byNoteable'])->name('notes.by-noteable');
+});
+
+// Protected image routes (JWT required)
+Route::middleware('jwt')->group(function () {
+    // Custom routes must come BEFORE apiResource
+    Route::get('images/by-imageable', [ImageController::class, 'getByImageable'])->name('images.by-imageable');
+    Route::get('images/statistics/summary', [ImageController::class, 'statistics'])->name('images.statistics');
+    Route::patch('images/{id}/order', [ImageController::class, 'updateOrder'])->name('images.update-order');
+    
+    // Standard CRUD operations
+    Route::apiResource('images', ImageController::class);
+});
+
+// ============================================
+// REPORTS & ANALYTICS ROUTES (JWT required)
+// ============================================
+Route::middleware('jwt')->prefix('reports')->group(function () {
+    
+    // Dashboard Overview
+    Route::get('dashboard/overview', [DashboardReportController::class, 'overview'])->name('reports.dashboard.overview');
+    Route::get('dashboard/today', [DashboardReportController::class, 'today'])->name('reports.dashboard.today');
+    
+    // Patient Reports
+    Route::prefix('patients')->group(function () {
+        Route::get('summary', [PatientReportController::class, 'summary'])->name('reports.patients.summary');
+        Route::get('by-source', [PatientReportController::class, 'bySource'])->name('reports.patients.by-source');
+        Route::get('by-doctor', [PatientReportController::class, 'byDoctor'])->name('reports.patients.by-doctor');
+        Route::get('trend', [PatientReportController::class, 'trend'])->name('reports.patients.trend');
+        Route::get('age-distribution', [PatientReportController::class, 'ageDistribution'])->name('reports.patients.age-distribution');
+    });
+    
+    // Case Reports
+    Route::prefix('cases')->group(function () {
+        Route::get('summary', [CaseReportController::class, 'summary'])->name('reports.cases.summary');
+        Route::get('by-category', [CaseReportController::class, 'byCategory'])->name('reports.cases.by-category');
+        Route::get('by-status', [CaseReportController::class, 'byStatus'])->name('reports.cases.by-status');
+        Route::get('by-doctor', [CaseReportController::class, 'byDoctor'])->name('reports.cases.by-doctor');
+        Route::get('trend', [CaseReportController::class, 'trend'])->name('reports.cases.trend');
+    });
+    
+    // Reservation Reports
+    Route::prefix('reservations')->group(function () {
+        Route::get('summary', [ReservationReportController::class, 'summary'])->name('reports.reservations.summary');
+        Route::get('by-status', [ReservationReportController::class, 'byStatus'])->name('reports.reservations.by-status');
+        Route::get('by-doctor', [ReservationReportController::class, 'byDoctor'])->name('reports.reservations.by-doctor');
+        Route::get('trend', [ReservationReportController::class, 'trend'])->name('reports.reservations.trend');
+    });
+    
+    // Financial Reports
+    Route::prefix('financial')->group(function () {
+        // Bills/Revenue
+        Route::get('bills/summary', [FinancialReportController::class, 'billsSummary'])->name('reports.financial.bills-summary');
+        Route::get('revenue/by-doctor', [FinancialReportController::class, 'revenueByDoctor'])->name('reports.financial.revenue-by-doctor');
+        Route::get('revenue/trend', [FinancialReportController::class, 'revenueTrend'])->name('reports.financial.revenue-trend');
+        Route::get('bills/by-payment-status', [FinancialReportController::class, 'billsByPaymentStatus'])->name('reports.financial.bills-by-payment-status');
+        
+        // Expenses
+        Route::get('expenses/summary', [FinancialReportController::class, 'expensesSummary'])->name('reports.financial.expenses-summary');
+        Route::get('expenses/by-category', [FinancialReportController::class, 'expensesByCategory'])->name('reports.financial.expenses-by-category');
+        Route::get('expenses/trend', [FinancialReportController::class, 'expensesTrend'])->name('reports.financial.expenses-trend');
+        
+        // Profit/Loss
+        Route::get('profit-loss', [FinancialReportController::class, 'profitLoss'])->name('reports.financial.profit-loss');
+        Route::get('profit-loss/trend', [FinancialReportController::class, 'profitLossTrend'])->name('reports.financial.profit-loss-trend');
+        
+        // Doctor Performance
+        Route::get('doctor-performance', [FinancialReportController::class, 'doctorPerformance'])->name('reports.financial.doctor-performance');
+    });
+    
+    // Legacy bill report (kept for backward compatibility)
+    Route::get('bills', [BillReportController::class, 'index'])->name('reports.bills.legacy');
 });

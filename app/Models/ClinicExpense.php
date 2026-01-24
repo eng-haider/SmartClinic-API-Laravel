@@ -151,6 +151,22 @@ class ClinicExpense extends Model
     }
 
     /**
+     * Scope a query to filter by start date (from).
+     */
+    public function scopeDateFrom($query, $date)
+    {
+        return $query->where('date', '>=', $date);
+    }
+
+    /**
+     * Scope a query to filter by end date (to).
+     */
+    public function scopeDateTo($query, $date)
+    {
+        return $query->where('date', '<=', $date);
+    }
+
+    /**
      * Scope a query to filter by category.
      */
     public function scopeInCategory($query, $categoryId)

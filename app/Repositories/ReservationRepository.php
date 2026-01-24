@@ -29,13 +29,25 @@ class ReservationRepository
                 'doctor_id',
                 'clinics_id',
                 'status_id',
+                'reservation_start_date',
+                'reservation_end_date',
+                'reservation_from_time',
+                'reservation_to_time',
                 'is_waiting',
+                'from_date',
+                'to_date',
                 AllowedFilter::exact('patient_id'),
                 AllowedFilter::exact('doctor_id'),
                 AllowedFilter::exact('clinics_id'),
                 AllowedFilter::exact('status_id'),
                 AllowedFilter::exact('is_waiting'),
                 AllowedFilter::scope('waiting'),
+                AllowedFilter::callback('from_date', function ($query, $value) {
+                    $query->where('reservation_start_date', '>=', $value);
+                }),
+                AllowedFilter::callback('to_date', function ($query, $value) {
+                    $query->where('reservation_start_date', '<=', $value);
+                }),
             ])
             ->allowedSorts([
                 'id',
@@ -68,7 +80,7 @@ class ReservationRepository
             $query->where('clinics_id', $clinicId);
         }
         
-        // Filter by doctor if provided (for doctors to see only their own reservations)
+        // Filter by doctor if provided
         if ($doctorId !== null) {
             $query->where('doctor_id', $doctorId);
         }

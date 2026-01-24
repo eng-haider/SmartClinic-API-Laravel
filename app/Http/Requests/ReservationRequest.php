@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use App\Models\Status;
 
 class ReservationRequest extends FormRequest
 {
@@ -23,16 +24,59 @@ class ReservationRequest extends FormRequest
     {
         return [
             'patient_id' => 'required|exists:patients,id',
-            'doctor_id' => 'required|exists:users,id',
-            'clinics_id' => 'required|exists:clinics,id',
+            'doctor_id' => 'nullable|exists:users,id',
+            'clinics_id' => 'nullable|exists:clinics,id', // Set from auth, but must be in rules for validated()
             'status_id' => 'nullable|exists:statuses,id',
             'notes' => 'nullable|string',
             'reservation_start_date' => 'required|date',
             'reservation_end_date' => 'nullable|date|after_or_equal:reservation_start_date',
             'reservation_from_time' => 'required|date_format:H:i:s',
-            'reservation_to_time' => 'required|date_format:H:i:s|after:reservation_from_time',
+            'reservation_to_time' => 'nullable|date_format:H:i:s|after:reservation_from_time',
             'is_waiting' => 'nullable|boolean',
         ];
+    }
+
+    /**
+     * Prepare the data for validation.
+     */
+
+    
+    protected function prepareForValidation(): void
+    {
+        // Remove clinics_id from request if sent (security measure)
+        $this->request->remove('clinics_id');
+
+        // Force clinics_id from authenticated user only
+        if (auth()->check() && auth()->user()->clinic_id) {
+            $this->merge([
+                'clinics_id' => auth()->user()->clinic_id,
+            ]);
+        }
+
+        // Set default status_id to "Pending/New" if not provided
+        if (!$this->has('status_id') || $this->status_id === null) {
+            // Try to find "New" status, fallback to first available status
+            $defaultStatus = Status::where('name_en', 'New')
+                ->orWhere('name_ar', 'جديد')
+                ->first();
+            // If not found, get the first status by order or ID
+            if (!$defaultStatus) {
+                $defaultStatus = Status::orderBy('order')->orOrderBy('id')->first();
+            }
+            // Only set status_id if we found a status
+            if ($defaultStatus) {
+                $this->merge([
+                    'status_id' => $defaultStatus->id,
+                ]);
+            }
+        }
+
+        // Set default creator_id if not set
+        if (!$this->has('creator_id')) {
+            $this->merge([
+                'creator_id' => auth()->id(),
+            ]);
+        }
     }
 
     /**

@@ -535,6 +535,181 @@ curl -X GET "http://localhost:8000/api/bills/statistics/summary?start_date=2026-
 
 ---
 
+### 10. Get Bill Reports with Filters
+
+Get comprehensive bill statistics with optional filtering by date range and doctor.
+
+**Endpoint:** `GET /api/reports/bills`
+
+**Authentication:** Required
+
+**Request Headers:**
+
+```
+Content-Type: application/json
+Authorization: Bearer {token}
+```
+
+**Query Parameters:**
+
+| Parameter | Type    | Required | Description               | Example                |
+| --------- | ------- | -------- | ------------------------- | ---------------------- |
+| date_from | date    | No       | Start date for filtering  | `date_from=2026-01-01` |
+| date_to   | date    | No       | End date for filtering    | `date_to=2026-01-31`   |
+| doctor_id | integer | No       | Filter by specific doctor | `doctor_id=2`          |
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Bill report retrieved successfully",
+  "data": {
+    "total_bills": 45,
+    "paid_bills": 30,
+    "unpaid_bills": 15,
+    "total_paid_price": 1500000,
+    "total_unpaid_price": 450000,
+    "total_revenue": 1500000,
+    "total_outstanding": 450000
+  }
+}
+```
+
+**Response Fields:**
+
+| Field              | Type    | Description                                    |
+| ------------------ | ------- | ---------------------------------------------- |
+| total_bills        | integer | Total number of bills in the filtered period   |
+| paid_bills         | integer | Number of bills marked as paid                 |
+| unpaid_bills       | integer | Number of bills that are unpaid                |
+| total_paid_price   | integer | Sum of all paid bill amounts (in cents)        |
+| total_unpaid_price | integer | Sum of all unpaid bill amounts (in cents)      |
+| total_revenue      | integer | Alias for total_paid_price (backward compat)   |
+| total_outstanding  | integer | Alias for total_unpaid_price (backward compat) |
+
+**cURL Examples:**
+
+```bash
+# Get all-time report
+curl -X GET "http://localhost:8000/api/reports/bills" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Get report for specific date range
+curl -X GET "http://localhost:8000/api/reports/bills?date_from=2026-01-01&date_to=2026-01-31" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Get report for specific doctor in date range
+curl -X GET "http://localhost:8000/api/reports/bills?date_from=2026-01-01&date_to=2026-01-31&doctor_id=2" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Get report for last 7 days
+curl -X GET "http://localhost:8000/api/reports/bills?date_from=2026-01-15&date_to=2026-01-22" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Postman:**
+
+- Method: GET
+- URL: `{{base_url}}/reports/bills`
+- Params (optional):
+  - date_from: 2026-01-01
+  - date_to: 2026-01-31
+  - doctor_id: 2
+- Authorization: Bearer Token
+
+**Use Cases:**
+
+1. **Monthly Financial Report**
+
+   ```
+   GET /reports/bills?date_from=2026-01-01&date_to=2026-01-31
+   ```
+
+   Get complete billing summary for January 2026
+
+2. **Doctor Performance Report**
+
+   ```
+   GET /reports/bills?doctor_id=5&date_from=2026-01-01&date_to=2026-01-31
+   ```
+
+   Track specific doctor's billing metrics
+
+3. **Weekly Collection Report**
+
+   ```
+   GET /reports/bills?date_from=2026-01-15&date_to=2026-01-22
+   ```
+
+   Monitor weekly revenue and outstanding amounts
+
+4. **Year-to-Date Overview**
+   ```
+   GET /reports/bills?date_from=2026-01-01
+   ```
+   Get cumulative statistics from start of year
+
+**Validation Error Response (422):**
+
+```json
+{
+  "message": "The date from field must be a valid date.",
+  "errors": {
+    "date_from": ["The date from field must be a valid date."]
+  }
+}
+```
+
+**Notes:**
+
+- Date format: YYYY-MM-DD or full datetime (YYYY-MM-DD HH:MM:SS)
+- Dates are filtered on the `created_at` field of bills
+- Non-admin users only see bills from their assigned clinic
+- Super admin users see all bills across all clinics
+- All price amounts are in the smallest currency unit (cents)
+- Filter combinations are supported (date range + doctor)
+
+**Frontend Integration Example:**
+
+```javascript
+// React/JavaScript
+const billReports = {
+  async getReport(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.date_from) params.append("date_from", filters.date_from);
+    if (filters.date_to) params.append("date_to", filters.date_to);
+    if (filters.doctor_id) params.append("doctor_id", filters.doctor_id);
+
+    return await api.get(`/reports/bills?${params.toString()}`);
+  },
+};
+
+// Usage examples
+const monthlyReport = await billReports.getReport({
+  date_from: "2026-01-01",
+  date_to: "2026-01-31",
+});
+
+const doctorReport = await billReports.getReport({
+  date_from: "2026-01-01",
+  date_to: "2026-01-31",
+  doctor_id: 2,
+});
+
+console.log("Total Revenue:", monthlyReport.data.total_revenue);
+console.log("Outstanding:", monthlyReport.data.total_outstanding);
+console.log(
+  "Collection Rate:",
+  (
+    (monthlyReport.data.paid_bills / monthlyReport.data.total_bills) *
+    100
+  ).toFixed(2) + "%"
+);
+```
+
+---
+
 ## Advanced Filtering Examples
 
 ### Get Unpaid Bills for Clinic
@@ -790,5 +965,5 @@ console.log("Payment Rate:", stats.data.payment_rate);
 
 ---
 
-**Last Updated:** January 15, 2026  
+**Last Updated:** January 22, 2026  
 **API Version:** 1.0

@@ -26,8 +26,8 @@ class PatientRepository
     {
         return QueryBuilder::for(Patient::class)
             ->allowedFilters([
-                'first_name',
-                'last_name',
+            
+                  'name',
                 'email',
                 'phone',
                 'gender',

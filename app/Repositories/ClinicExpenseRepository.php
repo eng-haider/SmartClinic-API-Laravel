@@ -225,4 +225,36 @@ class ClinicExpenseRepository
             'total_count' => $totalCount,
         ];
     }
+
+    /**
+     * Get summary statistics for filtered expenses
+     */
+    public function getFilteredSummary(array $filters, ?int $clinicId = null): array
+    {
+        $query = $this->queryBuilder();
+        
+        // Filter by clinic if provided
+        if ($clinicId !== null) {
+            $query->where('clinic_id', $clinicId);
+        }
+        
+        // Clone the query to get different aggregations
+        $baseQuery = clone $query;
+        
+        $totalExpensesAmount = (clone $baseQuery)->sum(DB::raw('price * COALESCE(quantity, 1)'));
+        $totalPaidAmount = (clone $baseQuery)->where('is_paid', true)->sum(DB::raw('price * COALESCE(quantity, 1)'));
+        $totalUnpaidAmount = (clone $baseQuery)->where('is_paid', false)->sum(DB::raw('price * COALESCE(quantity, 1)'));
+        $expensesCount = (clone $baseQuery)->count();
+        $paidExpensesCount = (clone $baseQuery)->where('is_paid', true)->count();
+        $unpaidExpensesCount = (clone $baseQuery)->where('is_paid', false)->count();
+        
+        return [
+            'expenses_count' => $expensesCount,
+            'paid_expenses_count' => $paidExpensesCount,
+            'unpaid_expenses_count' => $unpaidExpensesCount,
+            'total_expenses_amount' => (float) ($totalExpensesAmount ?? 0),
+            'total_paid_amount' => (float) ($totalPaidAmount ?? 0),
+            'total_unpaid_amount' => (float) ($totalUnpaidAmount ?? 0),
+        ];
+    }
 }

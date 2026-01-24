@@ -40,6 +40,6 @@ class Status extends Model
      */
     public function cases()
     {
-        return $this->hasMany(Case::class, 'status_id');
+        return $this->hasMany(CaseModel::class, 'status_id');
     }
 }

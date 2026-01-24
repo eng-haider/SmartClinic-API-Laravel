@@ -2,7 +2,7 @@
 
 namespace App\Repositories;
 
-use App\Models\Case as MedicalCase;
+use App\Models\CaseModel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -15,7 +15,7 @@ class CaseRepository
      */
     protected function query(): Builder
     {
-        return MedicalCase::query();
+        return CaseModel::query();
     }
 
     /**
@@ -23,7 +23,7 @@ class CaseRepository
      */
     protected function queryBuilder(): QueryBuilder
     {
-        return QueryBuilder::for(MedicalCase::class)
+        return QueryBuilder::for(CaseModel::query())
             ->allowedFilters([
                 'patient_id',
                 'doctor_id',
@@ -89,7 +89,7 @@ class CaseRepository
     /**
      * Get case by ID
      */
-    public function getById(int $id, ?int $clinicId = null, ?int $doctorId = null): ?MedicalCase
+    public function getById(int $id, ?int $clinicId = null, ?int $doctorId = null): ?CaseModel
     {
         $query = $this->query()
             ->with(['patient', 'doctor', 'category', 'status']);
@@ -110,15 +110,15 @@ class CaseRepository
     /**
      * Create a new case
      */
-    public function create(array $data): MedicalCase
+    public function create(array $data): CaseModel
     {
-        return MedicalCase::create($data);
+        return CaseModel::create($data);
     }
 
     /**
      * Update case
      */
-    public function update(int $id, array $data): MedicalCase
+    public function update(int $id, array $data): CaseModel
     {
         $case = $this->query()->findOrFail($id);
         $case->update($data);
@@ -139,7 +139,7 @@ class CaseRepository
      */
     public function restore(int $id): bool
     {
-        $case = MedicalCase::withTrashed()->findOrFail($id);
+        $case = CaseModel::withTrashed()->findOrFail($id);
         return $case->restore();
     }
 
@@ -148,7 +148,7 @@ class CaseRepository
      */
     public function forceDelete(int $id): bool
     {
-        $case = MedicalCase::withTrashed()->findOrFail($id);
+        $case = CaseModel::withTrashed()->findOrFail($id);
         return $case->forceDelete();
     }
 

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 
 class Patient extends Model
 {
@@ -32,6 +33,9 @@ class Patient extends Model
         'identifier',
         'credit_balance',
         'credit_balance_add_at',
+        'creator_id',
+        'updator_id',
+        'tooth_details',
     ];
 
     /**
@@ -50,10 +54,36 @@ class Patient extends Model
             'from_where_come_id' => 'integer',
             'credit_balance' => 'integer',
             'credit_balance_add_at' => 'datetime',
+            'creator_id' => 'integer',
+            'updator_id' => 'integer',
+            'tooth_details' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Boot the model.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Automatically set creator_id when creating
+        static::creating(function ($model) {
+            if (Auth::check()) {
+                $model->creator_id = Auth::id();
+                $model->updator_id = Auth::id();
+            }
+        });
+
+        // Automatically set updator_id when updating
+        static::updating(function ($model) {
+            if (Auth::check()) {
+                $model->updator_id = Auth::id();
+            }
+        });
     }
 
     /**
@@ -85,7 +115,7 @@ class Patient extends Model
      */
     public function cases()
     {
-        return $this->hasMany(MedicalCase::class);
+        return $this->hasMany(CaseModel::class);
     }
 
     /**
@@ -154,5 +184,21 @@ class Patient extends Model
     public function scopeByDoctor($query, int $doctorId)
     {
         return $query->where('doctor_id', $doctorId);
+    }
+
+    /**
+     * Get the user who created this patient.
+     */
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'creator_id');
+    }
+
+    /**
+     * Get the user who last updated this patient.
+     */
+    public function updator()
+    {
+        return $this->belongsTo(User::class, 'updator_id');
     }
 }

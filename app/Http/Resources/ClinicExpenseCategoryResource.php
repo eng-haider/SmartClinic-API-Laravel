@@ -26,11 +26,19 @@ class ClinicExpenseCategoryResource extends JsonResource
             'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
             'deleted_at' => $this->deleted_at?->format('Y-m-d H:i:s'),
             
+            // Expense statistics
+            'expenses_count' => $this->whenCounted('expenses'),
+            'paid_expenses_count' => $this->when(isset($this->paid_expenses_count), $this->paid_expenses_count ?? 0),
+            'unpaid_expenses_count' => $this->when(isset($this->unpaid_expenses_count), $this->unpaid_expenses_count ?? 0),
+            'total_expenses_amount' => $this->when(isset($this->total_expenses_amount), (float) ($this->total_expenses_amount ?? 0)),
+            'total_paid_amount' => $this->when(isset($this->total_paid_amount), (float) ($this->total_paid_amount ?? 0)),
+            'total_unpaid_amount' => $this->when(isset($this->total_unpaid_amount), (float) ($this->total_unpaid_amount ?? 0)),
+            
             // Relationships (loaded conditionally)
             'clinic' => $this->whenLoaded('clinic'),
             'creator' => new UserResource($this->whenLoaded('creator')),
             'updator' => new UserResource($this->whenLoaded('updator')),
-            'expenses_count' => $this->whenCounted('expenses'),
+            'expenses' => ClinicExpenseResource::collection($this->whenLoaded('expenses')),
         ];
     }
 }

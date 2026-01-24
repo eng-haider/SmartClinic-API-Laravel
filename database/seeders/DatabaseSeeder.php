@@ -18,42 +18,15 @@ class DatabaseSeeder extends Seeder
         // Seed roles and permissions first
         $this->call(RoleAndPermissionSeeder::class);
         
-        // Seed clinics before creating users
-        $this->call(ClinicSeeder::class);
-
-        // Create test user with super_admin role
-        $superAdmin = User::factory()->create([
-            'name' => 'Super Admin',
-            'email' => 'superadmin@example.com',
-            'phone' => '201001111111',
-        ]);
-        $superAdmin->assignRole('super_admin');
-
-        // Create clinic super doctor user
-        $clinicSuperDoctor = User::factory()->create([
-            'name' => 'Clinic Super Doctor',
-            'email' => 'clinicsuperdoctor@example.com',
-            'phone' => '201002222222',
-            'clinic_id' => 1,
-        ]);
-        $clinicSuperDoctor->assignRole('clinic_super_doctor');
-
-        // Create doctor user
-        $doctor = User::factory()->create([
-            'name' => 'Doctor User',
-            'email' => 'doctor@example.com',
-            'phone' => '201003333333',
-            'clinic_id' => 1,
-        ]);
-        $doctor->assignRole('doctor');
-
-        // Create secretary user
-        $secretary = User::factory()->create([
-            'name' => 'Secretary User',
-            'email' => 'secretary@example.com',
-            'phone' => '201004444444',
-            'clinic_id' => 1,
-        ]);
-        $secretary->assignRole('secretary');
+        // Seed test users with all roles (includes clinic creation)
+        $this->call(TestUsersSeeder::class);
+        
+        // Seed complete data for account 07700281899
+        // Uncomment the line below to seed complete clinic data
+        // $this->call(CompleteDataSeeder::class);
+        
+        // Seed additional data (optional)
+        // $this->call(FromWhereComeSeeder::class);
+        // $this->call(CaseDataSeeder::class);
     }
 }

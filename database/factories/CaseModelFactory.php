@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\Case;
+use App\Models\CaseModel;
 use App\Models\Patient;
 use App\Models\User;
 use App\Models\CaseCategory;
@@ -11,16 +11,16 @@ use App\Models\Clinic;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Case>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\CaseModel>
  */
-class CaseFactory extends Factory
+class CaseModelFactory extends Factory
 {
     /**
      * The name of the factory's corresponding model.
      *
      * @var string
      */
-    protected $model = Case::class;
+    protected $model = CaseModel::class;
 
     /**
      * Define the model's default state.

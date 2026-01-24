@@ -22,14 +22,14 @@ class RegisterRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'phone' => 'required|string|unique:users,phone',
-            'email' => 'nullable|email|unique:users,email',
+            // 'email' => 'nullable|email|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
             
             // Clinic information (required for clinic_super_doctor registration)
             'clinic_name' => 'required|string|max:255',
             'clinic_address' => 'required|string|max:500',
             'clinic_phone' => 'nullable|string|max:50',
-            'clinic_email' => 'nullable|email|max:255',
+            // 'clinic_email' => 'nullable|email|max:255',
         ];
     }
 

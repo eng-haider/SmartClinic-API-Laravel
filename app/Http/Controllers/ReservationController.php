@@ -16,10 +16,10 @@ class ReservationController extends Controller
      */
     public function __construct(private ReservationRepository $reservationRepository)
     {
-        $this->middleware('permission:view-clinic-reservations')->only(['index', 'show']);
-        $this->middleware('permission:create-reservation')->only(['store']);
-        $this->middleware('permission:edit-reservation')->only(['update']);
-        $this->middleware('permission:delete-reservation')->only(['destroy']);
+        // $this->middleware('permission:view-clinic-reservations|view-all-reservations')->only(['index', 'show']);
+        // $this->middleware('permission:create-reservation')->only(['store']);
+        // $this->middleware('permission:edit-reservation')->only(['update']);
+        // $this->middleware('permission:delete-reservation')->only(['destroy']);
     }
 
     /**
@@ -32,6 +32,8 @@ class ReservationController extends Controller
             'filter',
             'sort',
             'include',
+            'from_date',
+            'to_date',
         ]);
 
         $perPage = $request->input('per_page', 15);

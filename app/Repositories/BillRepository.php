@@ -23,7 +23,7 @@ class BillRepository
      */
     protected function queryBuilder(): QueryBuilder
     {
-        return QueryBuilder::for(Bill::class)
+        $query = QueryBuilder::for(Bill::class)
             ->allowedFilters([
                 'patient_id',
                 'doctor_id',
@@ -52,9 +52,30 @@ class BillRepository
                 'creator',
                 'updator',
                 'billable',
+                'billable.patient',
+                'billable.doctor',
+                'billable.category',
+                'billable.status',
                 'notes',
             ])
             ->defaultSort('-created_at');
+
+
+        // If billable is requested, automatically load nested relationships
+        $includes = request()->get('include', []);
+        if (is_string($includes)) {
+            $includes = explode(',', $includes);
+        }
+        if (in_array('billable', $includes)) {
+            $query->with([
+                'billable.patient',
+                'billable.doctor',
+                'billable.category',
+                'billable.status'
+            ]);
+        }
+
+        return $query;
     }
 
     /**
@@ -77,7 +98,7 @@ class BillRepository
      */
     public function getById(int $id, ?int $clinicId = null): ?Bill
     {
-        $query = $this->query()->with(['patient', 'doctor', 'clinic', 'billable']);
+        $query = $this->query()->with(['patient', 'doctor', 'clinic', 'billable.patient', 'billable.doctor', 'billable.category', 'billable.status']);
 
         // Filter by clinic if provided
         if ($clinicId !== null) {
@@ -163,7 +184,7 @@ class BillRepository
     public function getByPatient(int $patientId, int $perPage = 15, ?int $clinicId = null): LengthAwarePaginator
     {
         $query = $this->query()
-            ->with(['patient', 'doctor', 'clinic', 'billable'])
+            ->with(['patient', 'doctor', 'clinic', 'billable.patient', 'billable.doctor', 'billable.category', 'billable.status'])
             ->byPatient($patientId);
 
         if ($clinicId !== null) {
@@ -179,7 +200,7 @@ class BillRepository
     public function getByDoctor(int $doctorId, int $perPage = 15, ?int $clinicId = null): LengthAwarePaginator
     {
         $query = $this->query()
-            ->with(['patient', 'doctor', 'clinic', 'billable'])
+            ->with(['patient', 'doctor', 'clinic', 'billable.patient', 'billable.doctor', 'billable.category', 'billable.status'])
             ->byDoctor($doctorId);
 
         if ($clinicId !== null) {
@@ -231,15 +252,62 @@ class BillRepository
         $totalBills = $query->count();
         $paidBills = (clone $query)->paid()->count();
         $unpaidBills = (clone $query)->unpaid()->count();
-        $totalRevenue = (clone $query)->paid()->sum('price');
-        $totalOutstanding = (clone $query)->unpaid()->sum('price');
+        $totalPaidPrice = (clone $query)->paid()->sum('price') ?? 0;
+        $totalUnpaidPrice = (clone $query)->unpaid()->sum('price') ?? 0;
 
         return [
             'total_bills' => $totalBills,
             'paid_bills' => $paidBills,
             'unpaid_bills' => $unpaidBills,
-            'total_revenue' => $totalRevenue,
-            'total_outstanding' => $totalOutstanding,
+            'total_paid_price' => $totalPaidPrice,
+            'total_unpaid_price' => $totalUnpaidPrice,
+            'total_revenue' => $totalPaidPrice,
+            'total_outstanding' => $totalUnpaidPrice,
+        ];
+    }
+
+    /**
+     * Get bill statistics with optional filters (date range, doctor)
+     *
+     * Filters supported:
+     * - date_from (Y-m-d or Y-m-d H:i:s)
+     * - date_to (Y-m-d or Y-m-d H:i:s)
+     * - doctor_id
+     */
+    public function getStatisticsWithFilters(array $filters = [], ?int $clinicId = null): array
+    {
+        $query = $this->query();
+
+        if ($clinicId !== null) {
+            $query->where('clinics_id', $clinicId);
+        }
+
+        if (!empty($filters['doctor_id'])) {
+            $query->where('doctor_id', $filters['doctor_id']);
+        }
+
+        if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
+            $query->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]);
+        } elseif (!empty($filters['date_from'])) {
+            $query->where('created_at', '>=', $filters['date_from']);
+        } elseif (!empty($filters['date_to'])) {
+            $query->where('created_at', '<=', $filters['date_to']);
+        }
+
+        $totalBills = $query->count();
+        $paidBills = (clone $query)->paid()->count();
+        $unpaidBills = (clone $query)->unpaid()->count();
+        $totalPaidPrice = (clone $query)->paid()->sum('price') ?? 0;
+        $totalUnpaidPrice = (clone $query)->unpaid()->sum('price') ?? 0;
+
+        return [
+            'total_bills' => $totalBills,
+            'paid_bills' => $paidBills,
+            'unpaid_bills' => $unpaidBills,
+            'total_paid_price' => $totalPaidPrice,
+            'total_unpaid_price' => $totalUnpaidPrice,
+            'total_revenue' => $totalPaidPrice, // Alias for backward compatibility
+            'total_outstanding' => $totalUnpaidPrice, // Alias for backward compatibility
         ];
     }
 }

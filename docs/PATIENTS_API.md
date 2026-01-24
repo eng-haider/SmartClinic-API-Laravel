@@ -569,6 +569,171 @@ curl -X GET "http://localhost:8000/api/patients/search/email/john@example.com" \
 
 ---
 
+### 8. Update Patient Tooth Details
+
+Update the dental chart information for a specific patient.
+
+**Endpoint:** `PUT /api/patients/{id}/tooth-details`
+
+**Authentication:** Required
+
+**Request Headers:**
+
+```
+Content-Type: application/json
+Authorization: Bearer {token}
+```
+
+**URL Parameters:**
+
+| Parameter | Type    | Required | Description |
+| --------- | ------- | -------- | ----------- |
+| id        | integer | Yes      | Patient ID  |
+
+**Request Body:**
+
+```json
+{
+  "tooth_details": [
+    {
+      "tooth_number": 38,
+      "tooth_id": "tooth-185",
+      "part_id": 1,
+      "color": "#FF5252"
+    },
+    {
+      "tooth_number": 38,
+      "tooth_id": "tooth-177",
+      "part_id": 1,
+      "color": "#FF5252"
+    },
+    {
+      "tooth_number": 27,
+      "tooth_id": "tooth-125",
+      "part_id": 2,
+      "color": "#4CAF50"
+    }
+  ]
+}
+```
+
+**Request Fields:**
+
+| Field                         | Type    | Required | Description                     |
+| ----------------------------- | ------- | -------- | ------------------------------- |
+| tooth_details                 | array   | Yes      | Array of tooth detail objects   |
+| tooth_details.\*.tooth_number | integer | Yes      | Tooth number (1-32 or 11-48)    |
+| tooth_details.\*.tooth_id     | string  | Yes      | Unique identifier for the tooth |
+| tooth_details.\*.part_id      | integer | Yes      | Tooth part/section ID           |
+| tooth_details.\*.color        | string  | Yes      | Hex color code (e.g., #FF5252)  |
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Tooth details updated successfully",
+  "data": {
+    "id": 1,
+    "name": "John Doe",
+    "phone": "+201234567890",
+    "tooth_details": [
+      {
+        "tooth_number": 38,
+        "tooth_id": "tooth-185",
+        "part_id": 1,
+        "color": "#FF5252"
+      },
+      {
+        "tooth_number": 38,
+        "tooth_id": "tooth-177",
+        "part_id": 1,
+        "color": "#FF5252"
+      }
+    ],
+    "created_at": "2026-01-22 10:30:00",
+    "updated_at": "2026-01-22 14:25:00"
+  }
+}
+```
+
+**Validation Error Response (422):**
+
+```json
+{
+  "message": "The tooth details field is required.",
+  "errors": {
+    "tooth_details": ["The tooth details field is required."],
+    "tooth_details.0.tooth_number": [
+      "The tooth details.0.tooth number field is required."
+    ],
+    "tooth_details.0.color": ["The tooth details.0.color field is required."]
+  }
+}
+```
+
+**Error Response (404):**
+
+```json
+{
+  "success": false,
+  "message": "Patient not found"
+}
+```
+
+**cURL Example:**
+
+```bash
+curl -X PUT "http://localhost:8000/api/patients/1/tooth-details" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tooth_details": [
+      {
+        "tooth_number": 38,
+        "tooth_id": "tooth-185",
+        "part_id": 1,
+        "color": "#FF5252"
+      },
+      {
+        "tooth_number": 27,
+        "tooth_id": "tooth-125",
+        "part_id": 2,
+        "color": "#4CAF50"
+      }
+    ]
+  }'
+```
+
+**Postman:**
+
+- Method: PUT
+- URL: `{{base_url}}/patients/{{patient_id}}/tooth-details`
+- Authorization: Bearer Token
+- Body (raw JSON):
+
+```json
+{
+  "tooth_details": [
+    {
+      "tooth_number": 38,
+      "tooth_id": "tooth-185",
+      "part_id": 1,
+      "color": "#FF5252"
+    }
+  ]
+}
+```
+
+**Use Cases:**
+
+- Update dental chart after examination
+- Save tooth conditions and treatments
+- Track tooth parts with different statuses (healthy, cavity, filled, etc.)
+- Color-code different tooth conditions
+
+---
+
 ## Advanced Filtering Examples
 
 ### Filter by Multiple Fields
@@ -748,5 +913,5 @@ export const usePatients = () => {
 
 ---
 
-**Last Updated:** January 15, 2026  
+**Last Updated:** January 22, 2026  
 **API Version:** 1.0

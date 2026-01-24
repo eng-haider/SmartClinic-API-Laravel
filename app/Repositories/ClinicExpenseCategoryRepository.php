@@ -48,7 +48,8 @@ class ClinicExpenseCategoryRepository
      */
     public function getAllWithFilters(array $filters, int $perPage = 15, ?int $clinicId = null): LengthAwarePaginator
     {
-        $query = $this->queryBuilder();
+        $query = $this->queryBuilder()
+            ->withExpenseTotals(); // Add expense totals
         
         // Filter by clinic if provided
         if ($clinicId !== null) {
@@ -63,7 +64,8 @@ class ClinicExpenseCategoryRepository
      */
     public function getById(int $id, ?int $clinicId = null): ?ClinicExpenseCategory
     {
-        $query = $this->query();
+        $query = $this->query()
+            ->withExpenseTotals(); // Add expense totals
         
         // Filter by clinic if provided
         if ($clinicId !== null) {
@@ -108,6 +110,7 @@ class ClinicExpenseCategoryRepository
     public function getActiveByClinic(int $clinicId): \Illuminate\Database\Eloquent\Collection
     {
         return $this->query()
+            ->withExpenseTotals() // Add expense totals
             ->where('clinic_id', $clinicId)
             ->where('is_active', true)
             ->orderBy('name')

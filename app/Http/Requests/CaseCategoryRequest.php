@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Auth;
 
 class CaseCategoryRequest extends FormRequest
 {
@@ -26,9 +27,24 @@ class CaseCategoryRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'order' => 'nullable|integer|min:0',
-            'clinic_id' => 'required|exists:clinics,id',
+            'clinic_id' => 'nullable|exists:clinics,id',
             'item_cost' => 'nullable|integer|min:0',
         ];
+    }
+
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if (!Auth::check()) {
+            return;
+        }
+
+        // Always set clinic_id from authenticated user
+        $this->merge([
+            'clinic_id' => Auth::user()->clinic_id,
+        ]);
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Auth;
 
 class PatientRequest extends FormRequest
 {
@@ -19,7 +20,7 @@ class PatientRequest extends FormRequest
      */
     public function rules(): array
     {
-        $patientId = $this->route('patient')?->id;
+        $patientId = $this->route('patient'); // This is the ID from the route parameter
 
         return [
             'name' => 'required|string|max:255',
@@ -36,6 +37,8 @@ class PatientRequest extends FormRequest
             'identifier' => 'nullable|string|max:255',
             'credit_balance' => 'nullable|integer',
             'credit_balance_add_at' => 'nullable|date',
+            'doctor_id' => 'nullable|exists:users,id',
+            'clinics_id' => 'nullable|exists:clinics,id',
         ];
     }
 
@@ -44,10 +47,37 @@ class PatientRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        $this->merge([
-            'doctor_id' => auth()->id(),
-            'clinics_id' => auth()->user()->clinic_id ?? auth()->user()->clinics_id ?? null,
-        ]);
+        if (!Auth::check()) {
+            return;
+        }
+
+        $user = Auth::user();
+
+        // Always override doctor_id and clinics_id from authenticated user
+        // Remove any values sent in the request
+        $data = $this->all();
+
+        $data['clinics_id'] = $user->clinic_id;
+
+        // If birth_date is just a year (e.g., "1990"), convert to "1990-01-01"
+        if (!empty($data['birth_date']) && is_numeric($data['birth_date']) && strlen($data['birth_date']) == 4) {
+            $data['birth_date'] = $data['birth_date'] . '-01-01';
+        }
+
+        // Always calculate age from birth_date if birth_date is provided
+        // This ensures age is updated whenever birth_date changes
+        if (!empty($data['birth_date'])) {
+            try {
+                $birthDate = new \DateTime($data['birth_date']);
+                $today = new \DateTime('today');
+                $age = $birthDate->diff($today)->y;
+                $data['age'] = $age;
+            } catch (\Exception $e) {
+                // If date parsing fails, let validation handle it
+            }
+        }
+
+        $this->replace($data);
     }
 
     /**

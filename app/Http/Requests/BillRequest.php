@@ -25,7 +25,7 @@ class BillRequest extends FormRequest
             'billable_type' => 'nullable|string|max:255',
             'price' => 'required|integer|min:0',
             'is_paid' => 'nullable|boolean',
-            'use_credit' => 'nullable|boolean',
+            // 'use_credit' => 'nullable|boolean',
             'doctor_id' => 'nullable|exists:users,id',
         ];
 

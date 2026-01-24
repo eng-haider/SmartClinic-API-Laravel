@@ -41,6 +41,6 @@ class CaseCategory extends Model
      */
     public function cases()
     {
-        return $this->hasMany('App\Models\Case', 'case_categores_id');
+        return $this->hasMany(CaseModel::class, 'case_categores_id');
     }
 }
