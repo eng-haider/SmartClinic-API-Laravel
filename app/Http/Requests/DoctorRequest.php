@@ -50,13 +50,6 @@ class DoctorRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        // Always set clinic_id from authenticated user
-        if (Auth::check()) {
-            $this->merge([
-                'clinic_id' => Auth::user()->clinic_id,
-            ]);
-        }
-
         // Set default is_active to true if not provided
         if (!$this->has('is_active')) {
             $this->merge([
@@ -70,6 +63,22 @@ class DoctorRequest extends FormRequest
                 'role' => 'doctor',
             ]);
         }
+    }
+
+    /**
+     * Get the validated data from the request.
+     * Override to add clinic_id from authenticated user.
+     */
+    public function validated($key = null, $default = null)
+    {
+        $validated = parent::validated($key, $default);
+        
+        // Add clinic_id from authenticated user (cannot be overridden from request)
+        if (Auth::check()) {
+            $validated['clinic_id'] = Auth::user()->clinic_id;
+        }
+        
+        return $validated;
     }
 
     /**
@@ -91,8 +100,6 @@ class DoctorRequest extends FormRequest
             
             'password.required' => 'Password is required',
             'password.min' => 'Password must be at least 8 characters',
-            
-            'clinic_id.exists' => 'Selected clinic does not exist',
             
             'role.in' => 'Role must be either doctor or clinic_super_doctor',
             
