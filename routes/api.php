@@ -10,6 +10,7 @@ use App\Http\Controllers\ClinicExpenseCategoryController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\RecipeController;
 use App\Http\Controllers\DoctorController;
+use App\Http\Controllers\SecretaryController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\Report\BillReportController;
@@ -110,6 +111,21 @@ Route::middleware('jwt')->group(function () {
     
     // Standard CRUD operations
     Route::apiResource('images', ImageController::class);
+});
+
+// ============================================
+// SECRETARY MANAGEMENT ROUTES (JWT required)
+// Only clinic_super_doctor can access these
+// ============================================
+Route::middleware('jwt')->prefix('secretaries')->group(function () {
+    Route::get('/available-permissions', [SecretaryController::class, 'availablePermissions'])->name('secretaries.available-permissions');
+    Route::get('/', [SecretaryController::class, 'index'])->name('secretaries.index');
+    Route::post('/', [SecretaryController::class, 'store'])->name('secretaries.store');
+    Route::get('/{secretary}', [SecretaryController::class, 'show'])->name('secretaries.show');
+    Route::put('/{secretary}', [SecretaryController::class, 'update'])->name('secretaries.update');
+    Route::delete('/{secretary}', [SecretaryController::class, 'destroy'])->name('secretaries.destroy');
+    Route::patch('/{secretary}/permissions', [SecretaryController::class, 'updatePermissions'])->name('secretaries.update-permissions');
+    Route::patch('/{secretary}/toggle-status', [SecretaryController::class, 'toggleStatus'])->name('secretaries.toggle-status');
 });
 
 // ============================================
