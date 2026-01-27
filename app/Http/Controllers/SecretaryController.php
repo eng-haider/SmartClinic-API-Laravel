@@ -14,7 +14,10 @@ class SecretaryController extends Controller
 {
     public function __construct(private SecretaryRepository $secretaryRepository)
     {
-        // Only clinic_super_doctor can access these endpoints
+        $this->middleware('permission:view-clinic-users')->only(['index', 'show', 'availablePermissions']);
+        $this->middleware('permission:create-user')->only(['store']);
+        $this->middleware('permission:edit-user')->only(['update', 'updatePermissions', 'toggleStatus']);
+        $this->middleware('permission:delete-user')->only(['destroy']);
     }
 
     /**
@@ -31,13 +34,6 @@ class SecretaryController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = Auth::user();
-        
-        if (!$user->clinic_id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User does not belong to any clinic',
-            ], 403);
-        }
         
         $filters = [
             'search' => $request->input('search'),
@@ -82,13 +78,6 @@ class SecretaryController extends Controller
         try {
             $user = Auth::user();
             
-            if (!$user->clinic_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User does not belong to any clinic',
-                ], 403);
-            }
-            
             $secretary = $this->secretaryRepository->create(
                 $request->validated(),
                 $user->clinic_id
@@ -118,13 +107,6 @@ class SecretaryController extends Controller
     public function show(int $id): JsonResponse
     {
         $user = Auth::user();
-        
-        if (!$user->clinic_id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User does not belong to any clinic',
-            ], 403);
-        }
         
         $secretary = $this->secretaryRepository->findInClinic($id, $user->clinic_id);
 
@@ -159,13 +141,6 @@ class SecretaryController extends Controller
     {
         try {
             $user = Auth::user();
-            
-            if (!$user->clinic_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User does not belong to any clinic',
-                ], 403);
-            }
             
             $secretary = $this->secretaryRepository->findInClinic($id, $user->clinic_id);
 
@@ -209,13 +184,6 @@ class SecretaryController extends Controller
     {
         try {
             $user = Auth::user();
-            
-            if (!$user->clinic_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User does not belong to any clinic',
-                ], 403);
-            }
             
             $secretary = $this->secretaryRepository->findInClinic($id, $user->clinic_id);
 
@@ -264,13 +232,6 @@ class SecretaryController extends Controller
         try {
             $user = Auth::user();
             
-            if (!$user->clinic_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User does not belong to any clinic',
-                ], 403);
-            }
-            
             $secretary = $this->secretaryRepository->findInClinic($id, $user->clinic_id);
 
             if (!$secretary) {
@@ -307,13 +268,6 @@ class SecretaryController extends Controller
     {
         try {
             $user = Auth::user();
-            
-            if (!$user->clinic_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User does not belong to any clinic',
-                ], 403);
-            }
             
             $secretary = $this->secretaryRepository->findInClinic($id, $user->clinic_id);
 

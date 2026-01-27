@@ -17,10 +17,10 @@ class DoctorController extends Controller
     public function __construct(private DoctorRepository $doctorRepository)
     {
         // Uncomment when permissions are set up
-        // $this->middleware('permission:view-doctors')->only(['index', 'show']);
-        // $this->middleware('permission:create-doctor')->only(['store']);
-        // $this->middleware('permission:edit-doctor')->only(['update']);
-        // $this->middleware('permission:delete-doctor')->only(['destroy']);
+        $this->middleware('permission:view-doctors')->only(['index', 'show']);
+        $this->middleware('permission:create-doctor')->only(['store']);
+        $this->middleware('permission:edit-doctor')->only(['update']);
+        $this->middleware('permission:delete-doctor')->only(['destroy']);
     }
 
     /**

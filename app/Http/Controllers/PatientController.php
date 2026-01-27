@@ -16,12 +16,12 @@ class PatientController extends Controller
      */
     public function __construct(private PatientRepository $patientRepository)
     {
-        // $this->middleware('permission:view-clinic-patients')->only(['index']);
-        // $this->middleware('permission:create-patient')->only(['store']);
-        // $this->middleware('permission:view-clinic-patients')->only(['show']);
-        // $this->middleware('permission:edit-patient')->only(['update']);
-        // $this->middleware('permission:delete-patient')->only(['destroy']);
-        // $this->middleware('permission:search-patient')->only(['searchByPhone', 'searchByEmail']);
+        $this->middleware('permission:view-clinic-patients')->only(['index']);
+        $this->middleware('permission:create-patient')->only(['store']);
+        $this->middleware('permission:view-clinic-patients')->only(['show']);
+        $this->middleware('permission:edit-patient')->only(['update']);
+        $this->middleware('permission:delete-patient')->only(['destroy']);
+        $this->middleware('permission:search-patient')->only(['searchByPhone', 'searchByEmail']);
     }
 
     /**

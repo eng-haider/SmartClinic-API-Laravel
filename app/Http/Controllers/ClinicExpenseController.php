@@ -16,10 +16,10 @@ class ClinicExpenseController extends Controller
      */
     public function __construct(private ClinicExpenseRepository $repository)
     {
-        // $this->middleware('permission:view-clinic-expenses')->only(['index', 'show', 'statistics']);
-        // $this->middleware('permission:create-expense')->only(['store']);
-        // $this->middleware('permission:edit-expense')->only(['update', 'markAsPaid', 'markAsUnpaid']);
-        // $this->middleware('permission:delete-expense')->only(['destroy']);
+        $this->middleware('permission:view-clinic-expenses')->only(['index', 'show', 'statistics']);
+        $this->middleware('permission:create-expense')->only(['store']);
+        $this->middleware('permission:edit-expense')->only(['update', 'markAsPaid', 'markAsUnpaid']);
+        $this->middleware('permission:delete-expense')->only(['destroy']);
     }
 
     /**

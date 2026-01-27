@@ -62,6 +62,24 @@ return [
                 'edit-recipe-item',
                 'delete-recipe-item',
 
+                // Clinic Expenses
+                'view-clinic-expenses',
+                'create-expense',
+                'edit-expense',
+                'delete-expense',
+
+                // Doctor Management
+                'view-doctors',
+                'create-doctor',
+                'edit-doctor',
+                'delete-doctor',
+
+                // Images
+                'view-images',
+                'create-image',
+                'edit-image',
+                'delete-image',
+
                 // System management
                 'manage-permissions',
                 'manage-roles',
@@ -124,6 +142,27 @@ return [
                 'create-recipe-item',
                 'edit-recipe-item',
                 'delete-recipe-item',
+
+                // Clinic Expenses
+                'view-clinic-expenses',
+                'create-expense',
+                'edit-expense',
+                'delete-expense',
+
+                // Doctor Management
+                'view-doctors',
+                'create-doctor',
+                'edit-doctor',
+                'delete-doctor',
+
+                // Images
+                'view-images',
+                'create-image',
+                'edit-image',
+                'delete-image',
+
+                // Secretary Management
+                'delete-user',
             ],
         ],
 
@@ -175,6 +214,18 @@ return [
                 'create-recipe-item',
                 'edit-recipe-item',
                 'delete-recipe-item',
+
+                // Clinic Expenses
+                'view-clinic-expenses',
+
+                // Doctor Management - view only
+                'view-doctors',
+
+                // Images
+                'view-images',
+                'create-image',
+                'edit-image',
+                'delete-image',
             ],
         ],
 
@@ -208,6 +259,15 @@ return [
                 // Notes
                 'view-notes',
                 'create-note',
+
+                // Clinic Expenses - view only
+                'view-clinic-expenses',
+
+                // Doctor Management - view only
+                'view-doctors',
+
+                // Images - view only
+                'view-images',
             ],
         ],
     ],

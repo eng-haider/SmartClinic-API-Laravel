@@ -16,10 +16,10 @@ class CaseCategoryController extends Controller
      */
     public function __construct(private CaseCategoryRepository $caseCategoryRepository)
     {
-        // $this->middleware('permission:view-clinic-cases')->only(['index', 'show']);
-        // $this->middleware('permission:create-case')->only(['store']);
-        // $this->middleware('permission:edit-case')->only(['update']);
-        // $this->middleware('permission:delete-case')->only(['destroy']);
+        $this->middleware('permission:view-clinic-cases')->only(['index', 'show']);
+        $this->middleware('permission:create-case')->only(['store']);
+        $this->middleware('permission:edit-case')->only(['update']);
+        $this->middleware('permission:delete-case')->only(['destroy']);
     }
 
     /**
