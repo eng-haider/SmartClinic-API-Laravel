@@ -18,7 +18,7 @@ class CaseResource extends JsonResource
             'id' => $this->id,
             'patient' => $this->when($this->relationLoaded('patient'), [
                 'id' => $this->patient_id,
-                'name' => $this->patient?->full_name ?? 'N/A',
+                'name' => $this->patient?->name ?? 'N/A',
                 'phone' => $this->patient?->phone ?? 'N/A',
             ]),
             'doctor' => $this->when($this->relationLoaded('doctor'), [
