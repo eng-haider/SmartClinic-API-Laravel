@@ -43,9 +43,21 @@ class PatientResource extends JsonResource
             'clinic' => $this->whenLoaded('clinic'),
             'fromWhereCome' => $this->whenLoaded('fromWhereCome'),
             'cases' => $this->whenLoaded('cases'),
+            'recipes' => $this->whenLoaded('recipes'),
             'reservations' => $this->whenLoaded('reservations'),
             'bills' => $this->whenLoaded('bills'),
             'notes' => $this->whenLoaded('notes'),
+            'images' => $this->whenLoaded('images'),
+            'creator' => $this->whenLoaded('creator'),
+            'updator' => $this->whenLoaded('updator'),
+            
+            // Counts (when loaded with withCount)
+            'cases_count' => $this->when(isset($this->cases_count), $this->cases_count),
+            'recipes_count' => $this->when(isset($this->recipes_count), $this->recipes_count),
+            'reservations_count' => $this->when(isset($this->reservations_count), $this->reservations_count),
+            'bills_count' => $this->when(isset($this->bills_count), $this->bills_count),
+            'notes_count' => $this->when(isset($this->notes_count), $this->notes_count),
+            'images_count' => $this->when(isset($this->images_count), $this->images_count),
         ];
     }
 }
