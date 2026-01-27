@@ -50,7 +50,7 @@ class CaseRequest extends FormRequest
         $this->merge([
             'doctor_id' => $user->id,
             'clinic_id' => $user->clinic_id,
-            'status_id' => $this->status_id ?? 1,
+            'status_id' => $this->status_id ?? 2,
         ]);
     }
 
