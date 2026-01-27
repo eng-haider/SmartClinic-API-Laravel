@@ -48,7 +48,7 @@ class PatientRepository
                 'updated_at',
             ])
             ->allowedIncludes([
-                // Add relations here if needed
+            'cases',
             ]);
     }
 
