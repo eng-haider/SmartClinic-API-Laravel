@@ -80,6 +80,9 @@ return [
                 'edit-image',
                 'delete-image',
 
+                // Reports
+                'view-reports',
+
                 // System management
                 'manage-permissions',
                 'manage-roles',
@@ -161,6 +164,9 @@ return [
                 'edit-image',
                 'delete-image',
 
+                // Reports
+                'view-reports',
+
                 // Secretary Management
                 'delete-user',
             ],
@@ -226,6 +232,9 @@ return [
                 'create-image',
                 'edit-image',
                 'delete-image',
+
+                // Reports
+                'view-reports',
             ],
         ],
 
@@ -268,6 +277,9 @@ return [
 
                 // Images - view only
                 'view-images',
+
+                // Reports
+                'view-reports',
             ],
         ],
     ],
