@@ -239,48 +239,48 @@ return [
         ],
 
         'secretary' => [
-            // 'display_name' => 'Secretary',
-            // 'description' => 'Can manage patients and reservations, view basic information',
-            // 'permissions' => [
-            //     // Patient permissions
-            //     'view-clinic-patients',
-            //     'create-patient',
-            //     'edit-patient',
-            //     'search-patient',
+            'display_name' => 'Secretary',
+            'description' => 'Can manage patients and reservations, view basic information',
+            'permissions' => [
+                // // Patient permissions
+                // 'view-clinic-patients',
+                // 'create-patient',
+                // 'edit-patient',
+                // 'search-patient',
 
-            //     // Case permissions - view only
-            //     'view-clinic-cases',
+                // // Case permissions - view only
+                // 'view-clinic-cases',
 
-            //     // Bill permissions - view and create
-            //     'view-clinic-bills',
-            //     'create-bill',
-            //     'mark-bill-paid',
+                // // Bill permissions - view and create
+                // 'view-clinic-bills',
+                // 'create-bill',
+                // 'mark-bill-paid',
 
-            //     // Clinic permissions
-            //     'view-own-clinic',
+                // // Clinic permissions
+                // 'view-own-clinic',
 
-            //     // Reservations
-            //     'view-clinic-reservations',
-            //     'create-reservation',
-            //     'edit-reservation',
-            //     'delete-reservation',
+                // // Reservations
+                // 'view-clinic-reservations',
+                // 'create-reservation',
+                // 'edit-reservation',
+                // 'delete-reservation',
 
-            //     // Notes
-            //     'view-notes',
-            //     'create-note',
+                // // Notes
+                // 'view-notes',
+                // 'create-note',
 
-            //     // Clinic Expenses - view only
-            //     'view-clinic-expenses',
+                // // Clinic Expenses - view only
+                // 'view-clinic-expenses',
 
-            //     // Doctor Management - view only
-            //     'view-doctors',
+                // // Doctor Management - view only
+                // 'view-doctors',
 
-            //     // Images - view only
-            //     'view-images',
+                // // Images - view only
+                // 'view-images',
 
-            //     // Reports
-            //     'view-reports',
-            // ],
+                // // Reports
+                // 'view-reports',
+            ],
         ],
     ],
 ];
