@@ -16,7 +16,7 @@ class BillController extends Controller
      */
     public function __construct(private BillRepository $billRepository)
     {
-        $this->middleware('permission:view-all-bills,view-clinic-bills,view-own-bills')->only(['index', 'show', 'statistics']);
+        $this->middleware('permission:view-all-bills')->only(['index', 'show', 'statistics']);
         $this->middleware('permission:create-bill')->only(['store']);
         $this->middleware('permission:edit-bill')->only(['update', 'markAsPaid', 'markAsUnpaid']);
         $this->middleware('permission:delete-bill')->only(['destroy']);
