@@ -24,7 +24,7 @@ class BillRequest extends FormRequest
             'billable_id' => 'nullable|integer',
             'billable_type' => 'nullable|string|max:255',
             'price' => 'required|integer|min:0',
-            'is_paid' => 'nullable|boolean',
+            // 'is_paid' => 'nullable|boolean',
             // 'use_credit' => 'nullable|boolean',
             'doctor_id' => 'nullable|exists:users,id',
         ];
@@ -104,7 +104,7 @@ class BillRequest extends FormRequest
             'patient_id' => 'patient',
             'billable_id' => 'billable item',
             'billable_type' => 'billable type',
-            'is_paid' => 'payment status',
+            // 'is_paid' => 'payment status',
             'use_credit' => 'credit usage',
             'doctor_id' => 'doctor',
             'clinics_id' => 'clinic',

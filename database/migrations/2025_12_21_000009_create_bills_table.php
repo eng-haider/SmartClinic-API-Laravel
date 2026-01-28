@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('patient_id')->nullable();
             $table->morphs('billable'); // Creates billable_id and billable_type
-            $table->boolean('is_paid')->default(false);
+            $table->boolean('is_paid')->default(true);
             $table->bigInteger('price');
             $table->unsignedBigInteger('clinics_id')->nullable();
             $table->unsignedBigInteger('doctor_id')->nullable();
