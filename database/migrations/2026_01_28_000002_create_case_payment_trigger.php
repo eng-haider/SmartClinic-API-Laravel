@@ -16,13 +16,13 @@ return new class extends Migration
             AFTER INSERT ON bills
             FOR EACH ROW
             BEGIN
-                IF NEW.billable_type = "App\\\\Models\\\\CaseModel" THEN
+                IF NEW.billable_type = "App\\\\Models\\\\Case" THEN
                     UPDATE cases
                     SET is_paid = (
                         SELECT IF(SUM(CASE WHEN is_paid = 1 THEN price ELSE 0 END) >= cases.price, 1, 0)
                         FROM bills
                         WHERE bills.billable_id = NEW.billable_id
-                        AND bills.billable_type = "App\\\\Models\\\\CaseModel"
+                        AND bills.billable_type = "App\\\\Models\\\\Case"
                         AND bills.deleted_at IS NULL
                     )
                     WHERE id = NEW.billable_id;
@@ -35,13 +35,13 @@ return new class extends Migration
             AFTER UPDATE ON bills
             FOR EACH ROW
             BEGIN
-                IF NEW.billable_type = "App\\\\Models\\\\CaseModel" THEN
+                IF NEW.billable_type = "App\\\\Models\\\\Case" THEN
                     UPDATE cases
                     SET is_paid = (
                         SELECT IF(SUM(CASE WHEN is_paid = 1 THEN price ELSE 0 END) >= cases.price, 1, 0)
                         FROM bills
                         WHERE bills.billable_id = NEW.billable_id
-                        AND bills.billable_type = "App\\\\Models\\\\CaseModel"
+                        AND bills.billable_type = "App\\\\Models\\\\Case"
                         AND bills.deleted_at IS NULL
                     )
                     WHERE id = NEW.billable_id;
@@ -54,13 +54,13 @@ return new class extends Migration
             AFTER UPDATE ON bills
             FOR EACH ROW
             BEGIN
-                IF NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL AND NEW.billable_type = "App\\\\Models\\\\CaseModel" THEN
+                IF NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL AND NEW.billable_type = "App\\\\Models\\\\Case" THEN
                     UPDATE cases
                     SET is_paid = (
                         SELECT IF(COALESCE(SUM(CASE WHEN is_paid = 1 THEN price ELSE 0 END), 0) >= cases.price, 1, 0)
                         FROM bills
                         WHERE bills.billable_id = NEW.billable_id
-                        AND bills.billable_type = "App\\\\Models\\\\CaseModel"
+                        AND bills.billable_type = "App\\\\Models\\\\Case"
                         AND bills.deleted_at IS NULL
                     )
                     WHERE id = NEW.billable_id;
