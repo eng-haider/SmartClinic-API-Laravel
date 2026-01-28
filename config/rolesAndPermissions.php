@@ -106,8 +106,9 @@ return [
                 'edit-case',
                 'delete-case',
 
-                // Bill permissions - their clinic
-                'view-clinic-bills',
+              
+                // Bill permissions
+                'view-all-bills',
                 'create-bill',
                 'edit-bill',
                 'delete-bill',
