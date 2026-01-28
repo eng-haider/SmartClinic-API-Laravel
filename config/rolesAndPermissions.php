@@ -100,6 +100,8 @@ return [
                 'delete-patient',
                 'search-patient',
 
+
+                
                 // Case permissions - their clinic
                 'view-clinic-cases',
                 'create-case',

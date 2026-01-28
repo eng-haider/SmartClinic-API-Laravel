@@ -18,7 +18,7 @@ class RecipeController extends Controller
 
         // Permissions - secretary role has no access to recipes
         $this->middleware('permission:view-all-recipes')->only(['index']);
-        $this->middleware('permission:view-own-recipes')->only(['index']);
+        // $this->middleware('permission:view-own-recipes')->only(['index']);
         $this->middleware('permission:create-recipe')->only(['store']);
         $this->middleware('permission:edit-recipe')->only(['update']);
         $this->middleware('permission:delete-recipe')->only(['destroy']);
