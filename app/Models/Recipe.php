@@ -56,7 +56,7 @@ class Recipe extends Model
      */
     public function recipeItems()
     {
-        return $this->hasMany(RecipeItem::class);
+        return $this->hasMany(RecipeItem::class, 'recipes_id');
     }
 
     /**

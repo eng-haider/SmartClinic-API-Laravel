@@ -24,6 +24,7 @@ class RecipeItem extends Model
      */
     protected $fillable = [
         'name',
+        'recipes_id',
         'doctors_id',
         'clinics_id',
     ];
@@ -36,12 +37,21 @@ class RecipeItem extends Model
     protected function casts(): array
     {
         return [
+            'recipes_id' => 'integer',
             'doctors_id' => 'integer',
             'clinics_id' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Get the recipe that owns the recipe item.
+     */
+    public function recipe()
+    {
+        return $this->belongsTo(Recipe::class, 'recipes_id');
     }
 
     /**
