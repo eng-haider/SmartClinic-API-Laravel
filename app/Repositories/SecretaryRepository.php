@@ -89,7 +89,7 @@ class SecretaryRepository
         $updateData = [
             'name' => $data['name'],
             'phone' => $data['phone'],
-            'email' => $data['email'],
+            // 'email' => $data['email'],
             'is_active' => $data['is_active'] ?? $secretary->is_active,
         ];
 
