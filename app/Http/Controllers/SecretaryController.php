@@ -314,7 +314,8 @@ class SecretaryController extends Controller
             'data' => [
                 'grouped_permissions' => $grouped,
                 'base_role_permissions' => $base,
-                'note' => 'Base permissions (view-own-clinic, view-notes) are always granted via secretary role and cannot be removed.',
+                'all_permissions' => $this->secretaryRepository->getAllPermissions(),
+                'note' => 'Secretaries have no default permissions. All permissions must be assigned individually by clinic_super_doctor from the available list.',
             ],
         ]);
     }

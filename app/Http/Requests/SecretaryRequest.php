@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Repositories\SecretaryRepository;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -24,34 +25,14 @@ class SecretaryRequest extends FormRequest
         $secretaryId = $this->route('secretary');
         $isUpdating = $this->isMethod('PUT') || $this->isMethod('PATCH');
 
-        $availablePermissions = [
-            'view-clinic-patients',
-            'create-patient',
-            'edit-patient',
-            'delete-patient',
-            'search-patient',
-            'view-clinic-cases',
-            'create-case',
-            'edit-case',
-            'delete-case',
-            'view-clinic-bills',
-            'create-bill',
-            'edit-bill',
-            'delete-bill',
-            'mark-bill-paid',
-            'view-clinic-reservations',
-            'create-reservation',
-            'edit-reservation',
-            'delete-reservation',
-            'create-note',
-            'edit-note',
-            'delete-note',
-        ];
+        // Get available permissions from config (clinic_super_doctor permissions)
+        $secretaryRepository = app(SecretaryRepository::class);
+        $availablePermissions = $secretaryRepository->getAllPermissions();
 
         return [
             'name' => 'required|string|max:255',
             'email' => [
-                'required',
+                'nullable',
                 'email',
                 'max:255',
                 Rule::unique('users', 'email')->ignore($secretaryId),

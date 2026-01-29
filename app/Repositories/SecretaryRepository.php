@@ -64,7 +64,7 @@ class SecretaryRepository
         $secretary = User::create([
             'name' => $data['name'],
             'phone' => $data['phone'],
-            'email' => $data['email'],
+            // 'email' => $data['email'],
             'password' => Hash::make($data['password']),
             'clinic_id' => $clinicId,
             'is_active' => $data['is_active'] ?? true,
@@ -136,52 +136,59 @@ class SecretaryRepository
 
     /**
      * Get available permissions for secretary role
+     * Automatically fetches from clinic_super_doctor role permissions in config
      */
     public function getAvailablePermissions(): array
     {
-        return [
-            'patients' => [
-                'view-clinic-patients' => 'View all clinic patients',
-                'create-patient' => 'Create new patients',
-                'edit-patient' => 'Edit patient information',
-                'delete-patient' => 'Delete patients',
-                'search-patient' => 'Search patients',
-            ],
-            'cases' => [
-                'view-clinic-cases' => 'View all clinic cases',
-                'create-case' => 'Create new cases',
-                'edit-case' => 'Edit cases',
-                'delete-case' => 'Delete cases',
-            ],
-            'bills' => [
-                'view-clinic-bills' => 'View all clinic bills',
-                'create-bill' => 'Create new bills',
-                'edit-bill' => 'Edit bills',
-                'delete-bill' => 'Delete bills',
-                'mark-bill-paid' => 'Mark bills as paid',
-            ],
-            'reservations' => [
-                'view-clinic-reservations' => 'View all reservations',
-                'create-reservation' => 'Create new reservations',
-                'edit-reservation' => 'Edit reservations',
-                'delete-reservation' => 'Delete reservations',
-            ],
-            'notes' => [
-                'create-note' => 'Create notes',
-                'edit-note' => 'Edit notes',
-                'delete-note' => 'Delete notes',
-            ],
-        ];
+        // Get all permissions from clinic_super_doctor role
+        $allPermissions = config('rolesAndPermissions.roles.clinic_super_doctor.permissions', []);
+
+        // Group permissions by category for better UI organization
+        $groupedPermissions = [];
+
+        foreach ($allPermissions as $permission) {
+            // Extract category from permission name (e.g., 'view-clinic-patients' -> 'patients')
+            if (preg_match('/-(patient|case|bill|reservation|note|recipe|expense|doctor|image|report|user|clinic)s?$/i', $permission, $matches)) {
+                $category = $matches[1] . 's'; // pluralize
+                $groupedPermissions[$category][$permission] = $this->formatPermissionName($permission);
+            } elseif (strpos($permission, 'manage-') === 0) {
+                $groupedPermissions['system'][$permission] = $this->formatPermissionName($permission);
+            } else {
+                $groupedPermissions['general'][$permission] = $this->formatPermissionName($permission);
+            }
+        }
+
+        return $groupedPermissions;
     }
 
     /**
-     * Get base role permissions
+     * Format permission name for display
+     */
+    private function formatPermissionName(string $permission): string
+    {
+        // Convert 'view-clinic-patients' to 'View Clinic Patients'
+        return ucwords(str_replace('-', ' ', $permission));
+    }
+
+    /**
+     * Get all permissions from clinic_super_doctor role
+     */
+    public function getAllPermissions(): array
+    {
+        return config('rolesAndPermissions.roles.clinic_super_doctor.permissions', []);
+    }
+
+    /**
+     * Get base role permissions for secretary
+     * These are automatically granted via the secretary role
+     * Note: Secretary role has no base permissions by design - all permissions are custom assigned
      */
     public function getBaseRolePermissions(): array
     {
-        return [
-            'view-own-clinic',
-            'view-notes',
-        ];
+        $basePermissions = config('rolesAndPermissions.roles.secretary.permissions', []);
+        
+        // If no permissions in config, return empty array
+        // Secretaries get custom permissions assigned by clinic_super_doctor
+        return $basePermissions;
     }
 }

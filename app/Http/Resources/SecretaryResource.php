@@ -18,7 +18,7 @@ class SecretaryResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'phone' => $this->phone,
-            'email' => $this->email,
+            // 'email' => $this->email,
             'is_active' => $this->is_active,
             'role' => 'secretary',
             'all_permissions' => $this->getAllPermissions()->pluck('name'),
