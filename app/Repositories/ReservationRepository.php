@@ -85,6 +85,15 @@ class ReservationRepository
             $query->where('doctor_id', $doctorId);
         }
         
+        // Apply date range filters - between two dates
+        if (!empty($filters['from_date']) && !empty($filters['to_date'])) {
+            $query->whereBetween('reservation_start_date', [$filters['from_date'], $filters['to_date']]);
+        } elseif (!empty($filters['from_date'])) {
+            $query->where('reservation_start_date', '>=', $filters['from_date']);
+        } elseif (!empty($filters['to_date'])) {
+            $query->where('reservation_start_date', '<=', $filters['to_date']);
+        }
+        
         return $query->paginate($perPage);
     }
 
