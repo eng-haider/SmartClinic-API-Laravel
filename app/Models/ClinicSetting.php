@@ -48,6 +48,14 @@ class ClinicSetting extends Model
     }
 
     /**
+     * Get the setting definition.
+     */
+    public function definition()
+    {
+        return $this->belongsTo(SettingDefinition::class, 'setting_key', 'setting_key');
+    }
+
+    /**
      * Get the casted value of the setting.
      */
     public function getValue()

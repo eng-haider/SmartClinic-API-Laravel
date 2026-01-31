@@ -7,6 +7,8 @@ use App\Http\Controllers\CaseController;
 use App\Http\Controllers\CaseCategoryController;
 use App\Http\Controllers\ClinicExpenseController;
 use App\Http\Controllers\ClinicExpenseCategoryController;
+use App\Http\Controllers\ClinicSettingController;
+use App\Http\Controllers\SettingDefinitionController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\RecipeController;
 use App\Http\Controllers\DoctorController;
@@ -100,6 +102,33 @@ Route::middleware('jwt')->group(function () {
 Route::middleware('jwt')->group(function () {
     Route::apiResource('notes', NoteController::class);
     Route::get('notes/{noteableType}/{noteableId}', [NoteController::class, 'byNoteable'])->name('notes.by-noteable');
+});
+
+// ============================================
+// SETTING DEFINITIONS ROUTES (Super Admin Only)
+// Super Admin defines what settings exist for all clinics
+// ============================================
+Route::middleware('jwt')->prefix('setting-definitions')->group(function () {
+    Route::get('/', [SettingDefinitionController::class, 'index'])->name('setting-definitions.index');
+    Route::post('/', [SettingDefinitionController::class, 'store'])->name('setting-definitions.store');
+    Route::get('/categories', [SettingDefinitionController::class, 'categories'])->name('setting-definitions.categories');
+    Route::get('/types', [SettingDefinitionController::class, 'types'])->name('setting-definitions.types');
+    Route::post('/sync-all', [SettingDefinitionController::class, 'syncAll'])->name('setting-definitions.sync-all');
+    Route::get('/{id}', [SettingDefinitionController::class, 'show'])->name('setting-definitions.show');
+    Route::put('/{id}', [SettingDefinitionController::class, 'update'])->name('setting-definitions.update');
+    Route::delete('/{id}', [SettingDefinitionController::class, 'destroy'])->name('setting-definitions.destroy');
+});
+
+// ============================================
+// CLINIC SETTINGS ROUTES (JWT required)
+// Doctors can UPDATE their clinic settings values
+// ============================================
+Route::middleware('jwt')->prefix('clinic-settings')->group(function () {
+    Route::get('/', [ClinicSettingController::class, 'index'])->name('clinic-settings.index');
+    Route::get('/{key}', [ClinicSettingController::class, 'show'])->name('clinic-settings.show');
+    Route::put('/{key}', [ClinicSettingController::class, 'update'])->name('clinic-settings.update');
+    Route::post('/bulk-update', [ClinicSettingController::class, 'updateBulk'])->name('clinic-settings.bulk-update');
+    Route::post('/upload-logo', [ClinicSettingController::class, 'uploadLogo'])->name('clinic-settings.upload-logo');
 });
 
 // Protected image routes (JWT required)

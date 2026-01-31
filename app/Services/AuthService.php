@@ -16,8 +16,10 @@ class AuthService
     /**
      * Create a new service instance
      */
-    public function __construct(private UserRepository $userRepository)
-    {
+    public function __construct(
+        private UserRepository $userRepository,
+        private ClinicSettingService $clinicSettingService
+    ) {
     }
 
     /**
@@ -46,14 +48,8 @@ class AuthService
                 'email' => $data['clinic_email'] ?? null,
             ]);
 
-            // Create clinic settings
-            ClinicSetting::create([
-                'clinic_id' => $clinic->id,
-                'currency' => 'USD',
-                'timezone' => 'UTC',
-                'date_format' => 'Y-m-d',
-                'time_format' => 'H:i',
-            ]);
+            // Create default settings for the clinic from setting definitions
+            $this->clinicSettingService->createDefaultSettingsForClinic($clinic);
 
             // Hash password
             $userData = [

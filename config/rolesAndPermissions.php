@@ -32,6 +32,13 @@ return [
                 'edit-clinic',
                 'delete-clinic',
 
+                // Clinic Settings
+                'view-clinic-settings',
+                'edit-clinic-settings',
+
+                // Setting Definitions (Super Admin only)
+                'manage-setting-definitions',
+
                 // User management
                 'view-all-users',
                 'create-user',
@@ -120,6 +127,10 @@ return [
                 'view-own-clinic',
                 'edit-clinic',
 
+                // Clinic Settings
+                'view-clinic-settings',
+                'edit-clinic-settings',
+
                 // User management - their clinic
                 'view-clinic-users',
                 'create-user',
@@ -198,6 +209,9 @@ return [
 
                 // Clinic permissions
                 'view-own-clinic',
+
+                // Clinic Settings - view only
+                'view-clinic-settings',
 
                 // User management - view only
                 'view-clinic-users',
