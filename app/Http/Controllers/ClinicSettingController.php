@@ -117,13 +117,14 @@ class ClinicSettingController extends Controller
     /**
      * Update multiple clinic settings at once.
      * Only updates existing settings, does not create new ones.
+     * Settings without a value will be skipped.
      */
     public function updateBulk(Request $request): JsonResponse
     {
         $request->validate([
             'settings' => 'required|array',
             'settings.*.key' => 'required|string',
-            'settings.*.value' => 'required',
+            'settings.*.value' => 'nullable',
         ]);
 
         try {
@@ -132,6 +133,11 @@ class ClinicSettingController extends Controller
             $skipped = [];
 
             foreach ($request->input('settings') as $settingData) {
+                // Skip settings without a value (null or not provided)
+                if (!array_key_exists('value', $settingData) || $settingData['value'] === null) {
+                    continue;
+                }
+                
                 $setting = $this->clinicSettingRepository->updateValue(
                     $clinicId,
                     $settingData['key'],
