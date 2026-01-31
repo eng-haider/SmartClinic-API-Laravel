@@ -16,7 +16,7 @@ class CaseController extends Controller
      */
     public function __construct(private CaseRepository $caseRepository)
     {
-        $this->middleware('permission:view-clinic-cases|create-bill')->only(['index']);
+        // index method will check permissions inside the method
         $this->middleware('permission:create-case')->only(['store']);
         $this->middleware('permission:view-clinic-cases')->only(['show']);
         $this->middleware('permission:edit-case')->only(['update']);
@@ -28,6 +28,15 @@ class CaseController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        // Check if user has either permission
+        $user = Auth::user();
+        if (!$user->hasPermissionTo('view-clinic-cases') && !$user->hasPermissionTo('create-bill')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You need either view-clinic-cases or create-bill permission.',
+            ], 403);
+        }
+
         $filters = $request->only([
             'search',
             'filter',
