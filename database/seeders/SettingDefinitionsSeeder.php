@@ -292,7 +292,7 @@ class SettingDefinitionsSeeder extends Seeder
             ],
 
             // ========================
-            // DENTAL/MEDICAL CATEGORY
+            // MEDICAL/DENTAL CATEGORY
             // ========================
             [
                 'setting_key' => 'tooth_condition_colors',
@@ -336,8 +336,8 @@ class SettingDefinitionsSeeder extends Seeder
                     ],
                 ]),
                 'description' => 'Tooth condition colors for dental charts (doctors can customize names)',
-                'category' => 'general',
-                'display_order' => 10,
+                'category' => 'medical',
+                'display_order' => 1,
                 'is_required' => false,
             ],
             [
@@ -402,8 +402,8 @@ class SettingDefinitionsSeeder extends Seeder
                     ],
                 ]),
                 'description' => 'Available tooth status options for dental records',
-                'category' => 'general',
-                'display_order' => 11,
+                'category' => 'medical',
+                'display_order' => 2,
                 'is_required' => false,
             ],
         ];

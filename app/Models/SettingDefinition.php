@@ -96,6 +96,7 @@ class SettingDefinition extends Model
             'financial' => 'Financial Settings',
             'display' => 'Display Settings',
             'social' => 'Social Media',
+            'medical' => 'Medical/Dental Settings',
         ];
     }
 
