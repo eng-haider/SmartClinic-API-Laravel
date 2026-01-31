@@ -34,6 +34,12 @@ class PatientResource extends JsonResource
             'credit_balance' => $this->credit_balance,
             'credit_balance_add_at' => $this->credit_balance_add_at?->format('Y-m-d H:i:s'),
             'tooth_details' => $this->tooth_details,
+            
+            // Public profile fields
+            'public_token' => $this->public_token,
+            'is_public_profile_enabled' => $this->is_public_profile_enabled,
+            'public_profile_url' => $this->public_profile_url,
+            
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
             'deleted_at' => $this->deleted_at?->format('Y-m-d H:i:s'),

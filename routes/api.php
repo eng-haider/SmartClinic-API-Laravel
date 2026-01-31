@@ -15,6 +15,8 @@ use App\Http\Controllers\DoctorController;
 use App\Http\Controllers\SecretaryController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\ImageController;
+use App\Http\Controllers\PublicPatientController;
+use App\Http\Controllers\PatientPublicProfileController;
 use App\Http\Controllers\Report\BillReportController;
 use App\Http\Controllers\Report\DashboardReportController;
 use App\Http\Controllers\Report\PatientReportController;
@@ -22,6 +24,17 @@ use App\Http\Controllers\Report\CaseReportController;
 use App\Http\Controllers\Report\ReservationReportController;
 use App\Http\Controllers\Report\FinancialReportController;
 use Illuminate\Support\Facades\Route;
+
+// ============================================
+// PUBLIC PATIENT PROFILE ROUTES (No authentication required)
+// These routes are accessed via QR code scanning
+// ============================================
+Route::prefix('public/patients')->group(function () {
+    Route::get('/{token}', [PublicPatientController::class, 'show'])->name('public.patients.show');
+    Route::get('/{token}/cases', [PublicPatientController::class, 'cases'])->name('public.patients.cases');
+    Route::get('/{token}/images', [PublicPatientController::class, 'images'])->name('public.patients.images');
+    Route::get('/{token}/reservations', [PublicPatientController::class, 'reservations'])->name('public.patients.reservations');
+});
 
 // Public auth routes (no authentication required)
 Route::post('auth/register', [AuthController::class, 'register']);
@@ -41,6 +54,13 @@ Route::middleware('jwt')->group(function () {
     Route::get('patients/search/phone/{phone}', [PatientController::class, 'searchByPhone'])->name('patients.search.phone');
     Route::get('patients/search/email/{email}', [PatientController::class, 'searchByEmail'])->name('patients.search.email');
     Route::put('patients/{id}/tooth-details', [PatientController::class, 'updateToothDetails'])->name('patients.update-tooth-details');
+    
+    // Patient Public Profile Management
+    Route::get('patients/{id}/public-profile', [PatientPublicProfileController::class, 'getPublicProfile'])->name('patients.public-profile');
+    Route::post('patients/{id}/public-profile/enable', [PatientPublicProfileController::class, 'enablePublicProfile'])->name('patients.public-profile.enable');
+    Route::post('patients/{id}/public-profile/disable', [PatientPublicProfileController::class, 'disablePublicProfile'])->name('patients.public-profile.disable');
+    Route::post('patients/{id}/public-profile/regenerate-token', [PatientPublicProfileController::class, 'regenerateToken'])->name('patients.public-profile.regenerate-token');
+    Route::get('patients/{id}/qr-code', [PatientPublicProfileController::class, 'getQrCodeData'])->name('patients.qr-code');
 });
 
 // Protected case routes (JWT required)

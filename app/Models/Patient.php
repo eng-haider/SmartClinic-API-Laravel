@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class Patient extends Model
 {
@@ -36,6 +37,8 @@ class Patient extends Model
         'creator_id',
         'updator_id',
         'tooth_details',
+        'public_token',
+        'is_public_profile_enabled',
     ];
 
     /**
@@ -57,6 +60,7 @@ class Patient extends Model
             'creator_id' => 'integer',
             'updator_id' => 'integer',
             'tooth_details' => 'array',
+            'is_public_profile_enabled' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
@@ -70,8 +74,11 @@ class Patient extends Model
     {
         parent::boot();
 
-        // Automatically set creator_id when creating
+        // Automatically generate public_token when creating
         static::creating(function ($model) {
+            if (empty($model->public_token)) {
+                $model->public_token = Str::uuid()->toString();
+            }
             if (Auth::check()) {
                 $model->creator_id = Auth::id();
                 $model->updator_id = Auth::id();
@@ -200,5 +207,49 @@ class Patient extends Model
     public function updator()
     {
         return $this->belongsTo(User::class, 'updator_id');
+    }
+
+    /**
+     * Find a patient by their public token.
+     *
+     * @param string $token
+     * @return Patient|null
+     */
+    public static function findByPublicToken(string $token): ?Patient
+    {
+        return static::where('public_token', $token)
+            ->where('is_public_profile_enabled', true)
+            ->first();
+    }
+
+    /**
+     * Regenerate the public token.
+     *
+     * @return string
+     */
+    public function regeneratePublicToken(): string
+    {
+        $this->public_token = Str::uuid()->toString();
+        $this->save();
+
+        return $this->public_token;
+    }
+
+    /**
+     * Get the public profile URL.
+     *
+     * @return string
+     */
+    public function getPublicProfileUrlAttribute(): string
+    {
+        return config('app.url') . '/api/public/patients/' . $this->public_token;
+    }
+
+    /**
+     * Scope a query to only include patients with public profile enabled.
+     */
+    public function scopePublicEnabled($query)
+    {
+        return $query->where('is_public_profile_enabled', true);
     }
 }
