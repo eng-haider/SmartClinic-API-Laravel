@@ -84,9 +84,13 @@ class PublicPatientResource extends JsonResource
             'upcoming_reservations' => $this->whenLoaded('reservations', function () {
                 return $this->reservations->map(function ($reservation) {
                     return [
-                        'date' => $reservation->date,
-                        'time' => $reservation->time,
-                        'status' => $reservation->status,
+                        'date' => $reservation->reservation_start_date?->format('Y-m-d'),
+                        'time' => $reservation->reservation_from_time,
+                        'status' => $reservation->status ? [
+                            'name_en' => $reservation->status->name_en,
+                            'name_ar' => $reservation->status->name_ar,
+                            'color' => $reservation->status->color,
+                        ] : null,
                         'notes' => $reservation->notes,
                         'doctor' => $reservation->doctor ? [
                             'name' => $reservation->doctor->name,

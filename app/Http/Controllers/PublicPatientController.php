@@ -42,10 +42,10 @@ class PublicPatientController extends Controller
                     ->orderBy('created_at', 'desc');
             },
             'reservations' => function ($query) {
-                $query->select('id', 'patient_id', 'doctor_id', 'date', 'time', 'status', 'notes', 'created_at')
-                    ->where('date', '>=', now()->toDateString())
-                    ->orderBy('date', 'asc')
-                    ->with('doctor:id,name');
+                $query->select('id', 'patient_id', 'doctor_id', 'status_id', 'reservation_start_date', 'reservation_from_time', 'notes', 'created_at')
+                    ->where('reservation_start_date', '>=', now()->toDateString())
+                    ->orderBy('reservation_start_date', 'asc')
+                    ->with(['doctor:id,name', 'status:id,name_en,name_ar,color']);
             },
         ]);
 
@@ -160,10 +160,10 @@ class PublicPatientController extends Controller
         }
 
         $reservations = $patient->reservations()
-            ->with('doctor:id,name')
-            ->where('date', '>=', now()->toDateString())
-            ->orderBy('date', 'asc')
-            ->orderBy('time', 'asc')
+            ->with(['doctor:id,name', 'status:id,name_en,name_ar,color'])
+            ->where('reservation_start_date', '>=', now()->toDateString())
+            ->orderBy('reservation_start_date', 'asc')
+            ->orderBy('reservation_from_time', 'asc')
             ->get();
 
         return response()->json([
@@ -171,9 +171,13 @@ class PublicPatientController extends Controller
             'data' => $reservations->map(function ($reservation) {
                 return [
                     'id' => $reservation->id,
-                    'date' => $reservation->date,
-                    'time' => $reservation->time,
-                    'status' => $reservation->status,
+                    'date' => $reservation->reservation_start_date?->format('Y-m-d'),
+                    'time' => $reservation->reservation_from_time,
+                    'status' => $reservation->status ? [
+                        'name_en' => $reservation->status->name_en,
+                        'name_ar' => $reservation->status->name_ar,
+                        'color' => $reservation->status->color,
+                    ] : null,
                     'notes' => $reservation->notes,
                     'doctor' => $reservation->doctor ? [
                         'id' => $reservation->doctor->id,
