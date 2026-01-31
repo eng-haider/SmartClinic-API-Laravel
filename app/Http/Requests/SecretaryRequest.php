@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Repositories\SecretaryRepository;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -26,8 +25,7 @@ class SecretaryRequest extends FormRequest
         $isUpdating = $this->isMethod('PUT') || $this->isMethod('PATCH');
 
         // Get available permissions from config (clinic_super_doctor permissions)
-        $secretaryRepository = app(SecretaryRepository::class);
-        $availablePermissions = $secretaryRepository->getAllPermissions();
+        $availablePermissions = config('rolesAndPermissions.roles.clinic_super_doctor.permissions', []);
 
         return [
             'name' => 'required|string|max:255',

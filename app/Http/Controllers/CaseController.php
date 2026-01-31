@@ -16,7 +16,7 @@ class CaseController extends Controller
      */
     public function __construct(private CaseRepository $caseRepository)
     {
-        $this->middleware('permission:view-clinic-cases')->only(['index']);
+        $this->middleware('permission:view-clinic-cases|create-bill')->only(['index']);
         $this->middleware('permission:create-case')->only(['store']);
         $this->middleware('permission:view-clinic-cases')->only(['show']);
         $this->middleware('permission:edit-case')->only(['update']);
