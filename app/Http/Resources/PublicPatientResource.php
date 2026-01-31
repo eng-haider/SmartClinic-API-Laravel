@@ -34,7 +34,7 @@ class PublicPatientResource extends JsonResource
                 return [
                     'name' => $this->clinic->name,
                     'address' => $this->clinic->address,
-                    'phone' => $this->clinic->phone,
+                    'phone' => $this->clinic->whatsapp_phone,
                 ];
             }),
             
