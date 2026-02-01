@@ -3,6 +3,7 @@
 ## 🎯 The Difference Explained Simply
 
 ### Before (Single Database):
+
 ```
 Database: smartclinic
 ├── patients (clinic_id = 1, 2, 3...)
@@ -10,9 +11,11 @@ Database: smartclinic
 ├── bills (clinic_id = 1, 2, 3...)
 └── users (clinic_id = 1, 2, 3...)
 ```
+
 **Problem:** All clinics share ONE database, filter by `clinic_id`
 
-###  After (Multi-Tenancy):
+### After (Multi-Tenancy):
+
 ```
 Database: smartclinic_tenants (CENTRAL)
 ├── tenants (clinic info)
@@ -30,6 +33,7 @@ Database: tenant_clinic_noor (CLINIC 2)
 ├── bills (only clinic_noor data)
 └── users (only clinic_noor staff)
 ```
+
 **Benefit:** Each clinic has SEPARATE database - complete isolation!
 
 ---
@@ -50,6 +54,7 @@ foreach(\$tables as \$table) {
 ```
 
 **Output:**
+
 ```
 === CENTRAL DATABASE TABLES ===
 cache
@@ -85,6 +90,7 @@ echo 'Created: ' . \$tenant->name . PHP_EOL;
 ```
 
 **What Happens Automatically:**
+
 1. ✅ Record added to `tenants` table in central DB
 2. ✅ New database created: `tenant_clinic_baghdad`
 3. ✅ All 16 migrations run in the new database
@@ -109,6 +115,7 @@ foreach(\$databases as \$db) {
 ```
 
 **Output:**
+
 ```
 === TENANT DATABASES ===
 tenant_clinic_baghdad  ← NEW!
@@ -124,6 +131,7 @@ php artisan tenants:run clinic_baghdad --option="--execute=DB::select('SHOW TABL
 ```
 
 **Output:**
+
 ```
 Tables in tenant_clinic_baghdad:
 - users                        ← Clinic staff
@@ -136,16 +144,16 @@ Tables in tenant_clinic_baghdad:
 - images                       ← Medical images
 - clinic_settings              ← Clinic-specific settings
 - clinic_expenses              ← Expenses
-- clinic_expense_categories    
-- case_categories              
-- statuses                     
-- from_where_comes             
-- recipe_items                 
+- clinic_expense_categories
+- case_categories
+- statuses
+- from_where_comes
+- recipe_items
 - roles                        ← Clinic roles
 - permissions                  ← Clinic permissions
-- model_has_roles              
-- model_has_permissions        
-- role_has_permissions         
+- model_has_roles
+- model_has_permissions
+- role_has_permissions
 ```
 
 **Notice:** Complete isolated database for this clinic!
@@ -166,6 +174,7 @@ echo 'Created: ' . \$tenant->name . PHP_EOL;
 ```
 
 **Result:**
+
 - New database: `tenant_clinic_basra`
 - Completely separate from `tenant_clinic_baghdad`
 
@@ -173,7 +182,7 @@ echo 'Created: ' . \$tenant->name . PHP_EOL;
 
 ## 🔐 Data Isolation Example
 
-###  Add Patient to Clinic Baghdad
+### Add Patient to Clinic Baghdad
 
 ```bash
 # Using API with tenant header
@@ -181,7 +190,7 @@ POST /api/tenant/patients
 Headers:
   X-Tenant-ID: clinic_baghdad
   Authorization: Bearer {token}
-  
+
 Body:
 {
   "name": "أحمد محمد",
@@ -199,7 +208,7 @@ POST /api/tenant/patients
 Headers:
   X-Tenant-ID: clinic_basra
   Authorization: Bearer {token}
-  
+
 Body:
 {
   "name": "علي حسن",
@@ -210,7 +219,8 @@ Body:
 
 **Stored in:** `tenant_clinic_basra.patients`
 
-**Result:** 
+**Result:**
+
 - ✅ Two separate databases
 - ✅ Two separate patient records
 - ✅ No mixing of data!
@@ -253,16 +263,19 @@ Response Sent to User
 ## 🎓 Key Concepts
 
 ### 1. Central Database
+
 - **Purpose:** Manage clinics
 - **Contains:** Tenant info, domains, global settings
 - **Tables:** tenants, domains, users (admins), setting_definitions
 
 ### 2. Tenant Databases
+
 - **Purpose:** Store clinic data
 - **One per clinic:** Each clinic = separate database
 - **Contains:** patients, cases, bills, users (staff), etc.
 
 ### 3. Automatic Switching
+
 - **Header:** `X-Tenant-ID: clinic_xxx`
 - **Middleware:** Automatically switches database connection
 - **Transparent:** Your code doesn't change!
@@ -272,17 +285,19 @@ Response Sent to User
 ## 📝 Migration Comparison
 
 ### Central Migrations (6 files)
+
 ```bash
 database/migrations/
 ├── create_users_table.php           # Central admins
-├── create_cache_table.php           
-├── create_jobs_table.php            
+├── create_cache_table.php
+├── create_jobs_table.php
 ├── create_tenants_table.php         # ← Clinic info
 ├── create_domains_table.php         # ← Clinic domains
 └── create_setting_definitions_table.php  # ← Global catalog
 ```
 
 ### Tenant Migrations (16 files)
+
 ```bash
 database/migrations/tenant/
 ├── create_users_table.php           # Clinic staff
@@ -298,14 +313,14 @@ database/migrations/tenant/
 
 ## ✨ Benefits Summary
 
-| Aspect | Before | After |
-|--------|--------|-------|
-| **Data Isolation** | ❌ Shared DB, filter by clinic_id | ✅ Separate DB per clinic |
-| **Performance** | ❌ Slow queries (many clinic_ids) | ✅ Fast (only one clinic) |
-| **Security** | ⚠️ One breach = all clinics exposed | ✅ Breach affects only one clinic |
-| **Backup** | ❌ Must backup/restore all clinics | ✅ Backup/restore individual clinic |
-| **Scaling** | ⚠️ One large database | ✅ Distribute across servers |
-| **Customization** | ❌ Same schema for all | ✅ Can customize per clinic |
+| Aspect             | Before                              | After                               |
+| ------------------ | ----------------------------------- | ----------------------------------- |
+| **Data Isolation** | ❌ Shared DB, filter by clinic_id   | ✅ Separate DB per clinic           |
+| **Performance**    | ❌ Slow queries (many clinic_ids)   | ✅ Fast (only one clinic)           |
+| **Security**       | ⚠️ One breach = all clinics exposed | ✅ Breach affects only one clinic   |
+| **Backup**         | ❌ Must backup/restore all clinics  | ✅ Backup/restore individual clinic |
+| **Scaling**        | ⚠️ One large database               | ✅ Distribute across servers        |
+| **Customization**  | ❌ Same schema for all              | ✅ Can customize per clinic         |
 
 ---
 
