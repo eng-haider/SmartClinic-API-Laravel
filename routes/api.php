@@ -17,6 +17,7 @@ use App\Http\Controllers\NoteController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\PublicPatientController;
 use App\Http\Controllers\PatientPublicProfileController;
+use App\Http\Controllers\TenantController;
 use App\Http\Controllers\Report\BillReportController;
 use App\Http\Controllers\Report\DashboardReportController;
 use App\Http\Controllers\Report\PatientReportController;
@@ -24,6 +25,22 @@ use App\Http\Controllers\Report\CaseReportController;
 use App\Http\Controllers\Report\ReservationReportController;
 use App\Http\Controllers\Report\FinancialReportController;
 use Illuminate\Support\Facades\Route;
+
+// ============================================
+// TENANT MANAGEMENT ROUTES (Central Database)
+// These routes manage clinics/tenants
+// ============================================
+Route::prefix('tenants')->group(function () {
+    Route::get('/', [TenantController::class, 'index'])->name('tenants.index');
+    Route::post('/', [TenantController::class, 'store'])->name('tenants.store');
+    Route::get('/{id}', [TenantController::class, 'show'])->name('tenants.show');
+    Route::put('/{id}', [TenantController::class, 'update'])->name('tenants.update');
+    Route::delete('/{id}', [TenantController::class, 'destroy'])->name('tenants.destroy');
+    Route::get('/{id}/domains', [TenantController::class, 'domains'])->name('tenants.domains');
+    Route::post('/{id}/domains', [TenantController::class, 'addDomain'])->name('tenants.add-domain');
+    Route::post('/{id}/migrate', [TenantController::class, 'migrate'])->name('tenants.migrate');
+    Route::post('/{id}/seed', [TenantController::class, 'seed'])->name('tenants.seed');
+});
 
 // ============================================
 // PUBLIC PATIENT PROFILE ROUTES (No authentication required)
