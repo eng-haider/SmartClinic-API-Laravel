@@ -11,6 +11,7 @@
 ## 📁 New Structure
 
 ### Central Database Migrations (8 files)
+
 Location: `database/migrations/`
 
 **Purpose:** Tables that exist in the central database only
@@ -27,6 +28,7 @@ Location: `database/migrations/`
 ```
 
 ### Tenant Database Migrations (16 files)
+
 Location: `database/migrations/tenant/`
 
 **Purpose:** Tables that are created in each clinic's isolated database
@@ -51,6 +53,7 @@ Location: `database/migrations/tenant/`
 ```
 
 ### Archived Migrations (33 files)
+
 Location: `database/migrations/archived_pre_tenancy/`
 
 **Purpose:** Old migrations from before tenancy implementation (kept for reference)
@@ -60,6 +63,7 @@ Location: `database/migrations/archived_pre_tenancy/`
 ## 🔄 What Changed
 
 ### Moved to Archive
+
 - All old table creation migrations for tenant-specific tables
 - All incremental update/alter migrations
 - Old `create_clinics_table.php` (replaced by tenants table)
@@ -67,6 +71,7 @@ Location: `database/migrations/archived_pre_tenancy/`
 Total: **33 migration files** moved to archive
 
 ### Why These Were Moved
+
 1. **Duplication:** Same tables existed in both central and tenant migrations
 2. **Wrong Location:** Tenant tables (patients, cases, etc.) were being created in central DB
 3. **Clean Slate:** Tenant migrations now have complete, final schema without incremental updates
@@ -75,22 +80,25 @@ Total: **33 migration files** moved to archive
 
 ## 🎯 Benefits
 
-| Before | After |
-|--------|-------|
-| ❌ Confusing duplicates | ✅ Clear separation |
+| Before                         | After                               |
+| ------------------------------ | ----------------------------------- |
+| ❌ Confusing duplicates        | ✅ Clear separation                 |
 | ❌ Tenant tables in central DB | ✅ Tenant tables only in tenant DBs |
-| ❌ 41 central migrations | ✅ 8 central migrations |
-| ❌ Hard to understand | ✅ Easy to understand |
+| ❌ 41 central migrations       | ✅ 8 central migrations             |
+| ❌ Hard to understand          | ✅ Easy to understand               |
 
 ---
 
 ## 📊 Migration Commands
 
 ### For Central Database
+
 ```bash
 php artisan migrate
 ```
+
 Creates:
+
 - users (central)
 - cache
 - jobs
@@ -99,10 +107,13 @@ Creates:
 - setting_definitions
 
 ### For Tenant Databases
+
 ```bash
 php artisan tenants:migrate
 ```
+
 Creates (in each tenant DB):
+
 - users (clinic staff)
 - patients
 - cases
@@ -130,11 +141,13 @@ No functionality lost - just better organized! 🎉
 ## 🚀 Next Steps
 
 1. Test migrations on fresh database:
+
    ```bash
    php artisan migrate:fresh
    ```
 
 2. Create a test tenant:
+
    ```bash
    POST /api/tenants
    {"name": "Test Clinic"}

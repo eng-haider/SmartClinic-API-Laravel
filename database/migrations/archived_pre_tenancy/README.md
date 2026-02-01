@@ -6,9 +6,10 @@ This folder contains migrations that were used **before** the multi-tenancy syst
 
 ## Why were these moved?
 
-These migrations created tenant-specific tables (patients, cases, bills, etc.) in the **central database**. 
+These migrations created tenant-specific tables (patients, cases, bills, etc.) in the **central database**.
 
 After implementing multi-tenancy:
+
 - Each clinic gets its own **separate database**
 - Tenant-specific tables should be created in **tenant databases**, not the central one
 - Clean tenant migrations are now in `database/migrations/tenant/`
@@ -16,6 +17,7 @@ After implementing multi-tenancy:
 ## Files in this folder:
 
 ### Table Creation Migrations (now in tenant folder)
+
 - `create_patients_table.php`
 - `create_cases_table.php`
 - `create_bills_table.php`
@@ -34,9 +36,11 @@ After implementing multi-tenancy:
 - `create_clinics_table.php` - Now replaced by `tenants` table
 
 ### Update/Alter Migrations (consolidated in tenant migrations)
+
 All the update migrations that modified tenant tables:
+
 - Patient table updates
-- Case table updates  
+- Case table updates
 - Bill table updates
 - Reservation table updates
 - Recipe table updates
@@ -47,6 +51,7 @@ These are **not needed** anymore because the tenant migrations in `database/migr
 ## Can I delete these?
 
 **Not recommended immediately!** Keep them for reference in case:
+
 1. You need to understand the evolution of the schema
 2. You have existing production data that needs migration
 3. You want to compare old vs new structure
@@ -56,6 +61,7 @@ After you've successfully migrated all data and the tenancy system is stable in 
 ## Migration Path
 
 **Old System (Pre-Tenancy):**
+
 ```
 Single Database
 ├── patients (all clinics)
@@ -65,6 +71,7 @@ Single Database
 ```
 
 **New System (Multi-Tenancy):**
+
 ```
 Central Database
 ├── tenants (clinic info)
