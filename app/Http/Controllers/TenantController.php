@@ -124,10 +124,16 @@ class TenantController extends Controller
                 }
             }
             
+            // Store database credentials for Hostinger (one user per database)
+            $databaseName = config('tenancy.database.prefix') . $validated['id'];
+            $tenant->setAttribute('db_name', $databaseName);
+            $tenant->setAttribute('db_username', $databaseName); // On Hostinger, username = database name
+            $tenant->setAttribute('db_password', env('TENANT_DB_PASSWORD'));
+            
             $tenant->saveQuietly();
             $tenant->refresh();
             
-            Log::info('Tenant created with ID:', ['id' => $tenant->id]);
+            Log::info('Tenant created with ID:', ['id' => $tenant->id, 'db_name' => $databaseName]);
             
             // Step 2.5: Create clinic record in central database (mirror of tenant)
             $clinic = Clinic::on($centralConnection)->create([
@@ -172,106 +178,84 @@ class TenantController extends Controller
         
         // Step 4: Setup tenant database (assumes database already exists on shared hosting)
         try {
-            $databaseName = config('tenancy.database.prefix') . $tenant->id;
+            // Get database credentials from tenant record (or use defaults)
+            $databaseName = $tenant->db_name ?? (config('tenancy.database.prefix') . $tenant->id);
+            $tenantUsername = $tenant->db_username ?? $databaseName;
+            $tenantPassword = $tenant->db_password ?? env('TENANT_DB_PASSWORD');
             
-            // Check if we should create database (only on local/VPS environments)
-            $autoCreateDatabase = config('tenancy.auto_create_database', false);
+            $centralConfig = config('database.connections.' . $centralConnection);
             
-            if ($autoCreateDatabase) {
-                try {
-                    // Create the database (only works on VPS/local with proper permissions)
-                    DB::statement("CREATE DATABASE `{$databaseName}`");
-                    Log::info('Database created:', ['database' => $databaseName]);
-                } catch (\Exception $e) {
-                    Log::warning('Could not auto-create database (expected on shared hosting):', [
-                        'database' => $databaseName,
-                        'error' => $e->getMessage()
-                    ]);
-                }
-            } else {
-                Log::info('Skipping auto database creation (using pre-created database):', ['database' => $databaseName]);
-            }
+            // Configure the tenant connection dynamically
+            config([
+                'database.connections.tenant.database' => $databaseName,
+                'database.connections.tenant.username' => $tenantUsername,
+                'database.connections.tenant.password' => $tenantPassword,
+                'database.connections.tenant.host' => $centralConfig['host'],
+                'database.connections.tenant.port' => $centralConfig['port'],
+            ]);
             
+            // Purge and reconnect
+            DB::purge('tenant');
             
-            // Verify database exists by attempting to connect
-            // On Hostinger, each tenant DB has its own user (same name as database)
+            // Test the connection
             try {
-                $centralConfig = config('database.connections.' . $centralConnection);
-                
-                // On Hostinger: username = database name, use TENANT_DB_PASSWORD
-                $tenantUsername = $databaseName;
-                $tenantPassword = env('TENANT_DB_PASSWORD', $centralConfig['password']);
-                
-                // Test connection with tenant-specific credentials
-                $pdo = new \PDO(
-                    "mysql:host={$centralConfig['host']};port={$centralConfig['port']};dbname={$databaseName}",
-                    $tenantUsername,
-                    $tenantPassword,
-                    [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]
-                );
-                
-                Log::info('Database connection verified:', [
+                DB::connection('tenant')->getPdo();
+                Log::info('Tenant database connection verified:', [
                     'database' => $databaseName,
                     'username' => $tenantUsername
                 ]);
             } catch (\Exception $e) {
-                // Provide helpful error message for shared hosting
-                $errorMessage = "Database '{$databaseName}' does not exist or cannot be accessed. " .
-                    "On shared hosting (Hostinger): " .
-                    "(1) Go to hosting panel → Databases → MySQL Databases. " .
-                    "(2) Create database with exact name: {$databaseName}. " .
-                    "(3) Create database user with same name: {$databaseName}. " .
-                    "(4) Set password to match TENANT_DB_PASSWORD in .env. " .
-                    "(5) Try creating the tenant again. " .
-                    "Original error: " . $e->getMessage();
-                
+                $errorMessage = "Database '{$databaseName}' cannot be accessed. " .
+                    "On Hostinger: (1) Create database: {$databaseName}. " .
+                    "(2) Username should be: {$databaseName}. " .
+                    "(3) Password should match TENANT_DB_PASSWORD in .env. " .
+                    "Error: " . $e->getMessage();
                 throw new \Exception($errorMessage);
             }
             
-            // Step 5: Run migrations and create user in tenant database
-            $userPassword = $validated['user_password']; // Store password before closure
+            // Step 5: Run migrations directly on tenant connection (bypass Stancl)
+            $userPassword = $validated['user_password'];
             
-            $tenant->run(function() use ($validated, $userPassword) {
-                // Run tenant migrations
-                Artisan::call('migrate', [
-                    '--path' => 'database/migrations/tenant',
-                    '--force' => true,
-                ]);
-                
-                // Clear cache
-                try {
-                    Artisan::call('cache:clear');
-                } catch (\Exception $e) {
-                    Log::warning('Cache clear failed:', ['error' => $e->getMessage()]);
-                }
-                
-                // Run seeder to create roles and permissions
-                Artisan::call('db:seed', [
-                    '--class' => 'RoleAndPermissionSeeder',
-                    '--force' => true,
-                ]);
-                
-                // Run additional tenant seeders if needed
-                Artisan::call('db:seed', [
-                    '--class' => 'TenantDatabaseSeeder',
-                    '--force' => true,
-                ]);
-                
-                // Create user in tenant database with same data
-                $tenantUser = User::create([
-                    'name' => $validated['user_name'],
-                    'phone' => $validated['user_phone'],
-                    'email' => $validated['user_email'] ?? null,
-                    'password' => Hash::make($userPassword),
-                    'is_active' => true,
-                ]);
-                
-                // Assign clinic_super_doctor role
-                $tenantUser->assignRole('clinic_super_doctor');
-                
-                Log::info('User created in tenant DB:', ['user_id' => $tenantUser->id]);
-            });
+            // Run migrations on tenant database
+            Artisan::call('migrate', [
+                '--database' => 'tenant',
+                '--path' => 'database/migrations/tenant',
+                '--force' => true,
+            ]);
+            Log::info('Tenant migrations completed');
             
+            // Run seeders on tenant database
+            Artisan::call('db:seed', [
+                '--database' => 'tenant',
+                '--class' => 'RoleAndPermissionSeeder',
+                '--force' => true,
+            ]);
+            Log::info('RoleAndPermissionSeeder completed');
+            
+            Artisan::call('db:seed', [
+                '--database' => 'tenant',
+                '--class' => 'TenantDatabaseSeeder',
+                '--force' => true,
+            ]);
+            Log::info('TenantDatabaseSeeder completed');
+            
+            // Create user in tenant database
+            $tenantUser = User::on('tenant')->create([
+                'name' => $validated['user_name'],
+                'phone' => $validated['user_phone'],
+                'email' => $validated['user_email'] ?? null,
+                'password' => Hash::make($userPassword),
+                'is_active' => true,
+            ]);
+            
+            // Assign role (need to use tenant connection for roles)
+            DB::connection('tenant')->table('model_has_roles')->insert([
+                'role_id' => DB::connection('tenant')->table('roles')->where('name', 'clinic_super_doctor')->value('id') ?? 1,
+                'model_type' => 'App\\Models\\User',
+                'model_id' => $tenantUser->id,
+            ]);
+            
+            Log::info('User created in tenant DB:', ['user_id' => $tenantUser->id]);
             Log::info('Tenant setup completed:', ['id' => $tenant->id]);
             
             return response()->json([

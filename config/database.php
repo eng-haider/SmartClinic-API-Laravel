@@ -51,6 +51,36 @@ return [
             ]) : [],
         ],
 
+        /*
+        |--------------------------------------------------------------------------
+        | Tenant Database Connection (for Hostinger one-user-per-database)
+        |--------------------------------------------------------------------------
+        |
+        | This is a template connection that will be dynamically configured
+        | at runtime for each tenant. On Hostinger, each database has its own
+        | user with the same name as the database.
+        |
+        */
+        'tenant' => [
+            'driver' => 'mysql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('TENANT_DB_DATABASE', ''),
+            'username' => env('TENANT_DB_USERNAME', ''),
+            'password' => env('TENANT_DB_PASSWORD', ''),
+            'unix_socket' => env('DB_SOCKET', ''),
+            'charset' => env('DB_CHARSET', 'utf8mb4'),
+            'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
         'sqlite' => [
             'driver' => 'sqlite',
             'url' => env('DB_URL'),

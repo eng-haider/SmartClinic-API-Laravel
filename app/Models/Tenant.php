@@ -47,6 +47,19 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'logo',
         'api_whatsapp',
         'data',
+        // Hostinger database credentials (one user per database)
+        'db_name',
+        'db_username',
+        'db_password',
+    ];
+
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var array<int, string>
+     */
+    protected $hidden = [
+        'db_password',
     ];
 
     /**
