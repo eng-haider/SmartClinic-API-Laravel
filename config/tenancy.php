@@ -55,6 +55,13 @@ return [
         'suffix' => '',
 
         /**
+         * Auto create database: Set to false on shared hosting where you must
+         * create databases manually through the hosting panel (e.g., Hostinger, cPanel).
+         * Set to true on VPS/local environments where your DB user has CREATE DATABASE privileges.
+         */
+        'auto_create_database' => env('TENANCY_AUTO_CREATE_DB', false),
+
+        /**
          * TenantDatabaseManagers are classes that handle the creation & deletion of tenant databases.
          */
         'managers' => [

@@ -150,13 +150,53 @@ class TenantController extends Controller
             ], 500);
         }
         
-        // Step 4: Create tenant database and setup
+        // Step 4: Setup tenant database (assumes database already exists on shared hosting)
         try {
             $databaseName = config('tenancy.database.prefix') . $tenant->id;
             
-            // Create the database
-            DB::statement("CREATE DATABASE `{$databaseName}`");
-            Log::info('Database created:', ['database' => $databaseName]);
+            // Check if we should create database (only on local/VPS environments)
+            $autoCreateDatabase = config('tenancy.auto_create_database', false);
+            
+            if ($autoCreateDatabase) {
+                try {
+                    // Create the database (only works on VPS/local with proper permissions)
+                    DB::statement("CREATE DATABASE `{$databaseName}`");
+                    Log::info('Database created:', ['database' => $databaseName]);
+                } catch (\Exception $e) {
+                    Log::warning('Could not auto-create database (expected on shared hosting):', [
+                        'database' => $databaseName,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            } else {
+                Log::info('Skipping auto database creation (using pre-created database):', ['database' => $databaseName]);
+            }
+            
+            // Verify database exists by attempting to connect
+            try {
+                $tenant->run(function() {
+                    DB::connection()->getPdo();
+                });
+                Log::info('Database connection verified:', ['database' => $databaseName]);
+            } catch (\Exception $e) {
+                // Provide helpful error message for shared hosting
+                $fullDatabaseName = $databaseName;
+                if (env('DB_USERNAME')) {
+                    // On Hostinger/shared hosting, database names are prefixed with username
+                    $userPrefix = explode('_', env('DB_USERNAME'))[0] . '_';
+                    $fullDatabaseName = $userPrefix . $databaseName;
+                }
+                
+                throw new \Exception(
+                    "Database '{$databaseName}' does not exist. " .
+                    "On shared hosting (Hostinger/cPanel), you must create it manually:\n" .
+                    "1. Go to your hosting panel → Databases → MySQL Databases\n" .
+                    "2. Create database with name: {$fullDatabaseName}\n" .
+                    "3. Ensure your DB user has access to this database\n" .
+                    "4. Try creating the tenant again\n" .
+                    "Original error: " . $e->getMessage()
+                );
+            }
             
             // Step 5: Run migrations and create user in tenant database
             $userPassword = $validated['user_password']; // Store password before closure
