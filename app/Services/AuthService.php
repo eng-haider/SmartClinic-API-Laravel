@@ -129,9 +129,7 @@ class AuthService
         tenancy()->initialize($tenant);
 
         // Step 5: Get user from tenant database with roles and permissions
-        $tenantUser = User::where('phone', $phone)
-            ->with(['roles', 'permissions'])
-            ->first();
+        $tenantUser = User::where('phone', $phone)->first();
 
         if (!$tenantUser) {
             throw new \Exception('User not found in tenant database');
@@ -141,10 +139,8 @@ class AuthService
             throw new \Exception('User account is inactive in tenant database');
         }
 
-        // Load roles and permissions if not already loaded
-        if (!$tenantUser->relationLoaded('roles')) {
-            $tenantUser->load('roles', 'permissions');
-        }
+        // Load roles and permissions explicitly
+        $tenantUser->load(['roles.permissions', 'permissions']);
 
         // Generate token for tenant user
         $token = JWTAuth::fromUser($tenantUser);
@@ -347,6 +343,9 @@ class AuthService
         if (!$user->is_active) {
             throw new \Exception('User account is inactive');
         }
+
+        // Load roles and permissions explicitly
+        $user->load(['roles.permissions', 'permissions']);
 
         // Generate token
         $token = JWTAuth::fromUser($user);
