@@ -201,20 +201,16 @@ class TenantController extends Controller
                 Log::info('Database connection verified:', ['database' => $databaseName]);
             } catch (\Exception $e) {
                 // Provide helpful error message for shared hosting
-                $fullDatabaseName = $databaseName;
-                if (env('DB_USERNAME')) {
-                    // On Hostinger/shared hosting, database names are prefixed with username
-                    $userPrefix = explode('_', env('DB_USERNAME'))[0] . '_';
-                    $fullDatabaseName = $userPrefix . $databaseName;
-                }
+                // Note: $databaseName already includes the full name with prefix (e.g., u876784197_tenant_alamal)
                 
                 throw new \Exception(
-                    "Database '{$databaseName}' does not exist. " .
+                    "Database '{$databaseName}' does not exist or cannot be accessed. " .
                     "On shared hosting (Hostinger/cPanel), you must create it manually:\n" .
                     "1. Go to your hosting panel → Databases → MySQL Databases\n" .
-                    "2. Create database with name: {$fullDatabaseName}\n" .
-                    "3. Ensure your DB user has access to this database\n" .
-                    "4. Try creating the tenant again\n" .
+                    "2. Create database with exact name: {$databaseName}\n" .
+                    "3. Ensure your DB user (same as central DB) has access to this database\n" .
+                    "4. Verify the database name matches exactly (including prefix)\n" .
+                    "5. Try creating the tenant again\n" .
                     "Original error: " . $e->getMessage()
                 );
             }
