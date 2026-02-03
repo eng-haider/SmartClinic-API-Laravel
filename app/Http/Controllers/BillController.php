@@ -65,7 +65,7 @@ class BillController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Bill created successfully',
-                'data' => new BillResource($bill->load(['patient', 'doctor', 'clinic'])),
+                'data' => new BillResource($bill->load(['patient', 'doctor'])),
             ], 201);
         } catch (\Exception $e) {
             return response()->json([

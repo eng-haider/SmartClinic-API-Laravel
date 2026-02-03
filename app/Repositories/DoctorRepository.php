@@ -13,10 +13,11 @@ class DoctorRepository
 {
     /**
      * Get the query builder instance for doctors only
+     * Always use central database connection for users
      */
     protected function query(): Builder
     {
-        return User::query()
+        return User::on('mysql')->query()
             ->whereHas('roles', function ($query) {
                 $query->whereIn('name', ['doctor', 'clinic_super_doctor']);
             });
@@ -91,6 +92,7 @@ class DoctorRepository
 
     /**
      * Create a new doctor
+     * Always create in central database
      */
     public function create(array $data): User
     {
@@ -99,7 +101,8 @@ class DoctorRepository
             $data['password'] = Hash::make($data['password']);
         }
 
-        $doctor = User::create($data);
+        // Use setConnection to ensure we're creating in central database
+        $doctor = User::on('mysql')->create($data);
 
         // Assign doctor role if role is specified
         if (isset($data['role'])) {

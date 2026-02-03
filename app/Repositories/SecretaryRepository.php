@@ -10,10 +10,11 @@ class SecretaryRepository
 {
     /**
      * Get all secretaries for a specific clinic
+     * Always query from central database
      */
     public function getAllForClinic(int $clinicId, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = User::where('clinic_id', $clinicId)
+        $query = User::on('mysql')->where('clinic_id', $clinicId)
             ->whereHas('roles', function ($query) {
                 $query->where('name', 'secretary');
             })
@@ -44,10 +45,11 @@ class SecretaryRepository
 
     /**
      * Find secretary by ID within clinic
+     * Always query from central database
      */
     public function findInClinic(int $id, int $clinicId): ?User
     {
-        return User::where('id', $id)
+        return User::on('mysql')->where('id', $id)
             ->where('clinic_id', $clinicId)
             ->whereHas('roles', function ($query) {
                 $query->where('name', 'secretary');
@@ -58,10 +60,11 @@ class SecretaryRepository
 
     /**
      * Create a new secretary
+     * Always create in central database
      */
     public function create(array $data, int $clinicId): User
     {
-        $secretary = User::create([
+        $secretary = User::on('mysql')->create([
             'name' => $data['name'],
             'phone' => $data['phone'],
             // 'email' => $data['email'],

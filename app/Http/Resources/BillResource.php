@@ -25,10 +25,6 @@ class BillResource extends JsonResource
                 'id' => $this->doctor_id,
                 'name' => $this->doctor?->name ?? 'N/A',
             ],
-            'clinic' => $this->clinic ? [
-                'id' => $this->clinics_id,
-                'name' => $this->clinic?->name ?? 'N/A',
-            ] : null,
             'billable' => $this->when($this->billable, function () {
                 // Check if billable type is CaseModel (handle both legacy and new format) and load full data if relations are loaded
                 $isCaseModel = in_array($this->billable_type, ['App\\Models\\Case', 'App\\Models\\CaseModel', 'Case', 'CaseModel']);
