@@ -15,14 +15,6 @@ class User extends Authenticatable implements JWTSubject
     use HasFactory, Notifiable, HasRoles, SoftDeletes;
 
     /**
-     * Always use the central database for User model
-     * Users are stored in main database, not tenant database
-     *
-     * @var string
-     */
-    protected $connection = 'mysql';
-
-    /**
      * The guard name for Spatie Permission
      * Using 'web' guard for compatibility with JWT authentication
      *

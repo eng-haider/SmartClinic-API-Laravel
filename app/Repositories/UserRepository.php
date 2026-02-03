@@ -11,11 +11,10 @@ class UserRepository
 {
     /**
      * Get the query builder instance
-     * Always use central database for users
      */
     protected function query(): Builder
     {
-        return User::on('mysql')->query();
+        return User::query();
     }
 
     /**
@@ -23,7 +22,7 @@ class UserRepository
      */
     protected function queryBuilder(): QueryBuilder
     {
-        return QueryBuilder::for(User::on('mysql'))
+        return QueryBuilder::for(User::class)
             ->allowedFilters([
                 'name',
                 'email',
