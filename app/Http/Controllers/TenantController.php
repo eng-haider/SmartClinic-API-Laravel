@@ -194,21 +194,34 @@ class TenantController extends Controller
             
             
             // Verify database exists by attempting to connect
+            // On Hostinger, each tenant DB has its own user (same name as database)
             try {
-                $tenant->run(function() {
-                    DB::connection()->getPdo();
-                });
-                Log::info('Database connection verified:', ['database' => $databaseName]);
+                $centralConfig = config('database.connections.' . $centralConnection);
+                
+                // On Hostinger: username = database name, use TENANT_DB_PASSWORD
+                $tenantUsername = $databaseName;
+                $tenantPassword = env('TENANT_DB_PASSWORD', $centralConfig['password']);
+                
+                // Test connection with tenant-specific credentials
+                $pdo = new \PDO(
+                    "mysql:host={$centralConfig['host']};port={$centralConfig['port']};dbname={$databaseName}",
+                    $tenantUsername,
+                    $tenantPassword,
+                    [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]
+                );
+                
+                Log::info('Database connection verified:', [
+                    'database' => $databaseName,
+                    'username' => $tenantUsername
+                ]);
             } catch (\Exception $e) {
                 // Provide helpful error message for shared hosting
-                // Note: $databaseName already includes the full name with prefix (e.g., u876784197_tenant_alamal)
-                
                 $errorMessage = "Database '{$databaseName}' does not exist or cannot be accessed. " .
-                    "On shared hosting (Hostinger/cPanel): " .
+                    "On shared hosting (Hostinger): " .
                     "(1) Go to hosting panel → Databases → MySQL Databases. " .
                     "(2) Create database with exact name: {$databaseName}. " .
-                    "(3) Assign your DB user (same as central DB) to this database. " .
-                    "(4) Verify the database name matches exactly. " .
+                    "(3) Create database user with same name: {$databaseName}. " .
+                    "(4) Set password to match TENANT_DB_PASSWORD in .env. " .
                     "(5) Try creating the tenant again. " .
                     "Original error: " . $e->getMessage();
                 
