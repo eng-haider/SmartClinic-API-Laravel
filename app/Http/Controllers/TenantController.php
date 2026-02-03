@@ -63,6 +63,26 @@ class TenantController extends Controller
         }
 
         $centralConnection = config('tenancy.database.central_connection');
+        
+        // Step 0: Check if tenant/clinic already exists
+        $existingTenant = Tenant::find($validated['id']);
+        if ($existingTenant) {
+            return response()->json([
+                'success' => false,
+                'message' => "Tenant with ID '{$validated['id']}' already exists. Use a different clinic name or delete the existing tenant first.",
+                'message_ar' => "العيادة بمعرف '{$validated['id']}' موجودة بالفعل. استخدم اسماً مختلفاً أو احذف العيادة الموجودة أولاً.",
+            ], 422);
+        }
+        
+        $existingClinic = Clinic::on($centralConnection)->find($validated['id']);
+        if ($existingClinic) {
+            return response()->json([
+                'success' => false,
+                'message' => "Clinic with ID '{$validated['id']}' already exists. Use a different clinic name or delete the existing clinic first.",
+                'message_ar' => "العيادة بمعرف '{$validated['id']}' موجودة بالفعل. استخدم اسماً مختلفاً أو احذف العيادة الموجودة أولاً.",
+            ], 422);
+        }
+        
         DB::connection($centralConnection)->beginTransaction();
         
         try {
@@ -171,6 +191,7 @@ class TenantController extends Controller
             } else {
                 Log::info('Skipping auto database creation (using pre-created database):', ['database' => $databaseName]);
             }
+            
             
             // Verify database exists by attempting to connect
             try {

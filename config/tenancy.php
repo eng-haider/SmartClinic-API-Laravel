@@ -50,8 +50,11 @@ return [
         /**
          * Tenant database names are created like this:
          * prefix + tenant_id + suffix.
+         * 
+         * On Hostinger, use your database username prefix (e.g., u876784197_)
+         * On local/VPS, use 'tenant' or any custom prefix
          */
-        'prefix' => 'tenant',
+        'prefix' => env('TENANCY_DB_PREFIX', 'u876784197_tenant'),
         'suffix' => '',
 
         /**
