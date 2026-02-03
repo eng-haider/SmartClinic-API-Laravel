@@ -114,6 +114,24 @@ Route::middleware([
         Route::apiResource('images', ImageController::class);
     });
 
+    // Doctor routes
+    Route::middleware('jwt')->group(function () {
+        Route::apiResource('doctors', DoctorController::class);
+        Route::get('doctors-active', [DoctorController::class, 'active']);
+    });
+
+    // Secretary routes
+    Route::middleware('jwt')->prefix('secretaries')->group(function () {
+        Route::get('/available-permissions', [SecretaryController::class, 'availablePermissions']);
+        Route::get('/', [SecretaryController::class, 'index']);
+        Route::post('/', [SecretaryController::class, 'store']);
+        Route::get('/{secretary}', [SecretaryController::class, 'show']);
+        Route::put('/{secretary}', [SecretaryController::class, 'update']);
+        Route::delete('/{secretary}', [SecretaryController::class, 'destroy']);
+        Route::patch('/{secretary}/permissions', [SecretaryController::class, 'updatePermissions']);
+        Route::patch('/{secretary}/toggle-status', [SecretaryController::class, 'toggleStatus']);
+    });
+
     // Clinic settings routes
     Route::middleware('jwt')->prefix('clinic-settings')->group(function () {
         Route::get('/', [ClinicSettingController::class, 'index']);
