@@ -20,6 +20,7 @@ class ReservationReportController extends Controller
      * Get reservations summary statistics.
      * 
      * Returns total count, waiting/confirmed distribution with percentages.
+     * Multi-tenancy: Database is already isolated by tenant via middleware.
      *
      * @param Request $request
      * @return JsonResponse
@@ -31,18 +32,17 @@ class ReservationReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $clinicId = $this->getClinicIdByRole();
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
-        $summary = $this->reportsRepository->getReservationsSummary($clinicId, $dateFrom, $dateTo);
+        // Multi-tenancy: No need for clinic_id filter
+        $summary = $this->reportsRepository->getReservationsSummary(null, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
             'message' => 'Reservations summary retrieved successfully',
             'data' => $summary,
             'filters' => [
-                'clinic_id' => $clinicId,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
             ],
@@ -54,6 +54,7 @@ class ReservationReportController extends Controller
      * 
      * Returns reservation counts grouped by status with colors.
      * Useful for pie charts or status boards.
+     * Multi-tenancy: Database is already isolated by tenant via middleware.
      *
      * @param Request $request
      * @return JsonResponse
@@ -65,18 +66,17 @@ class ReservationReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $clinicId = $this->getClinicIdByRole();
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
-        $data = $this->reportsRepository->getReservationsByStatus($clinicId, $dateFrom, $dateTo);
+        // Multi-tenancy: No need for clinic_id filter
+        $data = $this->reportsRepository->getReservationsByStatus(null, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
             'message' => 'Reservations by status retrieved successfully',
             'data' => $data,
             'filters' => [
-                'clinic_id' => $clinicId,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
             ],
@@ -89,6 +89,7 @@ class ReservationReportController extends Controller
      * 
      * Returns reservation counts grouped by doctor.
      * Useful for bar charts showing doctor appointment distribution.
+     * Multi-tenancy: Database is already isolated by tenant via middleware.
      *
      * @param Request $request
      * @return JsonResponse
@@ -100,18 +101,17 @@ class ReservationReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $clinicId = $this->getClinicIdByRole();
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
-        $data = $this->reportsRepository->getReservationsByDoctor($clinicId, $dateFrom, $dateTo);
+        // Multi-tenancy: No need for clinic_id filter
+        $data = $this->reportsRepository->getReservationsByDoctor(null, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
             'message' => 'Reservations by doctor retrieved successfully',
             'data' => $data,
             'filters' => [
-                'clinic_id' => $clinicId,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
             ],
@@ -136,41 +136,24 @@ class ReservationReportController extends Controller
             'period' => 'nullable|in:day,week,month,year',
         ]);
 
-        $clinicId = $this->getClinicIdByRole();
+        // Multi-tenancy: Database isolation via InitializeTenancyByHeader middleware
+        // No clinic_id filtering needed
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
         $period = $request->input('period', 'month');
 
-        $data = $this->reportsRepository->getReservationsTrend($clinicId, $period, $dateFrom, $dateTo);
+        $data = $this->reportsRepository->getReservationsTrend(null, $period, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
             'message' => 'Reservations trend retrieved successfully',
             'data' => $data,
             'filters' => [
-                'clinic_id' => $clinicId,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
                 'period' => $period,
             ],
             'chart_type' => 'line',
         ]);
-    }
-
-    /**
-     * Get clinic ID based on user role.
-     * Super admin sees all, others see only their clinic.
-     */
-    private function getClinicIdByRole(): ?int
-    {
-        $user = Auth::user();
-
-        // Super admin can see all data from all clinics
-        if ($user->hasRole('super_admin')) {
-            return null;
-        }
-
-        // All other roles see only their clinic's data
-        return $user->clinic_id;
     }
 }

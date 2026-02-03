@@ -37,10 +37,8 @@ class DoctorController extends Controller
 
         $perPage = $request->input('per_page', 15);
         
-        // Get clinic_id based on user role
-        $clinicId = $this->getClinicIdByRole();
-        
-        $doctors = $this->doctorRepository->getAllWithFilters($filters, $perPage, $clinicId);
+        // Multi-tenancy: Database is already isolated by tenant, no clinic_id filtering needed
+        $doctors = $this->doctorRepository->getAllWithFilters($filters, $perPage, null);
 
         return response()->json([
             'success' => true,
@@ -83,8 +81,8 @@ class DoctorController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-        $doctor = $this->doctorRepository->getById($id, $clinicId);
+        // Multi-tenancy: Database is already isolated by tenant
+        $doctor = $this->doctorRepository->getById($id, null);
 
         if (!$doctor) {
             return response()->json([
@@ -160,8 +158,8 @@ class DoctorController extends Controller
      */
     public function active(Request $request): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-        $doctors = $this->doctorRepository->getActive($clinicId);
+        // Multi-tenancy: Database is already isolated by tenant
+        $doctors = $this->doctorRepository->getActive(null);
 
         return response()->json([
             'success' => true,
@@ -175,8 +173,8 @@ class DoctorController extends Controller
      */
     public function searchByEmail(string $email): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-        $doctor = $this->doctorRepository->getByEmail($email, $clinicId);
+        // Multi-tenancy: Database is already isolated by tenant
+        $doctor = $this->doctorRepository->getByEmail($email, null);
 
         if (!$doctor) {
             return response()->json([
@@ -197,8 +195,8 @@ class DoctorController extends Controller
      */
     public function searchByPhone(string $phone): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-        $doctor = $this->doctorRepository->getByPhone($phone, $clinicId);
+        // Multi-tenancy: Database is already isolated by tenant
+        $doctor = $this->doctorRepository->getByPhone($phone, null);
 
         if (!$doctor) {
             return response()->json([
@@ -212,22 +210,5 @@ class DoctorController extends Controller
             'message' => 'Doctor found',
             'data' => new UserResource($doctor),
         ]);
-    }
-
-    /**
-     * Get clinic ID based on user role.
-     * Super admin sees all, others see only their clinic.
-     */
-    private function getClinicIdByRole(): ?int
-    {
-        $user = Auth::user();
-        
-        // Super admin can see all doctors from all clinics
-        if ($user->hasRole('super_admin')) {
-            return null;
-        }
-        
-        // All other roles see only their clinic
-        return $user->clinic_id;
     }
 }

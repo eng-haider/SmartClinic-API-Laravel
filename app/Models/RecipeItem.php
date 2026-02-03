@@ -26,7 +26,6 @@ class RecipeItem extends Model
         'name',
         'recipes_id',
         'doctors_id',
-        'clinics_id',
     ];
 
     /**
@@ -39,7 +38,6 @@ class RecipeItem extends Model
         return [
             'recipes_id' => 'integer',
             'doctors_id' => 'integer',
-            'clinics_id' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
@@ -63,27 +61,11 @@ class RecipeItem extends Model
     }
 
     /**
-     * Get the clinic that owns the recipe item.
-     */
-    public function clinic()
-    {
-        return $this->belongsTo(Clinic::class, 'clinics_id');
-    }
-
-    /**
      * Scope a query to filter by doctor.
      */
     public function scopeByDoctor($query, int $doctorId)
     {
         return $query->where('doctors_id', $doctorId);
-    }
-
-    /**
-     * Scope a query to filter by clinic.
-     */
-    public function scopeByClinic($query, int $clinicId)
-    {
-        return $query->where('clinics_id', $clinicId);
     }
 
     /**

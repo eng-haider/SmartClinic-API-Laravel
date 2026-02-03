@@ -20,7 +20,9 @@ class DashboardReportController extends Controller
      * Get dashboard overview statistics.
      * 
      * Returns aggregated statistics for patients, bills, reservations, cases, and expenses.
-     * Supports date filtering and role-based clinic filtering.
+     * Supports date filtering.
+     * 
+     * Multi-tenancy: Database is already isolated by tenant via middleware.
      *
      * @param Request $request
      * @return JsonResponse
@@ -32,18 +34,17 @@ class DashboardReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $clinicId = $this->getClinicIdByRole();
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
-        $overview = $this->reportsRepository->getDashboardOverview($clinicId, $dateFrom, $dateTo);
+        // Multi-tenancy: No need for clinic_id filter
+        $overview = $this->reportsRepository->getDashboardOverview(null, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
             'message' => 'Dashboard overview retrieved successfully',
             'data' => $overview,
             'filters' => [
-                'clinic_id' => $clinicId,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
             ],
@@ -55,40 +56,26 @@ class DashboardReportController extends Controller
      * 
      * Returns key metrics for the current day including new patients,
      * reservations, revenue, cases, and expenses.
+     * 
+     * Multi-tenancy: Database is already isolated by tenant via middleware.
      *
      * @return JsonResponse
      */
     public function today(): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-
-        $todaySummary = $this->reportsRepository->getTodaySummary($clinicId);
+        // Multi-tenancy: No need for clinic_id filter
+        $todaySummary = $this->reportsRepository->getTodaySummary(null);
 
         return response()->json([
             'success' => true,
             'message' => 'Today\'s summary retrieved successfully',
             'data' => $todaySummary,
             'filters' => [
-                'clinic_id' => $clinicId,
                 'date' => now()->toDateString(),
             ],
         ]);
     }
 
-    /**
-     * Get clinic ID based on user role.
-     * Super admin sees all, others see only their clinic.
-     */
-    private function getClinicIdByRole(): ?int
-    {
-        $user = Auth::user();
-
-        // Super admin can see all data from all clinics
-        if ($user->hasRole('super_admin')) {
-            return null;
-        }
-
-        // All other roles see only their clinic's data
-        return $user->clinic_id;
-    }
+    // Note: getClinicIdByRole() method removed - no longer needed with multi-tenancy
+    // Database isolation is handled automatically by the tenancy middleware
 }

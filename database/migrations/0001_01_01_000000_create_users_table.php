@@ -18,14 +18,17 @@ return new class extends Migration
             $table->string('phone')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            $table->string('clinic_id')->nullable(); // References tenant ID
             $table->enum('role', ['admin', 'doctor', 'nurse', 'receptionist', 'user'])->default('user');
             $table->boolean('is_active')->default(true);
             $table->rememberToken();
             $table->timestamps();
+            $table->softDeletes();
 
             // Indexes for common queries
             $table->index('phone');
             $table->index('email');
+            $table->index('clinic_id');
             $table->index('role');
             $table->index('is_active');
         });

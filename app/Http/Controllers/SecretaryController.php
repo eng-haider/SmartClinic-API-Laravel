@@ -44,7 +44,8 @@ class SecretaryController extends Controller
 
         $perPage = $request->input('per_page', 15);
         
-        $secretaries = $this->secretaryRepository->getAllForClinic($user->clinic_id, $filters, $perPage);
+        // Multi-tenancy: Database is already isolated by tenant, no need for clinic_id filtering
+        $secretaries = $this->secretaryRepository->getAllForClinic(null, $filters, $perPage);
 
         return response()->json([
             'success' => true,

@@ -29,9 +29,11 @@ class RecipeController extends Controller
      */
     public function index(Request $request)
     {
-        [$clinicId, $doctorId] = $this->getFiltersByRole();
+        // Multi-tenancy: Database is already isolated by tenant
+        // Only filter by doctor_id for regular doctors
+        $doctorId = $this->getDoctorIdFilter();
         
-        $recipes = $this->recipeRepository->getAll($request, $clinicId, $doctorId);
+        $recipes = $this->recipeRepository->getAll($request, null, $doctorId);
         
         return RecipeResource::collection($recipes);
     }
@@ -108,32 +110,27 @@ class RecipeController extends Controller
     }
 
     /**
-     * Get filters based on user role.
-     * Returns [clinicId, doctorId]
+     * Multi-tenancy: Database is already isolated by tenant via middleware.
+     * We only need to filter by doctor for regular doctors who should only see their own recipes.
      * 
-     * - super_admin: [null, null] - sees all recipes
-     * - clinic_super_doctor: [clinic_id, null] - sees all clinic recipes
-     * - doctor: [clinic_id, user_id] - sees only their own recipes
-     * - secretary: no access (blocked by middleware)
+     * - Super Doctor: sees all recipes in their tenant database [null]
+     * - Doctor: sees ONLY their own recipes [user_id]
+     * - Secretary: no access (blocked by middleware)
      */
-    private function getFiltersByRole(): array
+    private function getDoctorIdFilter(): ?int
     {
         $user = Auth::user();
 
-        if ($user->hasRole('super_admin')) {
-            return [null, null]; // Super admin sees all
-        }
-
-        if ($user->hasRole('clinic_super_doctor')) {
-            return [$user->clinic_id, null]; // Clinic super doctor sees all clinic recipes
+        if ($user->hasRole('super_admin') || $user->hasRole('clinic_super_doctor')) {
+            return null; // Super admin and clinic super doctor see all
         }
 
         if ($user->hasRole('doctor')) {
-            return [$user->clinic_id, $user->id]; // Doctor sees only their own recipes
+            return $user->id; // Doctor sees only their own recipes
         }
 
         // Secretary has no access (should be blocked by middleware)
-        return [null, null];
+        return null;
     }
 
     /**
@@ -144,13 +141,8 @@ class RecipeController extends Controller
         $user = Auth::user();
 
         // Super admin can access all
-        if ($user->hasRole('super_admin')) {
+        if ($user->hasRole('super_admin') || $user->hasRole('clinic_super_doctor')) {
             return true;
-        }
-
-        // Clinic super doctor can access clinic recipes
-        if ($user->hasRole('clinic_super_doctor')) {
-            return $recipe->doctor->clinic_id === $user->clinic_id;
         }
 
         // Doctor can only access their own recipes

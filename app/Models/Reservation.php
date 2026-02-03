@@ -19,7 +19,6 @@ class Reservation extends Model
     protected $fillable = [
         'patient_id',
         'doctor_id',
-        'clinics_id',
         'status_id',
         'notes',
         'reservation_start_date',
@@ -41,7 +40,6 @@ class Reservation extends Model
         return [
             'patient_id' => 'integer',
             'doctor_id' => 'integer',
-            'clinics_id' => 'integer',
             'status_id' => 'integer',
             'creator_id' => 'integer',
             'updator_id' => 'integer',
@@ -90,14 +88,6 @@ class Reservation extends Model
     public function doctor()
     {
         return $this->belongsTo(User::class, 'doctor_id');
-    }
-
-    /**
-     * Get the clinic that owns the reservation.
-     */
-    public function clinic()
-    {
-        return $this->belongsTo(Clinic::class, 'clinics_id');
     }
 
     /**
@@ -154,14 +144,6 @@ class Reservation extends Model
     public function scopeByDoctor($query, int $doctorId)
     {
         return $query->where('doctor_id', $doctorId);
-    }
-
-    /**
-     * Scope a query to filter by clinic.
-     */
-    public function scopeByClinic($query, int $clinicId)
-    {
-        return $query->where('clinics_id', $clinicId);
     }
 
     /**

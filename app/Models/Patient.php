@@ -21,7 +21,6 @@ class Patient extends Model
         'name',
         'age',
         'doctor_id',
-        'clinics_id',
         'phone',
         'systemic_conditions',
         'sex',
@@ -51,7 +50,6 @@ class Patient extends Model
         return [
             'age' => 'integer',
             'doctor_id' => 'integer',
-            'clinics_id' => 'integer',
             'sex' => 'integer',
             'birth_date' => 'date',
             'from_where_come_id' => 'integer',
@@ -99,14 +97,6 @@ class Patient extends Model
     public function doctor()
     {
         return $this->belongsTo(User::class, 'doctor_id');
-    }
-
-    /**
-     * Get the clinic that owns the patient.
-     */
-    public function clinic()
-    {
-        return $this->belongsTo(Clinic::class, 'clinics_id');
     }
 
     /**
@@ -175,14 +165,6 @@ class Patient extends Model
             2 => 'Female',
             default => 'Unknown',
         };
-    }
-
-    /**
-     * Scope a query to filter by clinic.
-     */
-    public function scopeByClinic($query, int $clinicId)
-    {
-        return $query->where('clinics_id', $clinicId);
     }
 
     /**

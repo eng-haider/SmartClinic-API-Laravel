@@ -46,10 +46,11 @@ class CaseController extends Controller
 
         $perPage = $request->input('per_page', 15);
         
-        // Get clinic_id and doctor_id based on user role
-        [$clinicId, $doctorId] = $this->getFiltersByRole();
+        // Multi-tenancy: Database is already isolated by tenant
+        // Only filter by doctor_id for regular doctors
+        $doctorId = $this->getDoctorIdFilter();
         
-        $cases = $this->caseRepository->getAllWithFilters($filters, $perPage, $clinicId, $doctorId);
+        $cases = $this->caseRepository->getAllWithFilters($filters, $perPage, null, $doctorId);
 
         return response()->json([
             'success' => true,
@@ -92,8 +93,9 @@ class CaseController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        [$clinicId, $doctorId] = $this->getFiltersByRole();
-        $case = $this->caseRepository->getById($id, $clinicId, $doctorId);
+        // Multi-tenancy: Database is already isolated by tenant
+        $doctorId = $this->getDoctorIdFilter();
+        $case = $this->caseRepository->getById($id, null, $doctorId);
 
         if (!$case) {
             return response()->json([
@@ -169,51 +171,27 @@ class CaseController extends Controller
     }
 
     /**
-     * Get clinic ID based on user role.
-     * Super admin sees all, others see only their clinic.
-     */
-    private function getClinicIdByRole(): ?int
-    {
-        $user = Auth::user();
-        
-        // Super admin can see all cases from all clinics
-        if ($user->hasRole('super_admin')) {
-            return null;
-        }
-        
-        // All other roles (clinic_super_doctor, doctor, secretary) see only their clinic
-        return $user->clinic_id;
-    }
-
-    /**
-     * Get filters (clinic_id and doctor_id) based on user role.
-     * Returns [clinic_id, doctor_id] array.
+     * Multi-tenancy: Database is already isolated by tenant via middleware.
+     * We only need to filter by doctor for regular doctors who should only see their own cases.
      * 
-     * - Super Admin: sees ALL cases from ALL clinics [null, null]
-     * - Clinic Super Doctor: sees all cases from their clinic [clinic_id, null]
-     * - Doctor: sees ONLY their own cases [clinic_id, user_id]
-     * - Secretary: sees all cases from their clinic [clinic_id, null]
+     * - Super Doctor/Secretary: sees all cases in their tenant database [null]
+     * - Doctor: sees ONLY their own cases [user_id]
      */
-    private function getFiltersByRole(): array
+    private function getDoctorIdFilter(): ?int
     {
         $user = Auth::user();
         
-        // Super admin can see all cases from all clinics
-        if ($user->hasRole('super_admin')) {
-            return [null, null];
-        }
-        
-        // Clinic super doctor and secretary see all cases from their clinic
-        if ($user->hasRole('clinic_super_doctor') || $user->hasRole('secretary')) {
-            return [$user->clinic_id, null];
+        // Super doctor and secretary see all cases in this tenant
+        if ($user->hasRole('clinic_super_doctor') || $user->hasRole('secretary') || $user->hasRole('super_admin')) {
+            return null;
         }
         
         // Doctor sees only their own cases
         if ($user->hasRole('doctor')) {
-            return [$user->clinic_id, $user->id];
+            return $user->id;
         }
         
-        // Default: filter by clinic only
-        return [$user->clinic_id, null];
+        // Default: show all cases in this tenant
+        return null;
     }
 }

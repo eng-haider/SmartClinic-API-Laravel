@@ -6,6 +6,7 @@ use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
+use Illuminate\Support\Facades\Log;
 
 class Tenant extends BaseTenant implements TenantWithDatabase
 {
@@ -47,6 +48,35 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'api_whatsapp',
         'data',
     ];
+
+    /**
+     * Boot the model.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Ensure ID is set before creating database
+        static::creating(function ($tenant) {
+            Log::info('BOOT Creating - ID BEFORE: ' . var_export($tenant->id, true));
+            Log::info('BOOT Creating - Attributes: ', $tenant->getAttributes());
+            
+            if (empty($tenant->id)) {
+                // Generate a random ID if not provided
+                $generatedId = '_' . \Illuminate\Support\Str::random(8);
+                $tenant->id = $generatedId;
+                $tenant->setAttribute('id', $generatedId);
+                Log::info('BOOT Creating - Generated ID: ' . $tenant->id);
+            }
+            
+            // Force set the ID attribute multiple ways to ensure it's there
+            $currentId = $tenant->id;
+            $tenant->setAttribute('id', $currentId);
+            $tenant->attributes['id'] = $currentId;
+            
+            Log::info('BOOT Creating - FINAL ID: ' . var_export($tenant->id, true));
+        });
+    }
 
     /**
      * The attributes that should be cast.

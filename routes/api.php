@@ -53,9 +53,15 @@ Route::prefix('public/patients')->group(function () {
     Route::get('/{token}/reservations', [PublicPatientController::class, 'reservations'])->name('public.patients.reservations');
 });
 
-// Public auth routes (no authentication required)
+// ============================================
+// PUBLIC AUTH ROUTES (No authentication required)
+// Step 1: Check credentials to get tenant_id
+// Step 2: Login with X-Tenant-ID to get token
+// ============================================
 Route::post('auth/register', [AuthController::class, 'register']);
-Route::post('auth/login', [AuthController::class, 'login']);
+Route::post('auth/check-credentials', [AuthController::class, 'checkCredentials']); // ← خطوة 1: التحقق
+Route::post('auth/login', [AuthController::class, 'login']); // ← قديم (بدون tenant)
+Route::post('auth/smart-login', [AuthController::class, 'smartLogin']); // ← الدخول الذكي
 
 // Protected auth routes (JWT required)
 Route::middleware('jwt')->group(function () {

@@ -36,10 +36,8 @@ class BillController extends Controller
 
         $perPage = $request->input('per_page', 15);
 
-        // Get clinic_id based on user role
-        $clinicId = $this->getClinicIdByRole();
-
-        $bills = $this->billRepository->getAllWithFilters($filters, $perPage, $clinicId);
+        // Multi-tenancy: Database is already isolated by tenant
+        $bills = $this->billRepository->getAllWithFilters($filters, $perPage, null);
 
         return response()->json([
             'success' => true,
@@ -82,8 +80,8 @@ class BillController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-        $bill = $this->billRepository->getById($id, $clinicId);
+        // Multi-tenancy: Database is already isolated by tenant
+        $bill = $this->billRepository->getById($id, null);
 
         if (!$bill) {
             return response()->json([
@@ -105,8 +103,8 @@ class BillController extends Controller
     public function update(BillRequest $request, int $id): JsonResponse
     {
         try {
-            $clinicId = $this->getClinicIdByRole();
-            $bill = $this->billRepository->update($id, $request->validated(), $clinicId);
+            // Multi-tenancy: Database is already isolated by tenant
+            $bill = $this->billRepository->update($id, $request->validated(), null);
 
             return response()->json([
                 'success' => true,
@@ -127,8 +125,8 @@ class BillController extends Controller
     public function destroy(int $id): JsonResponse
     {
         try {
-            $clinicId = $this->getClinicIdByRole();
-            $this->billRepository->delete($id, $clinicId);
+            // Multi-tenancy: Database is already isolated by tenant
+            $this->billRepository->delete($id, null);
 
             return response()->json([
                 'success' => true,
@@ -148,8 +146,8 @@ class BillController extends Controller
     public function markAsPaid(int $id): JsonResponse
     {
         try {
-            $clinicId = $this->getClinicIdByRole();
-            $bill = $this->billRepository->markAsPaid($id, $clinicId);
+            // Multi-tenancy: Database is already isolated by tenant
+            $bill = $this->billRepository->markAsPaid($id, null);
 
             return response()->json([
                 'success' => true,
@@ -170,8 +168,8 @@ class BillController extends Controller
     public function markAsUnpaid(int $id): JsonResponse
     {
         try {
-            $clinicId = $this->getClinicIdByRole();
-            $bill = $this->billRepository->markAsUnpaid($id, $clinicId);
+            // Multi-tenancy: Database is already isolated by tenant
+            $bill = $this->billRepository->markAsUnpaid($id, null);
 
             return response()->json([
                 'success' => true,
@@ -192,9 +190,8 @@ class BillController extends Controller
     public function byPatient(Request $request, int $patientId): JsonResponse
     {
         $perPage = $request->input('per_page', 15);
-        $clinicId = $this->getClinicIdByRole();
-
-        $bills = $this->billRepository->getByPatient($patientId, $perPage, $clinicId);
+        // Multi-tenancy: Database is already isolated by tenant
+        $bills = $this->billRepository->getByPatient($patientId, $perPage, null);
 
         return response()->json([
             'success' => true,
@@ -216,30 +213,13 @@ class BillController extends Controller
      */
     public function statistics(): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-        $statistics = $this->billRepository->getStatistics($clinicId);
+        // Multi-tenancy: Database is already isolated by tenant
+        $statistics = $this->billRepository->getStatistics(null);
 
         return response()->json([
             'success' => true,
             'message' => 'Bill statistics retrieved successfully',
             'data' => $statistics,
         ]);
-    }
-
-    /**
-     * Get clinic ID based on user role.
-     * Super admin sees all, others see only their clinic.
-     */
-    private function getClinicIdByRole(): ?int
-    {
-        $user = Auth::user();
-
-        // Super admin can see all bills from all clinics
-        if ($user->hasRole('super_admin')) {
-            return null;
-        }
-
-        // All other roles see only their clinic's bills
-        return $user->clinic_id ?? $user->clinics_id;
     }
 }

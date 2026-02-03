@@ -43,7 +43,6 @@ class Bill extends Model
         'billable_type',
         'is_paid',
         'price',
-        'clinics_id',
         'doctor_id',
         'creator_id',
         'updator_id',
@@ -60,7 +59,6 @@ class Bill extends Model
         return [
             'patient_id' => 'integer',
             'billable_id' => 'integer',
-            'clinics_id' => 'integer',
             'doctor_id' => 'integer',
             'creator_id' => 'integer',
             'updator_id' => 'integer',
@@ -87,14 +85,6 @@ class Bill extends Model
     public function patient()
     {
         return $this->belongsTo(Patient::class);
-    }
-
-    /**
-     * Get the clinic that owns the bill.
-     */
-    public function clinic()
-    {
-        return $this->belongsTo(Clinic::class, 'clinics_id');
     }
 
     /**
@@ -175,14 +165,6 @@ class Bill extends Model
     public function scopeByDoctor($query, int $doctorId)
     {
         return $query->where('doctor_id', $doctorId);
-    }
-
-    /**
-     * Scope a query to filter by clinic.
-     */
-    public function scopeByClinic($query, int $clinicId)
-    {
-        return $query->where('clinics_id', $clinicId);
     }
 
     /**

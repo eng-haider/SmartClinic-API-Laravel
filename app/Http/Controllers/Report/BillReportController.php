@@ -18,6 +18,8 @@ class BillReportController extends Controller
     /**
      * Return bill statistics (counts and sums) with optional filters.
      * Query params: date_from, date_to, doctor_id
+     * 
+     * Multi-tenancy: Database is already isolated by tenant via middleware.
      */
     public function index(Request $request): JsonResponse
     {
@@ -29,13 +31,8 @@ class BillReportController extends Controller
 
         $filters = $request->only(['date_from', 'date_to', 'doctor_id']);
 
-        $user = Auth::user();
-        $clinicId = null;
-        if (!$user->hasRole('super_admin')) {
-            $clinicId = $user->clinic_id;
-        }
-
-        $stats = $this->billRepository->getStatisticsWithFilters($filters, $clinicId);
+        // Multi-tenancy: No need for clinic_id filter
+        $stats = $this->billRepository->getStatisticsWithFilters($filters, null);
 
         return response()->json([
             'success' => true,

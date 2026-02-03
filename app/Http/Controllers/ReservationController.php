@@ -38,10 +38,11 @@ class ReservationController extends Controller
 
         $perPage = $request->input('per_page', 15);
         
-        // Get clinic_id and doctor_id based on user role
-        [$clinicId, $doctorId] = $this->getFiltersByRole();
+        // Multi-tenancy: Get doctor_id filter based on user role
+        // Database is already isolated by tenant, no need for clinic_id
+        $doctorId = $this->getDoctorIdFilter();
         
-        $reservations = $this->reservationRepository->getAllWithFilters($filters, $perPage, $clinicId, $doctorId);
+        $reservations = $this->reservationRepository->getAllWithFilters($filters, $perPage, null, $doctorId);
 
         return response()->json([
             'success' => true,
@@ -84,8 +85,9 @@ class ReservationController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        [$clinicId, $doctorId] = $this->getFiltersByRole();
-        $reservation = $this->reservationRepository->getById($id, $clinicId, $doctorId);
+        // Multi-tenancy: Database is already isolated by tenant
+        $doctorId = $this->getDoctorIdFilter();
+        $reservation = $this->reservationRepository->getById($id, null, $doctorId);
 
         if (!$reservation) {
             return response()->json([
@@ -143,34 +145,30 @@ class ReservationController extends Controller
     }
 
     /**
-     * Get filters (clinic_id and doctor_id) based on user role.
-     * Returns [clinic_id, doctor_id] array.
+     * Get doctor_id filter based on user role.
+     * Returns doctor_id or null.
      * 
-     * - Super Admin: sees ALL reservations from ALL clinics [null, null]
-     * - Clinic Super Doctor: sees all reservations from their clinic [clinic_id, null]
-     * - Doctor: sees ONLY their own reservations [clinic_id, user_id]
-     * - Secretary: sees all reservations from their clinic [clinic_id, null]
+     * Multi-tenancy: Database is already isolated by tenant via middleware.
+     * We only need to filter by doctor for regular doctors who should only see their own reservations.
+     * 
+     * - Super Doctor/Secretary: sees all reservations in their tenant database [null]
+     * - Doctor: sees ONLY their own reservations [user_id]
      */
-    private function getFiltersByRole(): array
+    private function getDoctorIdFilter(): ?int
     {
         $user = Auth::user();
         
-        // Super admin can see all reservations from all clinics
-        if ($user->hasRole('super_admin')) {
-            return [null, null];
-        }
-        
-        // Clinic super doctor and secretary see all reservations from their clinic
-        if ($user->hasRole('clinic_super_doctor') || $user->hasRole('secretary')) {
-            return [$user->clinic_id, null];
+        // Super doctor and secretary see all reservations in this tenant
+        if ($user->hasRole('clinic_super_doctor') || $user->hasRole('secretary') || $user->hasRole('super_admin')) {
+            return null;
         }
         
         // Doctor sees only their own reservations
         if ($user->hasRole('doctor')) {
-            return [$user->clinic_id, $user->id];
+            return $user->id;
         }
         
-        // Default: filter by clinic only
-        return [$user->clinic_id, null];
+        // Default: show all reservations in this tenant
+        return null;
     }
 }

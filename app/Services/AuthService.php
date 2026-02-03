@@ -89,7 +89,100 @@ class AuthService
     }
 
     /**
-     * Login user
+     * Smart Login: One-step authentication (discovers tenant and logs in)
+     * This combines checkCredentials and login into a single call
+     */
+    public function smartLogin(string $phone, string $password): array
+    {
+        // Step 1: Authenticate in CENTRAL database and get tenant_id
+        $centralConnection = config('tenancy.database.central_connection');
+        $centralUser = User::on($centralConnection)->where('phone', $phone)->first();
+
+        if (!$centralUser || !Hash::check($password, $centralUser->password)) {
+            throw new \Exception('Invalid phone number or password');
+        }
+
+        if (!$centralUser->is_active) {
+            throw new \Exception('User account is inactive');
+        }
+
+        // Get user's clinic
+        $clinic = $centralUser->clinic;
+        
+        if (!$clinic) {
+            throw new \Exception('User is not associated with any clinic');
+        }
+
+        // Step 2: Switch to tenant context and authenticate
+        $tenant = \App\Models\Tenant::find($clinic->id);
+        
+        if (!$tenant) {
+            throw new \Exception('Tenant/clinic not found');
+        }
+
+        // Initialize tenant context
+        tenancy()->initialize($tenant);
+
+        // Get user from tenant database
+        $tenantUser = User::where('phone', $phone)->first();
+
+        if (!$tenantUser) {
+            throw new \Exception('User not found in tenant database');
+        }
+
+        if (!$tenantUser->is_active) {
+            throw new \Exception('User account is inactive in tenant database');
+        }
+
+        // Generate token for tenant user
+        $token = JWTAuth::fromUser($tenantUser);
+
+        return [
+            'user' => $tenantUser,
+            'token' => $token,
+            'tenant_id' => $clinic->id,
+            'clinic_name' => $clinic->name,
+            'message' => 'Login successful',
+        ];
+    }
+
+    /**
+     * Step 1: Check credentials and return tenant_id (no token yet)
+     * Used to discover which clinic the user belongs to
+     */
+    public function checkCredentials(string $phone, string $password): array
+    {
+        // Authenticate in CENTRAL database (get connection from config)
+        $centralConnection = config('tenancy.database.central_connection');
+        $user = User::on($centralConnection)->where('phone', $phone)->first();
+
+        if (!$user || !Hash::check($password, $user->password)) {
+            throw new \Exception('Invalid phone number or password');
+        }
+
+        if (!$user->is_active) {
+            throw new \Exception('User account is inactive');
+        }
+
+        // Get user's clinic
+        $clinic = $user->clinic;
+        
+        if (!$clinic) {
+            throw new \Exception('User is not associated with any clinic');
+        }
+
+        // Return tenant_id for the frontend to use in step 2
+        return [
+            'tenant_id' => $clinic->id,
+            'clinic_name' => $clinic->name,
+            'user_name' => $user->name,
+            'message' => 'Credentials verified. Please proceed with tenant login.',
+        ];
+    }
+
+    /**
+     * Step 2: Login user with tenant context (requires X-Tenant-ID)
+     * This is called after checkCredentials with the tenant_id
      */
     public function login(string $phone, string $password): array
     {

@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -13,8 +14,14 @@ class RoleAndPermissionSeeder extends Seeder
      */
     public function run(): void
     {
-        // Reset cached roles and permissions
-        app()['cache']->forget('spatie.permission.cache');
+        // Reset cached roles and permissions - only if cache table exists
+        try {
+            if (Schema::hasTable('cache')) {
+                app()['cache']->forget('spatie.permission.cache');
+            }
+        } catch (\Exception $e) {
+            // Cache clearing failed, continue anyway
+        }
 
         // Get roles from config
         $config = config('rolesAndPermissions');

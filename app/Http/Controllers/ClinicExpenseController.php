@@ -36,13 +36,11 @@ class ClinicExpenseController extends Controller
 
         $perPage = $request->input('per_page', 15);
         
-        // Get clinic_id based on user role
-        $clinicId = $this->getClinicIdByRole();
-        
-        $expenses = $this->repository->getAllWithFilters($filters, $perPage, $clinicId);
+        // Multi-tenancy: No need for clinic_id filter, database is already isolated by tenant
+        $expenses = $this->repository->getAllWithFilters($filters, $perPage, null);
         
         // Calculate summary statistics for the filtered results
-        $summary = $this->repository->getFilteredSummary($filters, $clinicId);
+        $summary = $this->repository->getFilteredSummary($filters, null);
 
         return response()->json([
             'success' => true,
@@ -86,8 +84,8 @@ class ClinicExpenseController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-        $expense = $this->repository->getById($id, $clinicId);
+        // Multi-tenancy: No need for clinic_id filter, database is already isolated by tenant
+        $expense = $this->repository->getById($id, null);
 
         if (!$expense) {
             return response()->json([
@@ -191,24 +189,11 @@ class ClinicExpenseController extends Controller
      */
     public function statistics(Request $request): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-        
-        if (!$clinicId) {
-            // If super admin, require clinic_id in request
-            $clinicId = $request->input('clinic_id');
-            
-            if (!$clinicId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Clinic ID is required for statistics',
-                ], 400);
-            }
-        }
-
+        // Multi-tenancy: No need for clinic_id filter, database is already isolated by tenant
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
 
-        $statistics = $this->repository->getStatistics($clinicId, $startDate, $endDate);
+        $statistics = $this->repository->getStatistics(null, $startDate, $endDate);
 
         return response()->json([
             'success' => true,
@@ -222,20 +207,8 @@ class ClinicExpenseController extends Controller
      */
     public function unpaid(Request $request): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-        
-        if (!$clinicId) {
-            $clinicId = $request->input('clinic_id');
-            
-            if (!$clinicId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Clinic ID is required',
-                ], 400);
-            }
-        }
-
-        $expenses = $this->repository->getUnpaidByClinic($clinicId);
+        // Multi-tenancy: No need for clinic_id filter, database is already isolated by tenant
+        $expenses = $this->repository->getUnpaidByClinic(null);
 
         return response()->json([
             'success' => true,
@@ -254,11 +227,11 @@ class ClinicExpenseController extends Controller
             'end_date' => 'required|date|after_or_equal:start_date',
         ]);
 
-        $clinicId = $this->getClinicIdByRole();
+        // Multi-tenancy: No need for clinic_id filter, database is already isolated by tenant
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
 
-        $expenses = $this->repository->getByDateRange($startDate, $endDate, $clinicId);
+        $expenses = $this->repository->getByDateRange($startDate, $endDate, null);
 
         return response()->json([
             'success' => true,
@@ -267,20 +240,6 @@ class ClinicExpenseController extends Controller
         ]);
     }
 
-    /**
-     * Get clinic ID based on user role.
-     * Super admin sees all, others see only their clinic.
-     */
-    private function getClinicIdByRole(): ?int
-    {
-        $user = Auth::user();
-        
-        // If user is super admin, return null to see all
-        if ($user && $user->hasRole('super-admin')) {
-            return null;
-        }
-        
-        // Otherwise, return the user's clinic_id
-        return $user?->clinic_id;
-    }
+    // Note: getClinicIdByRole() method removed - no longer needed with multi-tenancy
+    // Database isolation is handled automatically by the tenancy middleware
 }

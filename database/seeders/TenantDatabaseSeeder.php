@@ -79,16 +79,16 @@ class TenantRolesAndPermissionsSeeder extends Seeder
         ];
 
         foreach ($permissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'api']);
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
 
         // Create roles
-        $adminRole = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'api']);
-        $doctorRole = Role::firstOrCreate(['name' => 'doctor', 'guard_name' => 'api']);
-        $secretaryRole = Role::firstOrCreate(['name' => 'secretary', 'guard_name' => 'api']);
+        $superDoctorRole = Role::firstOrCreate(['name' => 'clinic_super_doctor', 'guard_name' => 'web']);
+        $doctorRole = Role::firstOrCreate(['name' => 'doctor', 'guard_name' => 'web']);
+        $secretaryRole = Role::firstOrCreate(['name' => 'secretary', 'guard_name' => 'web']);
 
-        // Assign all permissions to admin
-        $adminRole->givePermissionTo(Permission::all());
+        // Assign all permissions to clinic_super_doctor
+        $superDoctorRole->givePermissionTo(Permission::all());
 
         // Assign doctor permissions
         $doctorRole->givePermissionTo([
