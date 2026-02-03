@@ -19,7 +19,6 @@ class ClinicExpenseResource extends JsonResource
             'name' => $this->name,
             'quantity' => $this->quantity,
             'clinic_expense_category_id' => $this->clinic_expense_category_id,
-            'clinic_id' => $this->clinic_id,
             'date' => $this->date?->format('Y-m-d'),
             'price' => $this->price,
             'total' => $this->total,
@@ -33,7 +32,6 @@ class ClinicExpenseResource extends JsonResource
             
             // Relationships (loaded conditionally)
             'category' => new ClinicExpenseCategoryResource($this->whenLoaded('category')),
-            'clinic' => $this->whenLoaded('clinic'),
             'doctor' => new UserResource($this->whenLoaded('doctor')),
             'creator' => new UserResource($this->whenLoaded('creator')),
             'updator' => new UserResource($this->whenLoaded('updator')),

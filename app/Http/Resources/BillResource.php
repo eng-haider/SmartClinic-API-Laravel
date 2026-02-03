@@ -57,7 +57,6 @@ class BillResource extends JsonResource
                             'id' => $this->billable->category->id ?? null,
                             'name' => $this->billable->category->name ?? 'N/A',
                             'order' => $this->billable->category->order ?? null,
-                            'clinic_id' => $this->billable->category->clinic_id ?? null,
                             'item_cost' => $this->billable->category->item_cost ?? null,
                             'created_at' => $this->billable->category->created_at?->format('Y-m-d H:i:s'),
                             'updated_at' => $this->billable->category->updated_at?->format('Y-m-d H:i:s'),

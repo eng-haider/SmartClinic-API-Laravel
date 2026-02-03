@@ -23,7 +23,6 @@ class CaseModel extends Model
     protected $fillable = [
         'patient_id',
         'doctor_id',
-        'clinic_id',
         'case_categores_id',
         'notes',
         'status_id',
@@ -43,7 +42,6 @@ class CaseModel extends Model
         return [
             'patient_id' => 'integer',
             'doctor_id' => 'integer',
-            'clinic_id' => 'integer',
             'case_categores_id' => 'integer',
             'status_id' => 'integer',
             'price' => 'integer',
@@ -84,14 +82,6 @@ class CaseModel extends Model
     public function status()
     {
         return $this->belongsTo(Status::class);
-    }
-
-    /**
-     * Get the clinic that owns the case.
-     */
-    public function clinic()
-    {
-        return $this->belongsTo(Clinic::class);
     }
 
     /**

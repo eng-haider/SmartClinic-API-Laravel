@@ -27,24 +27,8 @@ class CaseCategoryRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'order' => 'nullable|integer|min:0',
-            'clinic_id' => 'nullable|exists:clinics,id',
             'item_cost' => 'nullable|integer|min:0',
         ];
-    }
-
-    /**
-     * Prepare the data for validation.
-     */
-    protected function prepareForValidation(): void
-    {
-        if (!Auth::check()) {
-            return;
-        }
-
-        // Always set clinic_id from authenticated user
-        $this->merge([
-            'clinic_id' => Auth::user()->clinic_id,
-        ]);
     }
 
     /**
@@ -58,8 +42,6 @@ class CaseCategoryRequest extends FormRequest
             'name.required' => 'Category name is required',
             'name.string' => 'Category name must be a string',
             'name.max' => 'Category name must not exceed 255 characters',
-            'clinic_id.required' => 'Clinic ID is required',
-            'clinic_id.exists' => 'The selected clinic does not exist',
             'order.integer' => 'Order must be an integer',
             'order.min' => 'Order must be at least 0',
             'item_cost.integer' => 'Item cost must be an integer',

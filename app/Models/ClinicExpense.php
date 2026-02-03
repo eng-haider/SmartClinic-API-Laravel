@@ -49,7 +49,6 @@ class ClinicExpense extends Model
         'name',
         'quantity',
         'clinic_expense_category_id',
-        'clinic_id',
         'date',
         'price',
         'is_paid',
@@ -84,14 +83,6 @@ class ClinicExpense extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(ClinicExpenseCategory::class, 'clinic_expense_category_id');
-    }
-
-    /**
-     * Get the clinic that owns this expense.
-     */
-    public function clinic(): BelongsTo
-    {
-        return $this->belongsTo(Clinic::class, 'clinic_id');
     }
 
     /**
@@ -132,14 +123,6 @@ class ClinicExpense extends Model
     public function scopeUnpaid($query)
     {
         return $query->where('is_paid', false);
-    }
-
-    /**
-     * Scope a query to filter by clinic.
-     */
-    public function scopeForClinic($query, $clinicId)
-    {
-        return $query->where('clinic_id', $clinicId);
     }
 
     /**

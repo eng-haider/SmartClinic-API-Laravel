@@ -50,7 +50,6 @@ class ClinicExpenseCategory extends Model
     protected $fillable = [
         'name',
         'description',
-        'clinic_id',
         'is_active',
         'creator_id',
         'updator_id',
@@ -71,14 +70,6 @@ class ClinicExpenseCategory extends Model
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
-    }
-
-    /**
-     * Get the clinic that owns this expense category.
-     */
-    public function clinic(): BelongsTo
-    {
-        return $this->belongsTo(Clinic::class, 'clinic_id');
     }
 
     /**
@@ -111,14 +102,6 @@ class ClinicExpenseCategory extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
-    }
-
-    /**
-     * Scope a query to filter by clinic.
-     */
-    public function scopeForClinic($query, $clinicId)
-    {
-        return $query->where('clinic_id', $clinicId);
     }
 
     /**

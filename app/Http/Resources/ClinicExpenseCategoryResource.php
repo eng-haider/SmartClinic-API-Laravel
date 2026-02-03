@@ -18,7 +18,6 @@ class ClinicExpenseCategoryResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'description' => $this->description,
-            'clinic_id' => $this->clinic_id,
             'is_active' => $this->is_active,
             'creator_id' => $this->creator_id,
             'updator_id' => $this->updator_id,
@@ -35,7 +34,6 @@ class ClinicExpenseCategoryResource extends JsonResource
             'total_unpaid_amount' => $this->when(isset($this->total_unpaid_amount), (float) ($this->total_unpaid_amount ?? 0)),
             
             // Relationships (loaded conditionally)
-            'clinic' => $this->whenLoaded('clinic'),
             'creator' => new UserResource($this->whenLoaded('creator')),
             'updator' => new UserResource($this->whenLoaded('updator')),
             'expenses' => ClinicExpenseResource::collection($this->whenLoaded('expenses')),

@@ -16,7 +16,6 @@ class ClinicSetting extends Model
      * @var list<string>
      */
     protected $fillable = [
-        'clinic_id',
         'setting_key',
         'setting_value',
         'setting_type',
@@ -32,19 +31,10 @@ class ClinicSetting extends Model
     protected function casts(): array
     {
         return [
-            'clinic_id' => 'integer',
             'is_active' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
-    }
-
-    /**
-     * Get the clinic that owns the setting.
-     */
-    public function clinic()
-    {
-        return $this->belongsTo(Clinic::class);
     }
 
     /**

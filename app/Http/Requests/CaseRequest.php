@@ -23,7 +23,6 @@ class CaseRequest extends FormRequest
         return [
             'patient_id' => 'required|exists:patients,id',
             'doctor_id' => 'nullable|exists:users,id',
-            'clinic_id' => 'nullable|exists:clinics,id',
             'case_categores_id' => 'required|exists:case_categories,id',
             'status_id' => 'nullable|exists:statuses,id',
             'notes' => 'nullable|string|max:5000',
@@ -45,11 +44,10 @@ class CaseRequest extends FormRequest
 
         $user = Auth::user();
 
-        // Always set doctor_id and clinic_id from authenticated user
-        // Set default status_id to 1 (New) if not provided
+        // Always set doctor_id from authenticated user
+        // Set default status_id to 2 if not provided
         $this->merge([
             'doctor_id' => $user->id,
-            'clinic_id' => $user->clinic_id,
             'status_id' => $this->status_id ?? 2,
         ]);
     }
@@ -64,8 +62,6 @@ class CaseRequest extends FormRequest
             'patient_id.exists' => 'Selected patient does not exist',
             'doctor_id.required' => 'Doctor is required',
             'doctor_id.exists' => 'Selected doctor does not exist',
-            'clinic_id.required' => 'Clinic is required. Please make sure your user account has a clinic assigned.',
-            'clinic_id.exists' => 'Selected clinic does not exist',
             'case_categores_id.required' => 'Case category is required',
             'case_categores_id.exists' => 'Selected case category does not exist',
             'status_id.exists' => 'Selected status does not exist',
@@ -82,7 +78,6 @@ class CaseRequest extends FormRequest
         return [
             'patient_id' => 'patient',
             'doctor_id' => 'doctor',
-            'clinic_id' => 'clinic',
             'case_categores_id' => 'case category',
             'status_id' => 'status',
         ];

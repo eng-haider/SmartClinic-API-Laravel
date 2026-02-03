@@ -18,7 +18,6 @@ class CaseCategory extends Model
     protected $fillable = [
         'name',
         'order',
-        'clinic_id',
         'item_cost',
     ];
 

@@ -34,7 +34,6 @@ class ClinicSettingResource extends JsonResource
 
         return [
             'id' => $this->id,
-            'clinic_id' => $this->clinic_id,
             'setting_key' => $this->setting_key,
             'setting_value' => $value,
             'setting_value_raw' => $this->setting_value, // Original value
