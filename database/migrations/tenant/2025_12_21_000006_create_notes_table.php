@@ -13,14 +13,19 @@ return new class extends Migration
     {
         Schema::create('notes', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('patient_id');
+            $table->morphs('noteable'); // Creates noteable_id and noteable_type with index
             $table->text('content');
-            $table->unsignedBigInteger('creator_id')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable(); // User who created the note
             $table->timestamps();
-            $table->softDeletes();
-
-            $table->foreign('patient_id')->references('id')->on('patients')->onDelete('cascade');
-            $table->foreign('creator_id')->references('id')->on('users')->onDelete('set null');
+            
+            // Foreign key for created_by
+            $table->foreign('created_by')
+                  ->references('id')
+                  ->on('users')
+                  ->onDelete('set null');
+            
+            // Index for created_by
+            $table->index('created_by');
         });
     }
 

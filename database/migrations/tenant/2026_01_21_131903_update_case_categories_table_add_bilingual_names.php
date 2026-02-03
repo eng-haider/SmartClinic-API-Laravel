@@ -12,8 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('case_categories', function (Blueprint $table) {
-            $table->integer('order')->default(0)->after('name');
-            $table->integer('item_cost')->default(0)->after('order');
+            // Add bilingual name columns
+            $table->string('name_ar')->nullable()->after('name');
+            $table->string('name_en')->nullable()->after('name_ar');
         });
     }
 
@@ -23,7 +24,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('case_categories', function (Blueprint $table) {
-            $table->dropColumn(['order', 'item_cost']);
+            $table->dropColumn(['name_ar', 'name_en']);
         });
     }
 };

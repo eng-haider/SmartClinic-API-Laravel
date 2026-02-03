@@ -11,12 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('from_where_comes', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->text('description')->nullable();
-            $table->timestamps();
-            $table->softDeletes();
+        Schema::table('reservations', function (Blueprint $table) {
+            $table->date('reservation_end_date')->nullable()->change();
         });
     }
 
@@ -25,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('from_where_comes');
+        Schema::table('reservations', function (Blueprint $table) {
+            $table->date('reservation_end_date')->nullable(false)->change();
+        });
     }
 };

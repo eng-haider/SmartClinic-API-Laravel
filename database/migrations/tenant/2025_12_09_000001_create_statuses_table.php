@@ -11,16 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('clinic_settings', function (Blueprint $table) {
+        Schema::create('statuses', function (Blueprint $table) {
             $table->id();
-            $table->string('setting_key')->nullable();
-            $table->text('setting_value')->nullable();
-            $table->string('setting_type')->default('string');
-            $table->text('description')->nullable();
+            $table->string('name_ar');
+            $table->string('name_en')->nullable();
+            $table->string('color')->nullable();
+            $table->integer('order')->nullable();
             $table->timestamps();
-            $table->softDeletes();
 
-            $table->unique('setting_key');
+            // Indexes
+            $table->index('order');
         });
     }
 
@@ -29,6 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('clinic_settings');
+        Schema::dropIfExists('statuses');
     }
 };

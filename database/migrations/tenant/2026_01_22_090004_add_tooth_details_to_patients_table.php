@@ -11,12 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('clinic_expense_categories', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->text('description')->nullable();
-            $table->timestamps();
-            $table->softDeletes();
+        Schema::table('patients', function (Blueprint $table) {
+            $table->json('tooth_details')->nullable()->after('age');
         });
     }
 
@@ -25,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('clinic_expense_categories');
+        Schema::table('patients', function (Blueprint $table) {
+            $table->dropColumn('tooth_details');
+        });
     }
 };

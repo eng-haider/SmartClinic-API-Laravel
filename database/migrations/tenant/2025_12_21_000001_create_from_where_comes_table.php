@@ -11,13 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('statuses', function (Blueprint $table) {
+        Schema::create('from_where_comes', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('color')->nullable();
+            $table->string('name_ar')->nullable();
             $table->text('description')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->integer('order')->nullable();
             $table->timestamps();
-            $table->softDeletes();
+
+            // Indexes
+            $table->index('is_active');
+            $table->index('order');
         });
     }
 
@@ -26,6 +31,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('statuses');
+        Schema::dropIfExists('from_where_comes');
     }
 };
