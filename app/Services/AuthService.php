@@ -91,6 +91,7 @@ class AuthService
     /**
      * Smart Login: One-step authentication (discovers tenant and logs in)
      * This combines checkCredentials and login into a single call
+     * AUTO-CREATES tenant database and user if they don't exist
      */
     public function smartLogin(string $phone, string $password): array
     {
@@ -113,17 +114,21 @@ class AuthService
             throw new \Exception('User is not associated with any clinic');
         }
 
-        // Step 2: Switch to tenant context and authenticate
+        // Step 2: Ensure tenant exists, create if not
         $tenant = \App\Models\Tenant::find($clinic->id);
         
         if (!$tenant) {
-            throw new \Exception('Tenant/clinic not found');
+            // Auto-create tenant record
+            $tenant = $this->createTenantForClinic($clinic);
         }
 
-        // Initialize tenant context
+        // Step 3: Ensure tenant database is setup
+        $this->ensureTenantDatabaseExists($tenant, $centralUser, $password);
+
+        // Step 4: Initialize tenant context
         tenancy()->initialize($tenant);
 
-        // Get user from tenant database
+        // Step 5: Get user from tenant database
         $tenantUser = User::where('phone', $phone)->first();
 
         if (!$tenantUser) {
@@ -144,6 +149,134 @@ class AuthService
             'clinic_name' => $clinic->name,
             'message' => 'Login successful',
         ];
+    }
+
+    /**
+     * Create tenant record for existing clinic
+     */
+    private function createTenantForClinic(Clinic $clinic): \App\Models\Tenant
+    {
+        $tenant = new \App\Models\Tenant();
+        $tenant->setAttribute('id', $clinic->id);
+        $tenant->exists = false;
+        
+        // Copy clinic data to tenant
+        $tenant->setAttribute('name', $clinic->name);
+        $tenant->setAttribute('address', $clinic->address);
+        $tenant->setAttribute('logo', $clinic->logo);
+        
+        // Store database credentials for Hostinger
+        $databaseName = config('tenancy.database.prefix') . $clinic->id;
+        $tenant->setAttribute('db_name', $databaseName);
+        $tenant->setAttribute('db_username', $databaseName);
+        $tenant->setAttribute('db_password', env('TENANT_DB_PASSWORD'));
+        
+        $tenant->saveQuietly();
+        $tenant->refresh();
+        
+        \Illuminate\Support\Facades\Log::info('Auto-created tenant record', [
+            'tenant_id' => $tenant->id,
+            'db_name' => $databaseName
+        ]);
+        
+        return $tenant;
+    }
+
+    /**
+     * Ensure tenant database exists and is properly setup
+     */
+    private function ensureTenantDatabaseExists(\App\Models\Tenant $tenant, User $centralUser, string $password): void
+    {
+        $databaseName = $tenant->db_name ?? (config('tenancy.database.prefix') . $tenant->id);
+        $tenantUsername = $tenant->db_username ?? $databaseName;
+        $tenantPassword = $tenant->db_password ?? env('TENANT_DB_PASSWORD');
+        
+        $centralConfig = config('database.connections.' . config('tenancy.database.central_connection'));
+        
+        // Configure the tenant connection
+        config([
+            'database.connections.tenant.database' => $databaseName,
+            'database.connections.tenant.username' => $tenantUsername,
+            'database.connections.tenant.password' => $tenantPassword,
+            'database.connections.tenant.host' => $centralConfig['host'],
+            'database.connections.tenant.port' => $centralConfig['port'],
+        ]);
+        
+        // Purge and reconnect
+        DB::purge('tenant');
+        
+        // Test connection
+        try {
+            DB::connection('tenant')->getPdo();
+            
+            // Check if database is already setup (has users table with data)
+            try {
+                $userCount = DB::connection('tenant')->table('users')->count();
+                if ($userCount > 0) {
+                    \Illuminate\Support\Facades\Log::info('Tenant database already setup', [
+                        'database' => $databaseName,
+                        'user_count' => $userCount
+                    ]);
+                    return; // Database already setup
+                }
+            } catch (\Exception $e) {
+                // Table doesn't exist, need to run migrations
+            }
+            
+            // Database exists but not setup - run migrations and seeders
+            \Illuminate\Support\Facades\Log::info('Setting up tenant database', [
+                'database' => $databaseName
+            ]);
+            
+            // Run migrations
+            \Illuminate\Support\Facades\Artisan::call('migrate', [
+                '--database' => 'tenant',
+                '--path' => 'database/migrations/tenant',
+                '--force' => true,
+            ]);
+            
+            // Run seeders
+            \Illuminate\Support\Facades\Artisan::call('db:seed', [
+                '--database' => 'tenant',
+                '--class' => 'RoleAndPermissionSeeder',
+                '--force' => true,
+            ]);
+            
+            \Illuminate\Support\Facades\Artisan::call('db:seed', [
+                '--database' => 'tenant',
+                '--class' => 'TenantDatabaseSeeder',
+                '--force' => true,
+            ]);
+            
+            // Create user in tenant database
+            User::on('tenant')->create([
+                'name' => $centralUser->name,
+                'phone' => $centralUser->phone,
+                'email' => $centralUser->email ?? null,
+                'password' => Hash::make($password),
+                'is_active' => true,
+            ]);
+            
+            // Assign role
+            $tenantUser = User::on('tenant')->where('phone', $centralUser->phone)->first();
+            if ($tenantUser) {
+                $tenantUser->assignRole('clinic_super_doctor');
+            }
+            
+            \Illuminate\Support\Facades\Log::info('Tenant database setup completed', [
+                'database' => $databaseName
+            ]);
+            
+        } catch (\Exception $e) {
+            throw new \Exception(
+                "Database '{$databaseName}' does not exist. " .
+                "Please create it in your hosting panel (e.g., hPanel on Hostinger): " .
+                "(1) Create database: {$databaseName}. " .
+                "(2) Create user: {$tenantUsername}. " .
+                "(3) Set password to match TENANT_DB_PASSWORD in .env. " .
+                "Original error: " . $e->getMessage()
+            );
+        }
     }
 
     /**
