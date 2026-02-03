@@ -41,20 +41,22 @@ class HostingerDatabaseManager extends MySQLDatabaseManager
     }
 
     /**
-     * Make the tenant's database connection.
-     * This overrides the default to use per-tenant database credentials.
+     * Get the tenant database connection configuration.
+     * On Hostinger, each database has its own user with the same name as the database.
      */
     public function makeConnectionConfig(array $baseConfig, string $databaseName): array
     {
-        $config = parent::makeConnectionConfig($baseConfig, $databaseName);
+        // Start with parent config
+        $config = $baseConfig;
         
-        // On Hostinger, each tenant database has its own user with the same name as the database
-        // Use the database name as the username
+        // Set database name
+        $config['database'] = $databaseName;
+        
+        // On Hostinger: username = database name
         $config['username'] = $databaseName;
         
-        // Use the tenant database password from .env
-        // All tenant databases should use the same password (set this in hPanel when creating DBs)
-        $config['password'] = env('TENANT_DB_PASSWORD', env('DB_PASSWORD'));
+        // Use tenant database password from .env (same for all tenants)
+        $config['password'] = env('TENANT_DB_PASSWORD', $baseConfig['password'] ?? '');
         
         return $config;
     }
@@ -65,26 +67,15 @@ class HostingerDatabaseManager extends MySQLDatabaseManager
     public function databaseExists(string $name): bool
     {
         try {
-            // Try to connect using tenant-specific credentials
+            // Get central connection config
             $connection = $this->database()->connection();
             $config = $connection->getConfig();
             
-            // Create a test connection with tenant credentials
-            $testConfig = [
-                'driver' => 'mysql',
-                'host' => $config['host'],
-                'port' => $config['port'],
-                'database' => $name,
-                'username' => $name, // On Hostinger, username = database name
-                'password' => env('TENANT_DB_PASSWORD', env('DB_PASSWORD')),
-                'charset' => $config['charset'] ?? 'utf8mb4',
-                'collation' => $config['collation'] ?? 'utf8mb4_unicode_ci',
-            ];
-            
+            // Try to connect using tenant-specific credentials
             $pdo = new \PDO(
-                "mysql:host={$testConfig['host']};port={$testConfig['port']};dbname={$testConfig['database']}",
-                $testConfig['username'],
-                $testConfig['password'],
+                "mysql:host={$config['host']};port={$config['port']};dbname={$name}",
+                $name, // username = database name on Hostinger
+                env('TENANT_DB_PASSWORD', $config['password']),
                 [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]
             );
             
