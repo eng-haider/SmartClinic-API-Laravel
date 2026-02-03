@@ -11,36 +11,37 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('clinic_expenses', function (Blueprint $table) {
+        Schema::create('reservations', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->bigInteger('quantity')->nullable();
-            $table->unsignedBigInteger('clinic_expense_category_id')->nullable();
-            $table->unsignedBigInteger('clinic_id');
-            $table->date('date')->default(now());
-            $table->decimal('price', 15, 2);
-            $table->boolean('is_paid')->default(true);
+            $table->unsignedBigInteger('patient_id');
             $table->unsignedBigInteger('doctor_id')->nullable();
+            $table->unsignedBigInteger('status_id');
+            $table->text('notes')->nullable();
+            $table->date('reservation_start_date');
+            $table->date('reservation_end_date');
+            $table->time('reservation_from_time');
+            $table->time('reservation_to_time')->nullable();
+            $table->boolean('is_waiting')->default(false);
             $table->unsignedBigInteger('creator_id')->nullable();
             $table->unsignedBigInteger('updator_id')->nullable();
             $table->softDeletes();
             $table->timestamps();
 
             // Foreign keys
-            $table->foreign('clinic_expense_category_id')
+            $table->foreign('patient_id')
                   ->references('id')
-                  ->on('clinic_expense_categories')
-                  ->onDelete('set null');
-
-            $table->foreign('clinic_id')
-                  ->references('id')
-                  ->on('clinics')
+                  ->on('patients')
                   ->onDelete('cascade');
 
             $table->foreign('doctor_id')
                   ->references('id')
                   ->on('users')
                   ->onDelete('set null');
+
+            $table->foreign('status_id')
+                  ->references('id')
+                  ->on('statuses')
+                  ->onDelete('cascade');
 
             $table->foreign('creator_id')
                   ->references('id')
@@ -53,14 +54,12 @@ return new class extends Migration
                   ->onDelete('set null');
 
             // Indexes for common queries
-            $table->index('clinic_expense_category_id');
-            $table->index('clinic_id');
+            $table->index('patient_id');
             $table->index('doctor_id');
-            $table->index('date');
-            $table->index('is_paid');
-            $table->index('creator_id');
-            $table->index('updator_id');
-            $table->index('created_at');
+            $table->index('status_id');
+            $table->index('reservation_start_date');
+            $table->index('reservation_end_date');
+            $table->index('is_waiting');
         });
     }
 
@@ -69,6 +68,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('clinic_expenses');
+        Schema::dropIfExists('reservations');
     }
 };

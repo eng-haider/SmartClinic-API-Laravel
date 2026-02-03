@@ -11,21 +11,22 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('notes', function (Blueprint $table) {
+        Schema::create('recipe_items', function (Blueprint $table) {
             $table->id();
-            $table->morphs('noteable'); // Creates noteable_id and noteable_type with index
-            $table->text('content');
-            $table->unsignedBigInteger('created_by')->nullable(); // User who created the note
+            $table->string('name');
+            $table->unsignedBigInteger('doctors_id')->nullable();
+            $table->softDeletes();
             $table->timestamps();
-            
-            // Foreign key for created_by
-            $table->foreign('created_by')
+
+            // Foreign keys
+            $table->foreign('doctors_id')
                   ->references('id')
                   ->on('users')
                   ->onDelete('set null');
-            
-            // Index for created_by
-            $table->index('created_by');
+
+            // Indexes
+            $table->index('doctors_id');
+            $table->index('name');
         });
     }
 
@@ -34,6 +35,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('notes');
+        Schema::dropIfExists('recipe_items');
     }
 };

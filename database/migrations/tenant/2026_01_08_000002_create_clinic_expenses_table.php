@@ -11,22 +11,30 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('clinic_expense_categories', function (Blueprint $table) {
+        Schema::create('clinic_expenses', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->text('description')->nullable();
-            $table->unsignedBigInteger('clinic_id')->nullable();
-            $table->boolean('is_active')->default(true);
+            $table->bigInteger('quantity')->nullable();
+            $table->unsignedBigInteger('clinic_expense_category_id')->nullable();
+            $table->date('date')->default(now());
+            $table->decimal('price', 15, 2);
+            $table->boolean('is_paid')->default(true);
+            $table->unsignedBigInteger('doctor_id')->nullable();
             $table->unsignedBigInteger('creator_id')->nullable();
             $table->unsignedBigInteger('updator_id')->nullable();
             $table->softDeletes();
             $table->timestamps();
 
             // Foreign keys
-            $table->foreign('clinic_id')
+            $table->foreign('clinic_expense_category_id')
                   ->references('id')
-                  ->on('clinics')
-                  ->onDelete('cascade');
+                  ->on('clinic_expense_categories')
+                  ->onDelete('set null');
+
+            $table->foreign('doctor_id')
+                  ->references('id')
+                  ->on('users')
+                  ->onDelete('set null');
 
             $table->foreign('creator_id')
                   ->references('id')
@@ -38,11 +46,14 @@ return new class extends Migration
                   ->on('users')
                   ->onDelete('set null');
 
-            // Indexes
-            $table->index('clinic_id');
-            $table->index('is_active');
+            // Indexes for common queries
+            $table->index('clinic_expense_category_id');
+            $table->index('doctor_id');
+            $table->index('date');
+            $table->index('is_paid');
             $table->index('creator_id');
             $table->index('updator_id');
+            $table->index('created_at');
         });
     }
 
@@ -51,6 +62,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('clinic_expense_categories');
+        Schema::dropIfExists('clinic_expenses');
     }
 };

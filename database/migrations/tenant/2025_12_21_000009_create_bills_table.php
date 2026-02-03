@@ -11,27 +11,33 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('recipes', function (Blueprint $table) {
+        Schema::create('bills', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('patient_id')->nullable();
-            $table->text('notes')->nullable();
-            $table->unsignedBigInteger('doctors_id');
+            $table->morphs('billable'); // Creates billable_id and billable_type
+            $table->boolean('is_paid')->default(true);
+            $table->bigInteger('price');
+            $table->unsignedBigInteger('doctor_id')->nullable();
+            $table->boolean('use_credit')->default(false);
+            $table->softDeletes();
             $table->timestamps();
 
             // Foreign keys
             $table->foreign('patient_id')
                   ->references('id')
                   ->on('patients')
-                  ->onDelete('cascade');
+                  ->onDelete('set null');
 
-            $table->foreign('doctors_id')
+            $table->foreign('doctor_id')
                   ->references('id')
                   ->on('users')
-                  ->onDelete('cascade');
+                  ->onDelete('set null');
 
-            // Indexes
+            // Indexes for common queries
             $table->index('patient_id');
-            $table->index('doctors_id');
+            $table->index('doctor_id');
+            $table->index('is_paid');
+            $table->index('use_credit');
             $table->index('created_at');
         });
     }
@@ -41,6 +47,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('recipes');
+        Schema::dropIfExists('bills');
     }
 };

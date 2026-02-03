@@ -14,11 +14,14 @@ return new class extends Migration
         Schema::create('case_categories', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+
             $table->bigInteger('order')->nullable();
             $table->bigInteger('item_cost')->default(0);
+         
             $table->timestamps();
-            $table->softDeletes();
-            
+
+       
+
             // Indexes
             $table->index('order');
         });

@@ -16,6 +16,11 @@ return new class extends Migration
             $table->softDeletes();
         });
 
+        // Add soft deletes to clinic_settings
+        Schema::table('clinic_settings', function (Blueprint $table) {
+            $table->softDeletes();
+        });
+
         // Add soft deletes to from_where_comes
         Schema::table('from_where_comes', function (Blueprint $table) {
             $table->softDeletes();
@@ -54,6 +59,11 @@ return new class extends Migration
     {
         // Remove soft deletes from case_categories
         Schema::table('case_categories', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+        });
+
+        // Remove soft deletes from clinic_settings
+        Schema::table('clinic_settings', function (Blueprint $table) {
             $table->dropSoftDeletes();
         });
 

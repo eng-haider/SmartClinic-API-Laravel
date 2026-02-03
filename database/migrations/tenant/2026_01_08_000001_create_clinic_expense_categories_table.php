@@ -11,29 +11,31 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('recipe_items', function (Blueprint $table) {
+        Schema::create('clinic_expense_categories', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->unsignedBigInteger('doctors_id')->nullable();
-            $table->unsignedBigInteger('clinics_id')->nullable();
+            $table->text('description')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->unsignedBigInteger('creator_id')->nullable();
+            $table->unsignedBigInteger('updator_id')->nullable();
             $table->softDeletes();
             $table->timestamps();
 
             // Foreign keys
-            $table->foreign('doctors_id')
+            $table->foreign('creator_id')
                   ->references('id')
                   ->on('users')
                   ->onDelete('set null');
 
-            $table->foreign('clinics_id')
+            $table->foreign('updator_id')
                   ->references('id')
-                  ->on('clinics')
+                  ->on('users')
                   ->onDelete('set null');
 
             // Indexes
-            $table->index('doctors_id');
-            $table->index('clinics_id');
-            $table->index('name');
+            $table->index('is_active');
+            $table->index('creator_id');
+            $table->index('updator_id');
         });
     }
 
@@ -42,6 +44,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('recipe_items');
+        Schema::dropIfExists('clinic_expense_categories');
     }
 };
