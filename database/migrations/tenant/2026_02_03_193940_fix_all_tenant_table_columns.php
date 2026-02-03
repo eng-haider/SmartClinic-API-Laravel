@@ -113,10 +113,10 @@ return new class extends Migration
         if (Schema::hasTable('case_categories')) {
             Schema::table('case_categories', function (Blueprint $table) {
                 if (!Schema::hasColumn('case_categories', 'order')) {
-                    $table->integer('order')->default(0)->after('name');
+                    $table->integer('order')->nullable();
                 }
                 if (!Schema::hasColumn('case_categories', 'item_cost')) {
-                    $table->integer('item_cost')->default(0)->after('order');
+                    $table->bigInteger('item_cost')->default(0);
                 }
             });
         }
@@ -125,7 +125,10 @@ return new class extends Migration
         if (Schema::hasTable('from_where_comes')) {
             Schema::table('from_where_comes', function (Blueprint $table) {
                 if (!Schema::hasColumn('from_where_comes', 'order')) {
-                    $table->integer('order')->nullable()->after('is_active');
+                    $table->integer('order')->nullable();
+                }
+                if (!Schema::hasColumn('from_where_comes', 'is_active')) {
+                    $table->boolean('is_active')->default(true);
                 }
             });
         }
@@ -134,7 +137,7 @@ return new class extends Migration
         if (Schema::hasTable('statuses')) {
             Schema::table('statuses', function (Blueprint $table) {
                 if (!Schema::hasColumn('statuses', 'order')) {
-                    $table->integer('order')->nullable()->after('color');
+                    $table->integer('order')->nullable();
                 }
             });
         }
@@ -143,16 +146,16 @@ return new class extends Migration
         if (Schema::hasTable('patients')) {
             Schema::table('patients', function (Blueprint $table) {
                 if (!Schema::hasColumn('patients', 'public_token')) {
-                    $table->uuid('public_token')->after('id');
+                    $table->uuid('public_token')->unique();
                 }
                 if (!Schema::hasColumn('patients', 'is_public_profile_enabled')) {
-                    $table->boolean('is_public_profile_enabled')->default(false)->after('public_token');
+                    $table->boolean('is_public_profile_enabled')->default(false);
                 }
                 if (!Schema::hasColumn('patients', 'credit_balance')) {
-                    $table->bigInteger('credit_balance')->nullable()->after('identifier');
+                    $table->bigInteger('credit_balance')->nullable();
                 }
                 if (!Schema::hasColumn('patients', 'credit_balance_add_at')) {
-                    $table->timestamp('credit_balance_add_at')->nullable()->after('credit_balance');
+                    $table->timestamp('credit_balance_add_at')->nullable();
                 }
             });
         }
@@ -161,7 +164,7 @@ return new class extends Migration
         if (Schema::hasTable('bills')) {
             Schema::table('bills', function (Blueprint $table) {
                 if (!Schema::hasColumn('bills', 'use_credit')) {
-                    $table->boolean('use_credit')->default(false)->after('updator_id');
+                    $table->boolean('use_credit')->default(false);
                 }
             });
         }
@@ -170,10 +173,10 @@ return new class extends Migration
         if (Schema::hasTable('clinic_expenses')) {
             Schema::table('clinic_expenses', function (Blueprint $table) {
                 if (!Schema::hasColumn('clinic_expenses', 'quantity')) {
-                    $table->bigInteger('quantity')->nullable()->after('name');
+                    $table->bigInteger('quantity')->nullable();
                 }
                 if (!Schema::hasColumn('clinic_expenses', 'date')) {
-                    $table->date('date')->default(now())->after('clinic_expense_category_id');
+                    $table->date('date')->default('2026-01-17');
                 }
             });
         }
