@@ -36,18 +36,22 @@ class RoleAndPermissionSeeder extends Seeder
         }
         $allPermissions = array_unique($allPermissions);
 
-        // Create all permissions
+        // Create all permissions with 'web' guard (compatible with JWT)
         $this->command->info('Creating permissions...');
         foreach ($allPermissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission]);
+            Permission::firstOrCreate([
+                'name' => $permission,
+                'guard_name' => 'web',
+            ]);
             $this->command->info("  ✓ {$permission}");
         }
 
-        // Create roles and assign permissions
+        // Create roles and assign permissions with 'web' guard
         $this->command->info("\nCreating roles and assigning permissions...");
         foreach ($roles as $roleName => $roleData) {
             $role = Role::firstOrCreate([
                 'name' => $roleName,
+                'guard_name' => 'web',
             ]);
 
             if (isset($roleData['permissions'])) {
