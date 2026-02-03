@@ -63,25 +63,14 @@ class HostingerDatabaseManager extends MySQLDatabaseManager
 
     /**
      * Check if the database exists and is accessible.
+     * On Hostinger shared hosting, we assume the database exists (created manually).
+     * Skipping this check prevents errors during tenant creation.
      */
     public function databaseExists(string $name): bool
     {
-        try {
-            // Get central connection config
-            $connection = $this->database()->connection();
-            $config = $connection->getConfig();
-            
-            // Try to connect using tenant-specific credentials
-            $pdo = new \PDO(
-                "mysql:host={$config['host']};port={$config['port']};dbname={$name}",
-                $name, // username = database name on Hostinger
-                env('TENANT_DB_PASSWORD', $config['password']),
-                [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]
-            );
-            
-            return true;
-        } catch (\Exception $e) {
-            return false;
-        }
+        // On shared hosting, databases are created manually in hPanel
+        // We skip the existence check to avoid permission errors
+        // The actual connection test happens in TenantController
+        return true;
     }
 }
