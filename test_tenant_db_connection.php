@@ -35,17 +35,23 @@ $tenantId = $argv[1] ?? '_alamal';
 $dbPrefix = config('tenancy.database.prefix', 'tenant');
 $tenantDbName = $dbPrefix . $tenantId;
 
+// On Hostinger, each tenant DB has its own user with the same name as the database
+$tenantUsername = $tenantDbName;
+$tenantPassword = env('TENANT_DB_PASSWORD', $password);
+
 echo "Testing Tenant Database:\n";
 echo "  Tenant ID: {$tenantId}\n";
 echo "  Database Name: {$tenantDbName}\n";
+echo "  Username: {$tenantUsername}\n";
+echo "  Password: " . (empty($tenantPassword) ? '(empty)' : str_repeat('*', strlen($tenantPassword))) . "\n";
 echo "  Expected Format: {$dbPrefix}[tenant_id]\n\n";
 
 echo "Attempting to connect...\n";
 
 try {
-    // Try to connect directly using PDO
+    // Try to connect directly using PDO with TENANT credentials
     $dsn = "mysql:host={$host};port={$port};dbname={$tenantDbName}";
-    $pdo = new PDO($dsn, $username, $password, [
+    $pdo = new PDO($dsn, $tenantUsername, $tenantPassword, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ]);

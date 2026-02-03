@@ -203,16 +203,16 @@ class TenantController extends Controller
                 // Provide helpful error message for shared hosting
                 // Note: $databaseName already includes the full name with prefix (e.g., u876784197_tenant_alamal)
                 
-                throw new \Exception(
-                    "Database '{$databaseName}' does not exist or cannot be accessed. " .
-                    "On shared hosting (Hostinger/cPanel), you must create it manually:\n" .
-                    "1. Go to your hosting panel → Databases → MySQL Databases\n" .
-                    "2. Create database with exact name: {$databaseName}\n" .
-                    "3. Ensure your DB user (same as central DB) has access to this database\n" .
-                    "4. Verify the database name matches exactly (including prefix)\n" .
-                    "5. Try creating the tenant again\n" .
-                    "Original error: " . $e->getMessage()
-                );
+                $errorMessage = "Database '{$databaseName}' does not exist or cannot be accessed. " .
+                    "On shared hosting (Hostinger/cPanel): " .
+                    "(1) Go to hosting panel → Databases → MySQL Databases. " .
+                    "(2) Create database with exact name: {$databaseName}. " .
+                    "(3) Assign your DB user (same as central DB) to this database. " .
+                    "(4) Verify the database name matches exactly. " .
+                    "(5) Try creating the tenant again. " .
+                    "Original error: " . $e->getMessage();
+                
+                throw new \Exception($errorMessage);
             }
             
             // Step 5: Run migrations and create user in tenant database
