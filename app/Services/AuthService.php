@@ -128,8 +128,10 @@ class AuthService
         // Step 4: Initialize tenant context
         tenancy()->initialize($tenant);
 
-        // Step 5: Get user from tenant database
-        $tenantUser = User::where('phone', $phone)->first();
+        // Step 5: Get user from tenant database with roles and permissions
+        $tenantUser = User::where('phone', $phone)
+            ->with(['roles', 'permissions'])
+            ->first();
 
         if (!$tenantUser) {
             throw new \Exception('User not found in tenant database');
@@ -137,6 +139,11 @@ class AuthService
 
         if (!$tenantUser->is_active) {
             throw new \Exception('User account is inactive in tenant database');
+        }
+
+        // Load roles and permissions if not already loaded
+        if (!$tenantUser->relationLoaded('roles')) {
+            $tenantUser->load('roles', 'permissions');
         }
 
         // Generate token for tenant user
@@ -249,7 +256,7 @@ class AuthService
             ]);
             
             // Create user in tenant database
-            User::on('tenant')->create([
+            $createdUser = User::on('tenant')->create([
                 'name' => $centralUser->name,
                 'phone' => $centralUser->phone,
                 'email' => $centralUser->email ?? null,
@@ -257,10 +264,22 @@ class AuthService
                 'is_active' => true,
             ]);
             
-            // Assign role
+            // Assign role - need to refresh connection context first
+            DB::purge('tenant');
             $tenantUser = User::on('tenant')->where('phone', $centralUser->phone)->first();
             if ($tenantUser) {
-                $tenantUser->assignRole('clinic_super_doctor');
+                try {
+                    $tenantUser->assignRole('clinic_super_doctor');
+                    \Illuminate\Support\Facades\Log::info('Role assigned to tenant user', [
+                        'user_id' => $tenantUser->id,
+                        'role' => 'clinic_super_doctor'
+                    ]);
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error('Failed to assign role', [
+                        'user_id' => $tenantUser->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
             
             \Illuminate\Support\Facades\Log::info('Tenant database setup completed', [
