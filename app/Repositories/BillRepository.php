@@ -79,14 +79,9 @@ class BillRepository
     /**
      * Get all bills with filters and pagination
      */
-    public function getAllWithFilters(array $filters, int $perPage = 15, ?string|int $clinicId = null): LengthAwarePaginator
+    public function getAllWithFilters(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = $this->queryBuilder();
-
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinics_id', $clinicId);
-        }
 
         return $query->paginate($perPage);
     }
@@ -94,14 +89,9 @@ class BillRepository
     /**
      * Get bill by ID
      */
-    public function getById(int $id, ?string|int $clinicId = null): ?Bill
+    public function getById(int $id): ?Bill
     {
         $query = $this->query()->with(['patient', 'doctor', 'billable.patient', 'billable.doctor', 'billable.category', 'billable.status']);
-
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinics_id', $clinicId);
-        }
 
         return $query->find($id);
     }
@@ -117,9 +107,9 @@ class BillRepository
     /**
      * Update bill
      */
-    public function update(int $id, array $data, ?string|int $clinicId = null): Bill
+    public function update(int $id, array $data): Bill
     {
-        $bill = $this->getById($id, $clinicId);
+        $bill = $this->getById($id);
 
         if (!$bill) {
             throw new \Exception("Bill with ID {$id} not found");
@@ -133,9 +123,9 @@ class BillRepository
     /**
      * Delete bill
      */
-    public function delete(int $id, ?string|int $clinicId = null): bool
+    public function delete(int $id): bool
     {
-        $bill = $this->getById($id, $clinicId);
+        $bill = $this->getById($id);
 
         if (!$bill) {
             throw new \Exception("Bill with ID {$id} not found");
@@ -147,9 +137,9 @@ class BillRepository
     /**
      * Mark bill as paid
      */
-    public function markAsPaid(int $id, ?string|int $clinicId = null): Bill
+    public function markAsPaid(int $id): Bill
     {
-        $bill = $this->getById($id, $clinicId);
+        $bill = $this->getById($id);
 
         if (!$bill) {
             throw new \Exception("Bill with ID {$id} not found");
@@ -163,9 +153,9 @@ class BillRepository
     /**
      * Mark bill as unpaid
      */
-    public function markAsUnpaid(int $id, ?string|int $clinicId = null): Bill
+    public function markAsUnpaid(int $id): Bill
     {
-        $bill = $this->getById($id, $clinicId);
+        $bill = $this->getById($id);
 
         if (!$bill) {
             throw new \Exception("Bill with ID {$id} not found");
@@ -179,15 +169,11 @@ class BillRepository
     /**
      * Get bills by patient
      */
-    public function getByPatient(int $patientId, int $perPage = 15, ?string|int $clinicId = null): LengthAwarePaginator
+    public function getByPatient(int $patientId, int $perPage = 15): LengthAwarePaginator
     {
         $query = $this->query()
             ->with(['patient', 'doctor', 'billable.patient', 'billable.doctor', 'billable.category', 'billable.status'])
             ->byPatient($patientId);
-
-        if ($clinicId !== null) {
-            $query->where('clinics_id', $clinicId);
-        }
 
         return $query->orderBy('created_at', 'desc')->paginate($perPage);
     }
@@ -195,15 +181,11 @@ class BillRepository
     /**
      * Get bills by doctor
      */
-    public function getByDoctor(int $doctorId, int $perPage = 15, ?string|int $clinicId = null): LengthAwarePaginator
+    public function getByDoctor(int $doctorId, int $perPage = 15): LengthAwarePaginator
     {
         $query = $this->query()
             ->with(['patient', 'doctor', 'billable.patient', 'billable.doctor', 'billable.category', 'billable.status'])
             ->byDoctor($doctorId);
-
-        if ($clinicId !== null) {
-            $query->where('clinics_id', $clinicId);
-        }
 
         return $query->orderBy('created_at', 'desc')->paginate($perPage);
     }
@@ -211,13 +193,9 @@ class BillRepository
     /**
      * Get total revenue for a clinic
      */
-    public function getTotalRevenue(?string|int $clinicId = null): int
+    public function getTotalRevenue(): int
     {
         $query = $this->query()->paid();
-
-        if ($clinicId !== null) {
-            $query->where('clinics_id', $clinicId);
-        }
 
         return $query->sum('price');
     }
@@ -225,13 +203,9 @@ class BillRepository
     /**
      * Get total outstanding for a clinic
      */
-    public function getTotalOutstanding(?string|int $clinicId = null): int
+    public function getTotalOutstanding(): int
     {
         $query = $this->query()->unpaid();
-
-        if ($clinicId !== null) {
-            $query->where('clinics_id', $clinicId);
-        }
 
         return $query->sum('price');
     }
@@ -239,13 +213,9 @@ class BillRepository
     /**
      * Get bill statistics
      */
-    public function getStatistics(?string|int $clinicId = null): array
+    public function getStatistics(): array
     {
         $query = $this->query();
-
-        if ($clinicId !== null) {
-            $query->where('clinics_id', $clinicId);
-        }
 
         $totalBills = $query->count();
         $paidBills = (clone $query)->paid()->count();
@@ -272,13 +242,9 @@ class BillRepository
      * - date_to (Y-m-d or Y-m-d H:i:s)
      * - doctor_id
      */
-    public function getStatisticsWithFilters(array $filters = [], ?string|int $clinicId = null): array
+    public function getStatisticsWithFilters(array $filters = []): array
     {
         $query = $this->query();
-
-        if ($clinicId !== null) {
-            $query->where('clinics_id', $clinicId);
-        }
 
         if (!empty($filters['doctor_id'])) {
             $query->where('doctor_id', $filters['doctor_id']);

@@ -55,14 +55,9 @@ class PatientRepository
     /**
      * Get all patients with filters and pagination
      */
-    public function getAllWithFilters(array $filters, int $perPage = 15, ?string|int $clinicId = null): LengthAwarePaginator
+    public function getAllWithFilters(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = $this->queryBuilder();
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinics_id', $clinicId);
-        }
         
         return $query->paginate($perPage);
     }
@@ -70,14 +65,9 @@ class PatientRepository
     /**
      * Get patient by ID
      */
-    public function getById(int $id, ?string|int $clinicId = null): ?Patient
+    public function getById(int $id): ?Patient
     {
         $query = $this->query();
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinics_id', $clinicId);
-        }
         
         return $query->find($id);
     }
@@ -123,14 +113,9 @@ class PatientRepository
     /**
      * Get patient by phone
      */
-    public function getByPhone(string $phone, ?string|int $clinicId = null): ?Patient
+    public function getByPhone(string $phone): ?Patient
     {
         $query = $this->query()->where('phone', $phone);
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinics_id', $clinicId);
-        }
         
         return $query->first();
     }
@@ -138,14 +123,9 @@ class PatientRepository
     /**
      * Get patient by email
      */
-    public function getByEmail(string $email, ?string|int $clinicId = null): ?Patient
+    public function getByEmail(string $email): ?Patient
     {
         $query = $this->query()->where('email', $email);
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinics_id', $clinicId);
-        }
         
         return $query->first();
     }

@@ -43,14 +43,9 @@ class CaseCategoryRepository
     /**
      * Get all case categories with filters and pagination
      */
-    public function getAllWithFilters(array $filters, int $perPage = 15, ?string|int $clinicId = null): LengthAwarePaginator
+    public function getAllWithFilters(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = $this->queryBuilder();
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinic_id', $clinicId);
-        }
         
         return $query->paginate($perPage);
     }
@@ -58,14 +53,9 @@ class CaseCategoryRepository
     /**
      * Get case category by ID
      */
-    public function getById(int $id, ?string|int $clinicId = null): ?CaseCategory
+    public function getById(int $id): ?CaseCategory
     {
         $query = $this->query();
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinic_id', $clinicId);
-        }
         
         return $query->find($id);
     }

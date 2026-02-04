@@ -45,15 +45,10 @@ class ClinicExpenseCategoryRepository
     /**
      * Get all expense categories with filters and pagination
      */
-    public function getAllWithFilters(array $filters, int $perPage = 15, ?string|int $clinicId = null): LengthAwarePaginator
+    public function getAllWithFilters(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = $this->queryBuilder()
             ->withExpenseTotals(); // Add expense totals
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinic_id', $clinicId);
-        }
         
         return $query->paginate($perPage);
     }
@@ -61,15 +56,10 @@ class ClinicExpenseCategoryRepository
     /**
      * Get expense category by ID
      */
-    public function getById(int $id, ?string|int $clinicId = null): ?ClinicExpenseCategory
+    public function getById(int $id): ?ClinicExpenseCategory
     {
         $query = $this->query()
             ->withExpenseTotals(); // Add expense totals
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinic_id', $clinicId);
-        }
         
         return $query->find($id);
     }
@@ -106,11 +96,10 @@ class ClinicExpenseCategoryRepository
     /**
      * Get active categories for a clinic
      */
-    public function getActiveByClinic(string|int $clinicId): \Illuminate\Database\Eloquent\Collection
+    public function getActiveByClinic(): \Illuminate\Database\Eloquent\Collection
     {
         return $this->query()
             ->withExpenseTotals() // Add expense totals
-            ->where('clinic_id', $clinicId)
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
@@ -119,11 +108,10 @@ class ClinicExpenseCategoryRepository
     /**
      * Check if category exists for clinic
      */
-    public function existsForClinic(int $id, string|int $clinicId): bool
+    public function existsForClinic(int $id): bool
     {
         return $this->query()
             ->where('id', $id)
-            ->where('clinic_id', $clinicId)
             ->exists();
     }
 }

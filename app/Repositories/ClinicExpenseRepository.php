@@ -56,14 +56,9 @@ class ClinicExpenseRepository
     /**
      * Get all expenses with filters and pagination
      */
-    public function getAllWithFilters(array $filters, int $perPage = 15, ?string|int $clinicId = null): LengthAwarePaginator
+    public function getAllWithFilters(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = $this->queryBuilder();
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinic_id', $clinicId);
-        }
         
         return $query->paginate($perPage);
     }
@@ -71,14 +66,9 @@ class ClinicExpenseRepository
     /**
      * Get expense by ID
      */
-    public function getById(int $id, ?string|int $clinicId = null): ?ClinicExpense
+    public function getById(int $id): ?ClinicExpense
     {
         $query = $this->query()->with(['category', 'doctor', 'creator', 'updator']);
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinic_id', $clinicId);
-        }
         
         return $query->find($id);
     }
@@ -112,17 +102,7 @@ class ClinicExpenseRepository
         return $expense->delete();
     }
 
-    /**
-     * Get expenses by clinic
-     */
-    public function getByClinic(string|int $clinicId, int $perPage = 15): LengthAwarePaginator
-    {
-        return $this->query()
-            ->where('clinic_id', $clinicId)
-            ->with(['category', 'doctor'])
-            ->orderByDesc('date')
-            ->paginate($perPage);
-    }
+    
 
     /**
      * Get expenses by category
@@ -139,15 +119,11 @@ class ClinicExpenseRepository
     /**
      * Get expenses by date range
      */
-    public function getByDateRange(string $startDate, string $endDate, ?string|int $clinicId = null): \Illuminate\Database\Eloquent\Collection
+    public function getByDateRange(string $startDate, string $endDate): \Illuminate\Database\Eloquent\Collection
     {
         $query = $this->query()
             ->whereBetween('date', [$startDate, $endDate])
             ->with(['category', 'doctor']);
-        
-        if ($clinicId !== null) {
-            $query->where('clinic_id', $clinicId);
-        }
         
         return $query->orderByDesc('date')->get();
     }
@@ -155,9 +131,9 @@ class ClinicExpenseRepository
     /**
      * Get total expenses for a clinic
      */
-    public function getTotalByClinic(string|int $clinicId, ?string $startDate = null, ?string $endDate = null): float
+    public function getTotalByClinic( ?string $startDate = null, ?string $endDate = null): float
     {
-        $query = $this->query()->where('clinic_id', $clinicId);
+        $query = $this->query()->where('clinic_id');
         
         if ($startDate && $endDate) {
             $query->whereBetween('date', [$startDate, $endDate]);
@@ -169,10 +145,9 @@ class ClinicExpenseRepository
     /**
      * Get unpaid expenses for a clinic
      */
-    public function getUnpaidByClinic(string|int $clinicId): \Illuminate\Database\Eloquent\Collection
+    public function getUnpaidByClinic(): \Illuminate\Database\Eloquent\Collection
     {
         return $this->query()
-            ->where('clinic_id', $clinicId)
             ->where('is_paid', false)
             ->with(['category', 'doctor'])
             ->orderByDesc('date')
@@ -204,9 +179,9 @@ class ClinicExpenseRepository
     /**
      * Get expense statistics for a clinic
      */
-    public function getStatistics(string|int $clinicId, ?string $startDate = null, ?string $endDate = null): array
+    public function getStatistics( ?string $startDate = null, ?string $endDate = null): array
     {
-        $query = $this->query()->where('clinic_id', $clinicId);
+        $query = $this->query()->where('clinic_id');
         
         if ($startDate && $endDate) {
             $query->whereBetween('date', [$startDate, $endDate]);
@@ -228,14 +203,9 @@ class ClinicExpenseRepository
     /**
      * Get summary statistics for filtered expenses
      */
-    public function getFilteredSummary(array $filters, ?string|int $clinicId = null): array
+    public function getFilteredSummary(array $filters): array
     {
         $query = $this->queryBuilder();
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinic_id', $clinicId);
-        }
         
         // Clone the query to get different aggregations
         $baseQuery = clone $query;

@@ -40,13 +40,13 @@ class ReportsRepository
     /**
      * Get today's summary for quick stats
      */
-    public function getTodaySummary(?string|int $clinicId = null): array
+    public function getTodaySummary(): array
     {
         $today = Carbon::today()->format('Y-m-d');
         
         return [
             'new_patients' => $this->getNewPatientsCount($clinicId, $today, $today),
-            'reservations_today' => $this->getReservationsCountByDate($today, $clinicId),
+            'reservations_today' => $this->getReservationsCountByDate($today),
             'revenue_today' => $this->getRevenueByDateRange($clinicId, $today, $today),
             'cases_today' => $this->getCasesCountByDateRange($clinicId, $today, $today),
             'expenses_today' => $this->getExpensesTotalByDateRange($clinicId, $today, $today),
@@ -67,7 +67,7 @@ class ReportsRepository
         $query = Patient::query();
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -93,7 +93,7 @@ class ReportsRepository
         $query = Patient::query();
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -112,7 +112,7 @@ class ReportsRepository
             ->groupBy('from_where_come_id');
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -141,7 +141,7 @@ class ReportsRepository
             ->groupBy('doctor_id');
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -165,7 +165,7 @@ class ReportsRepository
         $query = Patient::query();
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -176,12 +176,12 @@ class ReportsRepository
     /**
      * Get patients age distribution
      */
-    public function getPatientsAgeDistribution(?string|int $clinicId = null): array
+    public function getPatientsAgeDistribution(): array
     {
         $query = Patient::query();
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         $results = $query->select(
@@ -218,7 +218,7 @@ class ReportsRepository
         $query = Bill::query();
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -247,7 +247,7 @@ class ReportsRepository
         $query = Bill::query()->where('is_paid', true);
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -263,7 +263,7 @@ class ReportsRepository
         $query = Bill::query()->where('is_paid', true);
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -284,7 +284,7 @@ class ReportsRepository
             ->groupBy('doctor_id');
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -309,7 +309,7 @@ class ReportsRepository
         $query = Bill::query();
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -338,7 +338,7 @@ class ReportsRepository
         $query = Reservation::query();
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'reservation_start_date');
@@ -358,14 +358,14 @@ class ReportsRepository
     /**
      * Get reservations count for a specific date
      */
-    public function getReservationsCountByDate(string $date, ?string|int $clinicId = null): int
+    public function getReservationsCountByDate(string $date): int
     {
         $query = Reservation::query()
             ->whereDate('reservation_start_date', '<=', $date)
             ->whereDate('reservation_end_date', '>=', $date);
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         return $query->count();
@@ -383,7 +383,7 @@ class ReportsRepository
             ->groupBy('status_id');
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'reservation_start_date');
@@ -413,7 +413,7 @@ class ReportsRepository
             ->groupBy('doctor_id');
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'reservation_start_date');
@@ -437,7 +437,7 @@ class ReportsRepository
         $query = Reservation::query();
         
         if ($clinicId) {
-            $query->where('clinics_id', $clinicId);
+            $query->where('clinics_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'reservation_start_date');
@@ -459,7 +459,7 @@ class ReportsRepository
         $query = CaseModel::query();
         
         if ($clinicId) {
-            $query->where('clinic_id', $clinicId);
+            $query->where('clinic_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -486,7 +486,7 @@ class ReportsRepository
         $query = CaseModel::query();
         
         if ($clinicId) {
-            $query->where('clinic_id', $clinicId);
+            $query->where('clinic_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -506,7 +506,7 @@ class ReportsRepository
             ->groupBy('case_categores_id');
         
         if ($clinicId) {
-            $query->where('clinic_id', $clinicId);
+            $query->where('clinic_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -535,7 +535,7 @@ class ReportsRepository
             ->groupBy('status_id');
         
         if ($clinicId) {
-            $query->where('clinic_id', $clinicId);
+            $query->where('clinic_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -565,7 +565,7 @@ class ReportsRepository
             ->groupBy('doctor_id');
         
         if ($clinicId) {
-            $query->where('clinic_id', $clinicId);
+            $query->where('clinic_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -590,7 +590,7 @@ class ReportsRepository
         $query = CaseModel::query();
         
         if ($clinicId) {
-            $query->where('clinic_id', $clinicId);
+            $query->where('clinic_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -612,7 +612,7 @@ class ReportsRepository
         $query = ClinicExpense::query();
         
         if ($clinicId) {
-            $query->where('clinic_id', $clinicId);
+            $query->where('clinic_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'date');
@@ -642,7 +642,7 @@ class ReportsRepository
         $query = ClinicExpense::query();
         
         if ($clinicId) {
-            $query->where('clinic_id', $clinicId);
+            $query->where('clinic_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'date');
@@ -662,7 +662,7 @@ class ReportsRepository
             ->groupBy('clinic_expense_category_id');
         
         if ($clinicId) {
-            $query->where('clinic_id', $clinicId);
+            $query->where('clinic_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'date');
@@ -687,7 +687,7 @@ class ReportsRepository
         $query = ClinicExpense::query();
         
         if ($clinicId) {
-            $query->where('clinic_id', $clinicId);
+            $query->where('clinic_id');
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'date');
@@ -781,7 +781,7 @@ class ReportsRepository
             });
         
         if ($clinicId) {
-            $query->where('clinic_id', $clinicId);
+            $query->where('clinic_id');
         }
         
         if ($doctorId) {
@@ -798,10 +798,10 @@ class ReportsRepository
             $patientsQuery = Patient::where('doctor_id', $doctor->id);
             
             if ($clinicId) {
-                $casesQuery->where('clinic_id', $clinicId);
-                $billsQuery->where('clinics_id', $clinicId);
-                $reservationsQuery->where('clinics_id', $clinicId);
-                $patientsQuery->where('clinics_id', $clinicId);
+                $casesQuery->where('clinic_id');
+                $billsQuery->where('clinics_id');
+                $reservationsQuery->where('clinics_id');
+                $patientsQuery->where('clinics_id');
             }
             
             $this->applyDateFilter($casesQuery, $dateFrom, $dateTo, 'created_at');

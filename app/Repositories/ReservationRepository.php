@@ -70,14 +70,9 @@ class ReservationRepository
     /**
      * Get all reservations with filters and pagination
      */
-    public function getAllWithFilters(array $filters, int $perPage = 15, ?string|int $clinicId = null, ?int $doctorId = null): LengthAwarePaginator
+    public function getAllWithFilters(array $filters, int $perPage = 15, ?int $doctorId = null): LengthAwarePaginator
     {
         $query = $this->queryBuilder();
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinics_id', $clinicId);
-        }
         
         // Filter by doctor if provided
         if ($doctorId !== null) {
@@ -99,15 +94,10 @@ class ReservationRepository
     /**
      * Get reservation by ID
      */
-    public function getById(int $id, ?string|int $clinicId = null, ?int $doctorId = null): ?Reservation
+    public function getById(int $id, ?int $doctorId = null): ?Reservation
     {
         $query = $this->query()
             ->with(['patient', 'doctor', 'status']);
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinics_id', $clinicId);
-        }
         
         // Filter by doctor if provided (for doctors to see only their own reservations)
         if ($doctorId !== null) {

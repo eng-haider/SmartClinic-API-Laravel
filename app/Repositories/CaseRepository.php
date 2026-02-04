@@ -65,7 +65,7 @@ class CaseRepository
     /**
      * Get all cases with filters and pagination
      */
-    public function getAllWithFilters(array $filters, int $perPage = 15, ?string|int $clinicId = null, ?int $doctorId = null): LengthAwarePaginator
+    public function getAllWithFilters(array $filters, int $perPage = 15, ?int $doctorId = null): LengthAwarePaginator
     {
         $query = $this->queryBuilder();
         
@@ -80,7 +80,7 @@ class CaseRepository
     /**
      * Get case by ID
      */
-    public function getById(int $id, ?string|int $clinicId = null, ?int $doctorId = null): ?CaseModel
+    public function getById(int $id, ?int $doctorId = null): ?CaseModel
     {
         $query = $this->query()
             ->with(['patient', 'doctor', 'category', 'status']);
@@ -191,7 +191,7 @@ class CaseRepository
      * DEPRECATED: clinic_id not used in multi-tenant setup
      * Database is already isolated by tenant
      */
-    public function getByClinicId(string|int $clinicId, int $perPage = 15): LengthAwarePaginator
+    public function getByClinicId( int $perPage = 15): LengthAwarePaginator
     {
         return $this->query()
             ->with(['patient', 'doctor', 'category', 'status'])
@@ -385,7 +385,7 @@ class CaseRepository
     /**
      * Get revenue by date range
      */
-    public function getRevenueByDateRange(string $startDate, string $endDate, ?string|int $clinicId = null): array
+    public function getRevenueByDateRange(string $startDate, string $endDate): array
     {
         $query = $this->query()
             ->selectRaw('DATE(created_at) as date, SUM(price) as revenue, COUNT(*) as cases_count')

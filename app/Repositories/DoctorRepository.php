@@ -51,14 +51,9 @@ class DoctorRepository
     /**
      * Get all doctors with filters and pagination
      */
-    public function getAllWithFilters(array $filters, int $perPage = 15, ?string|int $clinicId = null): LengthAwarePaginator
+    public function getAllWithFilters(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = $this->queryBuilder();
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinic_id', $clinicId);
-        }
 
         // Apply search filter
         if (!empty($filters['search'])) {
@@ -76,14 +71,9 @@ class DoctorRepository
     /**
      * Get doctor by ID
      */
-    public function getById(int $id, ?string|int $clinicId = null): ?User
+    public function getById(int $id): ?User
     {
         $query = $this->query();
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinic_id', $clinicId);
-        }
         
         return $query->find($id);
     }
@@ -158,14 +148,9 @@ class DoctorRepository
     /**
      * Get doctor by email
      */
-    public function getByEmail(string $email, ?string|int $clinicId = null): ?User
+    public function getByEmail(string $email): ?User
     {
         $query = $this->query()->where('email', $email);
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinic_id', $clinicId);
-        }
         
         return $query->first();
     }
@@ -173,39 +158,21 @@ class DoctorRepository
     /**
      * Get doctor by phone
      */
-    public function getByPhone(string $phone, ?string|int $clinicId = null): ?User
+    public function getByPhone(string $phone): ?User
     {
         $query = $this->query()->where('phone', $phone);
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinic_id', $clinicId);
-        }
         
         return $query->first();
     }
 
-    /**
-     * Get doctors by clinic
-     */
-    public function getByClinic(string|int $clinicId): Collection
-    {
-        return $this->query()
-            ->where('clinic_id', $clinicId)
-            ->get();
-    }
+    
 
     /**
      * Get active doctors
      */
-    public function getActive(?string|int $clinicId = null): Collection
+    public function getActive(): Collection
     {
         $query = $this->query()->where('is_active', true);
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinic_id', $clinicId);
-        }
         
         return $query->get();
     }

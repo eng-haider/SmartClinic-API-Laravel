@@ -50,7 +50,7 @@ class SecretaryRepository
      * In multi-tenant setup, database is already isolated by tenant
      * clinic_id is optional for backward compatibility
      */
-    public function findInClinic(int $id, ?string $clinicId = null): ?User
+    public function findInClinic(int $id): ?User
     {
         $query = User::on('mysql')->where('id', $id)
             ->whereHas('roles', function ($query) {

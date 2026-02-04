@@ -17,7 +17,7 @@ class RecipeRepository
      * @param int|null $doctorId
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    public function getAll(Request $request, ?string|int $clinicId = null, ?int $doctorId = null)
+    public function getAll(Request $request, ?int $doctorId = null)
     {
         $query = QueryBuilder::for(Recipe::class)
             ->allowedIncludes(['patient', 'doctor', 'recipeItems'])
@@ -34,7 +34,7 @@ class RecipeRepository
         // Filter by clinic through doctor's clinic_id
         if ($clinicId !== null) {
             $query->whereHas('doctor', function ($q) use ($clinicId) {
-                $q->where('clinic_id', $clinicId);
+                $q->where('clinic_id');
             });
         }
 
