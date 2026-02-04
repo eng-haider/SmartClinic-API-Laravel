@@ -59,9 +59,9 @@ class ReservationRequest extends FormRequest
             $defaultStatus = Status::where('name_en', 'New')
                 ->orWhere('name_ar', 'جديد')
                 ->first();
-            // If not found, get the first status by order or ID
+            // If not found, get the first status by ID
             if (!$defaultStatus) {
-                $defaultStatus = Status::orderBy('order')->orOrderBy('id')->first();
+                $defaultStatus = Status::orderBy('id')->first();
             }
             // Only set status_id if we found a status
             if ($defaultStatus) {
