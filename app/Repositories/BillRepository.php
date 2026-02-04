@@ -36,7 +36,6 @@ class BillRepository
                 AllowedFilter::scope('unpaid'),
                 AllowedFilter::scope('by_patient', 'byPatient'),
                 AllowedFilter::scope('by_doctor', 'byDoctor'),
-                AllowedFilter::scope('by_clinic', 'byClinic'),
             ])
             ->allowedSorts([
                 'id',
@@ -48,7 +47,6 @@ class BillRepository
             ->allowedIncludes([
                 'patient',
                 'doctor',
-                'clinic',
                 'creator',
                 'updator',
                 'billable',
@@ -98,7 +96,7 @@ class BillRepository
      */
     public function getById(int $id, ?int $clinicId = null): ?Bill
     {
-        $query = $this->query()->with(['patient', 'doctor', 'clinic', 'billable.patient', 'billable.doctor', 'billable.category', 'billable.status']);
+        $query = $this->query()->with(['patient', 'doctor', 'billable.patient', 'billable.doctor', 'billable.category', 'billable.status']);
 
         // Filter by clinic if provided
         if ($clinicId !== null) {
@@ -129,7 +127,7 @@ class BillRepository
 
         $bill->update($data);
 
-        return $bill->fresh(['patient', 'doctor', 'clinic', 'billable']);
+        return $bill->fresh(['patient', 'doctor', 'billable']);
     }
 
     /**
@@ -159,7 +157,7 @@ class BillRepository
 
         $bill->markAsPaid();
 
-        return $bill->fresh(['patient', 'doctor', 'clinic', 'billable']);
+        return $bill->fresh(['patient', 'doctor', 'billable']);
     }
 
     /**
@@ -175,7 +173,7 @@ class BillRepository
 
         $bill->markAsUnpaid();
 
-        return $bill->fresh(['patient', 'doctor', 'clinic', 'billable']);
+        return $bill->fresh(['patient', 'doctor', 'billable']);
     }
 
     /**
@@ -184,7 +182,7 @@ class BillRepository
     public function getByPatient(int $patientId, int $perPage = 15, ?int $clinicId = null): LengthAwarePaginator
     {
         $query = $this->query()
-            ->with(['patient', 'doctor', 'clinic', 'billable.patient', 'billable.doctor', 'billable.category', 'billable.status'])
+            ->with(['patient', 'doctor', 'billable.patient', 'billable.doctor', 'billable.category', 'billable.status'])
             ->byPatient($patientId);
 
         if ($clinicId !== null) {
@@ -200,7 +198,7 @@ class BillRepository
     public function getByDoctor(int $doctorId, int $perPage = 15, ?int $clinicId = null): LengthAwarePaginator
     {
         $query = $this->query()
-            ->with(['patient', 'doctor', 'clinic', 'billable.patient', 'billable.doctor', 'billable.category', 'billable.status'])
+            ->with(['patient', 'doctor', 'billable.patient', 'billable.doctor', 'billable.category', 'billable.status'])
             ->byDoctor($doctorId);
 
         if ($clinicId !== null) {

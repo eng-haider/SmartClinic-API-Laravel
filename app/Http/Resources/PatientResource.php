@@ -46,7 +46,6 @@ class PatientResource extends JsonResource
             
             // Relationships (when loaded)
             'doctor' => $this->whenLoaded('doctor'),
-            'clinic' => $this->whenLoaded('clinic'),
             'fromWhereCome' => $this->whenLoaded('fromWhereCome'),
             'cases' => $this->whenLoaded('cases'),
             'recipes' => $this->whenLoaded('recipes'),

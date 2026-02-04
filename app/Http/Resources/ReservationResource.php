@@ -39,12 +39,6 @@ class ReservationResource extends JsonResource
                     'name' => $this->doctor->name,
                 ];
             }),
-            'clinic' => $this->when($this->relationLoaded('clinic'), function () {
-                return [
-                    'id' => $this->clinic->id,
-                    'name' => $this->clinic->name,
-                ];
-            }),
             'status' => $this->when($this->relationLoaded('status'), function () {
                 return [
                     'id' => $this->status->id,

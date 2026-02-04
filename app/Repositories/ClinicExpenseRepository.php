@@ -45,7 +45,6 @@ class ClinicExpenseRepository
                 'updated_at',
             ])
             ->allowedIncludes([
-                'clinic',
                 'category',
                 'doctor',
                 'creator',
@@ -74,7 +73,7 @@ class ClinicExpenseRepository
      */
     public function getById(int $id, ?int $clinicId = null): ?ClinicExpense
     {
-        $query = $this->query()->with(['category', 'clinic', 'doctor', 'creator', 'updator']);
+        $query = $this->query()->with(['category', 'doctor', 'creator', 'updator']);
         
         // Filter by clinic if provided
         if ($clinicId !== null) {
@@ -100,7 +99,7 @@ class ClinicExpenseRepository
         $expense = $this->query()->findOrFail($id);
         $expense->update($data);
         
-        return $expense->fresh(['category', 'clinic', 'doctor', 'creator', 'updator']);
+        return $expense->fresh(['category', 'doctor', 'creator', 'updator']);
     }
 
     /**
@@ -132,7 +131,7 @@ class ClinicExpenseRepository
     {
         return $this->query()
             ->where('clinic_expense_category_id', $categoryId)
-            ->with(['clinic', 'doctor'])
+            ->with(['doctor'])
             ->orderByDesc('date')
             ->paginate($perPage);
     }

@@ -69,7 +69,7 @@ class ClinicExpenseController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Expense created successfully',
-                'data' => new ClinicExpenseResource($expense->load(['category', 'clinic', 'doctor', 'creator'])),
+                'data' => new ClinicExpenseResource($expense->load(['category', 'doctor', 'creator'])),
             ], 201);
         } catch (\Exception $e) {
             return response()->json([

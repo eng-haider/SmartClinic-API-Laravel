@@ -30,15 +30,6 @@ class PublicPatientResource extends JsonResource
             'systemic_conditions' => $this->systemic_conditions,
             'tooth_details' => $this->tooth_details,
             
-            // Clinic information (limited)
-            'clinic' => $this->whenLoaded('clinic', function () {
-                return [
-                    'name' => $this->clinic->name,
-                    'address' => $this->clinic->address,
-                    'phone' => $this->clinic->whatsapp_phone,
-                ];
-            }),
-            
             // Doctor information (limited)
             'doctor' => $this->whenLoaded('doctor', function () {
                 return [

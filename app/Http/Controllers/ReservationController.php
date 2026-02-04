@@ -70,7 +70,7 @@ class ReservationController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Reservation created successfully',
-                'data' => new ReservationResource($reservation->load(['patient', 'doctor', 'clinic', 'status'])),
+                'data' => new ReservationResource($reservation->load(['patient', 'doctor', 'status'])),
             ], 201);
         } catch (\Exception $e) {
             return response()->json([

@@ -62,7 +62,6 @@ class ReservationRepository
             ->allowedIncludes([
                 'patient',
                 'doctor',
-                'clinic',
                 'status',
             ])
             ->defaultSort('-reservation_start_date');
@@ -103,7 +102,7 @@ class ReservationRepository
     public function getById(int $id, ?int $clinicId = null, ?int $doctorId = null): ?Reservation
     {
         $query = $this->query()
-            ->with(['patient', 'doctor', 'clinic', 'status']);
+            ->with(['patient', 'doctor', 'status']);
         
         // Filter by clinic if provided
         if ($clinicId !== null) {

@@ -35,7 +35,6 @@ class ClinicExpenseCategoryRepository
                 'updated_at',
             ])
             ->allowedIncludes([
-                'clinic',
                 'expenses',
                 'creator',
                 'updator',

@@ -43,7 +43,6 @@ class DoctorRepository
                 'updated_at',
             ])
             ->allowedIncludes([
-                'clinic',
                 'roles',
                 'permissions',
             ]);
