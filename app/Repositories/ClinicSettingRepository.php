@@ -16,24 +16,29 @@ class ClinicSettingRepository extends BaseRepository
     /**
      * Get all settings for a specific clinic.
      */
-    public function getAllByClinic(int $clinicId): Collection
+    public function getAllByClinic(?int $clinicId = null): Collection
     {
-        return $this->query()
-            ->where('clinic_id', $clinicId)
-            ->with('definition')
-            ->orderBy('setting_key')
-            ->get();
+        $query = $this->query()->with('definition');
+        
+        if ($clinicId !== null) {
+            $query->where('clinic_id', $clinicId);
+        }
+        
+        return $query->orderBy('setting_key')->get();
     }
 
     /**
      * Get all settings grouped by category.
      */
-    public function getAllByClinicGrouped(int $clinicId): array
+    public function getAllByClinicGrouped(?int $clinicId = null): array
     {
-        $settings = $this->query()
-            ->where('clinic_id', $clinicId)
-            ->with('definition')
-            ->get();
+        $query = $this->query()->with('definition');
+        
+        if ($clinicId !== null) {
+            $query->where('clinic_id', $clinicId);
+        }
+        
+        $settings = $query->get();
 
         // Group by category from definition
         $grouped = [];
@@ -84,20 +89,22 @@ class ClinicSettingRepository extends BaseRepository
     /**
      * Get a specific setting by key for a clinic.
      */
-    public function getByKey(int $clinicId, string $key): ?ClinicSetting
+    public function getByKey(?int $clinicId, string $key): ?ClinicSetting
     {
-        return $this->query()
-            ->where('clinic_id', $clinicId)
-            ->where('setting_key', $key)
-            ->with('definition')
-            ->first();
+        $query = $this->query()->where('setting_key', $key)->with('definition');
+        
+        if ($clinicId !== null) {
+            $query->where('clinic_id', $clinicId);
+        }
+        
+        return $query->first();
     }
 
     /**
      * Update only the value of a clinic setting.
      * Does not allow creating new settings (must exist from definition).
      */
-    public function updateValue(int $clinicId, string $key, $value): ?ClinicSetting
+    public function updateValue(?int $clinicId, string $key, $value): ?ClinicSetting
     {
         $setting = $this->getByKey($clinicId, $key);
         
@@ -114,24 +121,26 @@ class ClinicSettingRepository extends BaseRepository
     /**
      * Update or create a clinic setting.
      */
-    public function updateOrCreate(int $clinicId, string $key, array $data): ClinicSetting
+    public function updateOrCreate(?int $clinicId, string $key, array $data): ClinicSetting
     {
         $settingData = [
-            'clinic_id' => $clinicId,
             'setting_key' => $key,
             'setting_value' => $this->prepareValue($data['setting_value'] ?? '', $data['setting_type'] ?? 'string'),
             'setting_type' => $data['setting_type'] ?? 'string',
             'description' => $data['description'] ?? null,
             'is_active' => $data['is_active'] ?? true,
         ];
+        
+        if ($clinicId !== null) {
+            $settingData['clinic_id'] = $clinicId;
+        }
 
-        return $this->model->updateOrCreate(
-            [
-                'clinic_id' => $clinicId,
-                'setting_key' => $key,
-            ],
-            $settingData
-        );
+        $whereConditions = ['setting_key' => $key];
+        if ($clinicId !== null) {
+            $whereConditions['clinic_id'] = $clinicId;
+        }
+
+        return $this->model->updateOrCreate($whereConditions, $settingData);
     }
 
     /**
@@ -145,25 +154,29 @@ class ClinicSettingRepository extends BaseRepository
     /**
      * Get active settings for a clinic.
      */
-    public function getActiveByClinic(int $clinicId): Collection
+    public function getActiveByClinic(?int $clinicId = null): Collection
     {
-        return $this->query()
-            ->where('clinic_id', $clinicId)
-            ->where('is_active', true)
-            ->orderBy('setting_key')
-            ->get();
+        $query = $this->query()->where('is_active', true);
+        
+        if ($clinicId !== null) {
+            $query->where('clinic_id', $clinicId);
+        }
+        
+        return $query->orderBy('setting_key')->get();
     }
 
     /**
      * Get settings by type.
      */
-    public function getByType(int $clinicId, string $type): Collection
+    public function getByType(?int $clinicId, string $type): Collection
     {
-        return $this->query()
-            ->where('clinic_id', $clinicId)
-            ->where('setting_type', $type)
-            ->orderBy('setting_key')
-            ->get();
+        $query = $this->query()->where('setting_type', $type);
+        
+        if ($clinicId !== null) {
+            $query->where('clinic_id', $clinicId);
+        }
+        
+        return $query->orderBy('setting_key')->get();
     }
 
     /**
@@ -182,31 +195,35 @@ class ClinicSettingRepository extends BaseRepository
     /**
      * Search settings by key pattern.
      */
-    public function searchByKey(int $clinicId, string $searchTerm): Collection
+    public function searchByKey(?int $clinicId, string $searchTerm): Collection
     {
-        return $this->query()
-            ->where('clinic_id', $clinicId)
-            ->where('setting_key', 'like', "%{$searchTerm}%")
-            ->orderBy('setting_key')
-            ->get();
+        $query = $this->query()->where('setting_key', 'like', "%{$searchTerm}%");
+        
+        if ($clinicId !== null) {
+            $query->where('clinic_id', $clinicId);
+        }
+        
+        return $query->orderBy('setting_key')->get();
     }
 
     /**
      * Get multiple settings by keys.
      */
-    public function getByKeys(int $clinicId, array $keys): Collection
+    public function getByKeys(?int $clinicId, array $keys): Collection
     {
-        return $this->query()
-            ->where('clinic_id', $clinicId)
-            ->whereIn('setting_key', $keys)
-            ->get()
-            ->keyBy('setting_key');
+        $query = $this->query()->whereIn('setting_key', $keys);
+        
+        if ($clinicId !== null) {
+            $query->where('clinic_id', $clinicId);
+        }
+        
+        return $query->get()->keyBy('setting_key');
     }
 
     /**
      * Bulk update settings.
      */
-    public function bulkUpdate(int $clinicId, array $settings): Collection
+    public function bulkUpdate(?int $clinicId, array $settings): Collection
     {
         $results = collect();
 
