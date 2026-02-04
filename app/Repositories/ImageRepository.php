@@ -210,7 +210,7 @@ class ImageRepository extends BaseRepository
      * @param int|null $clinicId
      * @return array
      */
-    public function getStatistics(?int $clinicId = null): array
+    public function getStatistics(?string|int $clinicId = null): array
     {
         $query = $this->query();
 

@@ -43,7 +43,7 @@ class CaseCategoryRepository
     /**
      * Get all case categories with filters and pagination
      */
-    public function getAllWithFilters(array $filters, int $perPage = 15, ?int $clinicId = null): LengthAwarePaginator
+    public function getAllWithFilters(array $filters, int $perPage = 15, ?string|int $clinicId = null): LengthAwarePaginator
     {
         $query = $this->queryBuilder();
         
@@ -58,7 +58,7 @@ class CaseCategoryRepository
     /**
      * Get case category by ID
      */
-    public function getById(int $id, ?int $clinicId = null): ?CaseCategory
+    public function getById(int $id, ?string|int $clinicId = null): ?CaseCategory
     {
         $query = $this->query();
         

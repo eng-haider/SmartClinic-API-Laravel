@@ -13,7 +13,7 @@ class SecretaryRepository
      * In multi-tenant setup, database is already isolated by tenant
      * clinic_id is optional for backward compatibility
      */
-    public function getAllForClinic(?int $clinicId = null, array $filters = [], int $perPage = 15): LengthAwarePaginator
+    public function getAllForClinic(?string $clinicId = null, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
         $query = User::on('mysql')
             ->whereHas('roles', function ($query) {
@@ -49,7 +49,7 @@ class SecretaryRepository
      * In multi-tenant setup, database is already isolated by tenant
      * clinic_id is optional for backward compatibility
      */
-    public function findInClinic(int $id, ?int $clinicId = null): ?User
+    public function findInClinic(int $id, ?string $clinicId = null): ?User
     {
         $query = User::on('mysql')->where('id', $id)
             ->whereHas('roles', function ($query) {
@@ -64,7 +64,7 @@ class SecretaryRepository
      * Create a new secretary
      * Always create in central database
      */
-    public function create(array $data, int $clinicId): User
+    public function create(array $data, string $clinicId): User
     {
         $secretary = User::on('mysql')->create([
             'name' => $data['name'],

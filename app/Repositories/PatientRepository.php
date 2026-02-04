@@ -55,7 +55,7 @@ class PatientRepository
     /**
      * Get all patients with filters and pagination
      */
-    public function getAllWithFilters(array $filters, int $perPage = 15, ?int $clinicId = null): LengthAwarePaginator
+    public function getAllWithFilters(array $filters, int $perPage = 15, ?string|int $clinicId = null): LengthAwarePaginator
     {
         $query = $this->queryBuilder();
         
@@ -70,7 +70,7 @@ class PatientRepository
     /**
      * Get patient by ID
      */
-    public function getById(int $id, ?int $clinicId = null): ?Patient
+    public function getById(int $id, ?string|int $clinicId = null): ?Patient
     {
         $query = $this->query();
         
@@ -123,7 +123,7 @@ class PatientRepository
     /**
      * Get patient by phone
      */
-    public function getByPhone(string $phone, ?int $clinicId = null): ?Patient
+    public function getByPhone(string $phone, ?string|int $clinicId = null): ?Patient
     {
         $query = $this->query()->where('phone', $phone);
         
@@ -138,7 +138,7 @@ class PatientRepository
     /**
      * Get patient by email
      */
-    public function getByEmail(string $email, ?int $clinicId = null): ?Patient
+    public function getByEmail(string $email, ?string|int $clinicId = null): ?Patient
     {
         $query = $this->query()->where('email', $email);
         

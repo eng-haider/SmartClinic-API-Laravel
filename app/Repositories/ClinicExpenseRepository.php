@@ -56,7 +56,7 @@ class ClinicExpenseRepository
     /**
      * Get all expenses with filters and pagination
      */
-    public function getAllWithFilters(array $filters, int $perPage = 15, ?int $clinicId = null): LengthAwarePaginator
+    public function getAllWithFilters(array $filters, int $perPage = 15, ?string|int $clinicId = null): LengthAwarePaginator
     {
         $query = $this->queryBuilder();
         
@@ -71,7 +71,7 @@ class ClinicExpenseRepository
     /**
      * Get expense by ID
      */
-    public function getById(int $id, ?int $clinicId = null): ?ClinicExpense
+    public function getById(int $id, ?string|int $clinicId = null): ?ClinicExpense
     {
         $query = $this->query()->with(['category', 'doctor', 'creator', 'updator']);
         
@@ -115,7 +115,7 @@ class ClinicExpenseRepository
     /**
      * Get expenses by clinic
      */
-    public function getByClinic(int $clinicId, int $perPage = 15): LengthAwarePaginator
+    public function getByClinic(string|int $clinicId, int $perPage = 15): LengthAwarePaginator
     {
         return $this->query()
             ->where('clinic_id', $clinicId)
@@ -139,7 +139,7 @@ class ClinicExpenseRepository
     /**
      * Get expenses by date range
      */
-    public function getByDateRange(string $startDate, string $endDate, ?int $clinicId = null): \Illuminate\Database\Eloquent\Collection
+    public function getByDateRange(string $startDate, string $endDate, ?string|int $clinicId = null): \Illuminate\Database\Eloquent\Collection
     {
         $query = $this->query()
             ->whereBetween('date', [$startDate, $endDate])
@@ -155,7 +155,7 @@ class ClinicExpenseRepository
     /**
      * Get total expenses for a clinic
      */
-    public function getTotalByClinic(int $clinicId, ?string $startDate = null, ?string $endDate = null): float
+    public function getTotalByClinic(string|int $clinicId, ?string $startDate = null, ?string $endDate = null): float
     {
         $query = $this->query()->where('clinic_id', $clinicId);
         
@@ -169,7 +169,7 @@ class ClinicExpenseRepository
     /**
      * Get unpaid expenses for a clinic
      */
-    public function getUnpaidByClinic(int $clinicId): \Illuminate\Database\Eloquent\Collection
+    public function getUnpaidByClinic(string|int $clinicId): \Illuminate\Database\Eloquent\Collection
     {
         return $this->query()
             ->where('clinic_id', $clinicId)
@@ -204,7 +204,7 @@ class ClinicExpenseRepository
     /**
      * Get expense statistics for a clinic
      */
-    public function getStatistics(int $clinicId, ?string $startDate = null, ?string $endDate = null): array
+    public function getStatistics(string|int $clinicId, ?string $startDate = null, ?string $endDate = null): array
     {
         $query = $this->query()->where('clinic_id', $clinicId);
         
@@ -228,7 +228,7 @@ class ClinicExpenseRepository
     /**
      * Get summary statistics for filtered expenses
      */
-    public function getFilteredSummary(array $filters, ?int $clinicId = null): array
+    public function getFilteredSummary(array $filters, ?string|int $clinicId = null): array
     {
         $query = $this->queryBuilder();
         

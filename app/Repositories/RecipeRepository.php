@@ -17,7 +17,7 @@ class RecipeRepository
      * @param int|null $doctorId
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    public function getAll(Request $request, ?int $clinicId = null, ?int $doctorId = null)
+    public function getAll(Request $request, ?string|int $clinicId = null, ?int $doctorId = null)
     {
         $query = QueryBuilder::for(Recipe::class)
             ->allowedIncludes(['patient', 'doctor', 'recipeItems'])

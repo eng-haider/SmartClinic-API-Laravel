@@ -51,7 +51,7 @@ class DoctorRepository
     /**
      * Get all doctors with filters and pagination
      */
-    public function getAllWithFilters(array $filters, int $perPage = 15, ?int $clinicId = null): LengthAwarePaginator
+    public function getAllWithFilters(array $filters, int $perPage = 15, ?string|int $clinicId = null): LengthAwarePaginator
     {
         $query = $this->queryBuilder();
         
@@ -76,7 +76,7 @@ class DoctorRepository
     /**
      * Get doctor by ID
      */
-    public function getById(int $id, ?int $clinicId = null): ?User
+    public function getById(int $id, ?string|int $clinicId = null): ?User
     {
         $query = $this->query();
         
@@ -158,7 +158,7 @@ class DoctorRepository
     /**
      * Get doctor by email
      */
-    public function getByEmail(string $email, ?int $clinicId = null): ?User
+    public function getByEmail(string $email, ?string|int $clinicId = null): ?User
     {
         $query = $this->query()->where('email', $email);
         
@@ -173,7 +173,7 @@ class DoctorRepository
     /**
      * Get doctor by phone
      */
-    public function getByPhone(string $phone, ?int $clinicId = null): ?User
+    public function getByPhone(string $phone, ?string|int $clinicId = null): ?User
     {
         $query = $this->query()->where('phone', $phone);
         
@@ -188,7 +188,7 @@ class DoctorRepository
     /**
      * Get doctors by clinic
      */
-    public function getByClinic(int $clinicId): Collection
+    public function getByClinic(string|int $clinicId): Collection
     {
         return $this->query()
             ->where('clinic_id', $clinicId)
@@ -198,7 +198,7 @@ class DoctorRepository
     /**
      * Get active doctors
      */
-    public function getActive(?int $clinicId = null): Collection
+    public function getActive(?string|int $clinicId = null): Collection
     {
         $query = $this->query()->where('is_active', true);
         
