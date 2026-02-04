@@ -38,6 +38,51 @@ class TenantController extends Controller
     }
 
     /**
+     * Preview what tenant ID will be generated for a given name.
+     * Useful for testing before actually creating a tenant.
+     * 
+     * GET /api/tenants/preview?name=haider
+     */
+    public function previewId(Request $request): JsonResponse
+    {
+        $name = $request->input('name');
+        
+        if (empty($name)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Name is required',
+                'message_ar' => 'الاسم مطلوب',
+            ], 422);
+        }
+
+        $generatedId = $this->generateUniqueTenantId($name);
+        $prefix = config('tenancy.database.prefix', 'tenant');
+        $databaseName = $prefix . $generatedId;
+
+        // Check availability
+        $tenantExists = Tenant::where('id', $generatedId)->exists();
+        $clinicExists = DB::table('clinics')->where('id', $generatedId)->exists();
+        $dbExists = !empty(DB::select("SHOW DATABASES LIKE '{$databaseName}'"));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Tenant ID preview generated',
+            'message_ar' => 'تم إنشاء معاينة معرف العيادة',
+            'data' => [
+                'name' => $name,
+                'generated_id' => $generatedId,
+                'database_name' => $databaseName,
+                'is_available' => !$tenantExists && !$clinicExists && !$dbExists,
+                'checks' => [
+                    'tenant_exists' => $tenantExists,
+                    'clinic_exists' => $clinicExists,
+                    'database_exists' => $dbExists,
+                ],
+            ],
+        ]);
+    }
+
+    /**
      * Store a newly created tenant (clinic) and admin user.
      */
     public function store(Request $request): JsonResponse
@@ -57,10 +102,20 @@ class TenantController extends Controller
             'user_password' => 'required|string|min:6',
         ]);
 
-        // Generate unique tenant ID if not provided
-        if (empty($validated['id'])) {
-            $validated['id'] = $this->generateUniqueTenantId($validated['name']);
-        }
+        // Log the incoming request data
+        Log::info('=== TENANT CREATION REQUEST ===', [
+            'validated_data' => $validated,
+            'raw_request' => $request->all(),
+        ]);
+
+        // ALWAYS generate tenant ID from the name (ignore any provided ID)
+        // This ensures consistency and prevents conflicts
+        $validated['id'] = $this->generateUniqueTenantId($validated['name']);
+        
+        Log::info('Generated tenant ID from name', [
+            'name' => $validated['name'],
+            'generated_id' => $validated['id']
+        ]);
 
         $centralConnection = config('tenancy.database.central_connection');
         

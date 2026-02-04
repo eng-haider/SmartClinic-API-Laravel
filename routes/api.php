@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\Route;
 // ============================================
 Route::prefix('tenants')->group(function () {
     Route::get('/', [TenantController::class, 'index'])->name('tenants.index');
+    Route::get('/preview', [TenantController::class, 'previewId'])->name('tenants.preview');
     Route::post('/', [TenantController::class, 'store'])->name('tenants.store');
     Route::get('/{id}', [TenantController::class, 'show'])->name('tenants.show');
     Route::put('/{id}', [TenantController::class, 'update'])->name('tenants.update');
