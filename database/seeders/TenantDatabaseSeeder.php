@@ -115,10 +115,10 @@ class TenantStatusesSeeder extends Seeder
     public function run(): void
     {
         $statuses = [
-            ['name' => 'Pending', 'color' => '#FFA500', 'description' => 'Case is pending'],
-            ['name' => 'In Progress', 'color' => '#2196F3', 'description' => 'Case is in progress'],
-            ['name' => 'Completed', 'color' => '#4CAF50', 'description' => 'Case is completed'],
-            ['name' => 'Cancelled', 'color' => '#F44336', 'description' => 'Case is cancelled'],
+            ['name_ar' => 'قيد الانتظار', 'name_en' => 'Pending', 'color' => '#FFA500', 'order' => 1],
+            ['name_ar' => 'قيد التنفيذ', 'name_en' => 'In Progress', 'color' => '#2196F3', 'order' => 2],
+            ['name_ar' => 'مكتمل', 'name_en' => 'Completed', 'color' => '#4CAF50', 'order' => 3],
+            ['name_ar' => 'ملغي', 'name_en' => 'Cancelled', 'color' => '#F44336', 'order' => 4],
         ];
 
         foreach ($statuses as $status) {
