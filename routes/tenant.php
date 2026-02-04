@@ -24,6 +24,12 @@ use App\Http\Controllers\NoteController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\PublicPatientController;
 use App\Http\Controllers\PatientPublicProfileController;
+use App\Http\Controllers\Report\BillReportController;
+use App\Http\Controllers\Report\DashboardReportController;
+use App\Http\Controllers\Report\PatientReportController;
+use App\Http\Controllers\Report\CaseReportController;
+use App\Http\Controllers\Report\ReservationReportController;
+use App\Http\Controllers\Report\FinancialReportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -138,6 +144,66 @@ Route::middleware([
         Route::get('/{key}', [ClinicSettingController::class, 'show']);
         Route::put('/{key}', [ClinicSettingController::class, 'update']);
         Route::post('/bulk-update', [ClinicSettingController::class, 'updateBulk']);
+    });
+
+    // ============================================
+    // REPORTS & ANALYTICS ROUTES (JWT required)
+    // ============================================
+    Route::middleware('jwt')->prefix('reports')->group(function () {
+        
+        // Dashboard Overview
+        Route::get('dashboard/overview', [DashboardReportController::class, 'overview']);
+        Route::get('dashboard/today', [DashboardReportController::class, 'today']);
+        
+        // Patient Reports
+        Route::prefix('patients')->group(function () {
+            Route::get('summary', [PatientReportController::class, 'summary']);
+            Route::get('by-source', [PatientReportController::class, 'bySource']);
+            Route::get('by-doctor', [PatientReportController::class, 'byDoctor']);
+            Route::get('trend', [PatientReportController::class, 'trend']);
+            Route::get('age-distribution', [PatientReportController::class, 'ageDistribution']);
+        });
+        
+        // Case Reports
+        Route::prefix('cases')->group(function () {
+            Route::get('summary', [CaseReportController::class, 'summary']);
+            Route::get('by-category', [CaseReportController::class, 'byCategory']);
+            Route::get('by-status', [CaseReportController::class, 'byStatus']);
+            Route::get('by-doctor', [CaseReportController::class, 'byDoctor']);
+            Route::get('trend', [CaseReportController::class, 'trend']);
+        });
+        
+        // Reservation Reports
+        Route::prefix('reservations')->group(function () {
+            Route::get('summary', [ReservationReportController::class, 'summary']);
+            Route::get('by-status', [ReservationReportController::class, 'byStatus']);
+            Route::get('by-doctor', [ReservationReportController::class, 'byDoctor']);
+            Route::get('trend', [ReservationReportController::class, 'trend']);
+        });
+        
+        // Financial Reports
+        Route::prefix('financial')->group(function () {
+            // Bills/Revenue
+            Route::get('bills/summary', [FinancialReportController::class, 'billsSummary']);
+            Route::get('revenue/by-doctor', [FinancialReportController::class, 'revenueByDoctor']);
+            Route::get('revenue/trend', [FinancialReportController::class, 'revenueTrend']);
+            Route::get('bills/by-payment-status', [FinancialReportController::class, 'billsByPaymentStatus']);
+            
+            // Expenses
+            Route::get('expenses/summary', [FinancialReportController::class, 'expensesSummary']);
+            Route::get('expenses/by-category', [FinancialReportController::class, 'expensesByCategory']);
+            Route::get('expenses/trend', [FinancialReportController::class, 'expensesTrend']);
+            
+            // Profit/Loss
+            Route::get('profit-loss', [FinancialReportController::class, 'profitLoss']);
+            Route::get('profit-loss/trend', [FinancialReportController::class, 'profitLossTrend']);
+            
+            // Doctor Performance
+            Route::get('doctor-performance', [FinancialReportController::class, 'doctorPerformance']);
+        });
+        
+        // Legacy bill report (kept for backward compatibility)
+        Route::get('bills', [BillReportController::class, 'index']);
     });
 });
 
