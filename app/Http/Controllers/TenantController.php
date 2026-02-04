@@ -189,10 +189,10 @@ class TenantController extends Controller
             $tenant->refresh();
             
             Log::info('Tenant created with ID:', ['id' => $tenant->id, 'db_name' => $databaseName]);
-            
+            $validated['id'] = $this->generateUniqueTenantId($validated['name']);
             // Step 2.5: Create clinic record in central database (mirror of tenant)
             $clinic = Clinic::on($centralConnection)->create([
-                'id' => $tenant->id,
+                'id' => $validated['id'],
                 'name' => $validated['name'],
                 'address' => $validated['address'] ?? null,
                 'rx_img' => $validated['rx_img'] ?? null,
@@ -221,13 +221,19 @@ class TenantController extends Controller
             DB::connection($centralConnection)->rollBack();
             Log::error('Failed to create tenant/user in central database:', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'attempted_id' => $validated['id'] ?? 'unknown',
+                'requested_name' => $validated['name'] ?? 'unknown',
             ]);
             
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create tenant/user: ' . $e->getMessage(),
+                'message' => 'Failed to create tenant/user: ' . $e->getMessage() . " (Attempted ID: " . ($validated['id'] ?? 'unknown') . ")",
                 'message_ar' => 'فشل في إنشاء العيادة والمستخدم: ' . $e->getMessage(),
+                'debug' => [
+                    'attempted_tenant_id' => $validated['id'] ?? 'unknown',
+                    'requested_name' => $validated['name'] ?? 'unknown',
+                ],
             ], 500);
         }
         
