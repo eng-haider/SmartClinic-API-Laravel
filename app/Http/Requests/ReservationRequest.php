@@ -25,7 +25,6 @@ class ReservationRequest extends FormRequest
         return [
             'patient_id' => 'required|exists:patients,id',
             'doctor_id' => 'nullable|exists:users,id',
-            'clinics_id' => 'nullable|exists:clinics,id', // Set from auth, but must be in rules for validated()
             'status_id' => 'nullable|exists:statuses,id',
             'notes' => 'nullable|string',
             'reservation_start_date' => 'required|date',
@@ -43,15 +42,9 @@ class ReservationRequest extends FormRequest
     
     protected function prepareForValidation(): void
     {
-        // Remove clinics_id from request if sent (security measure)
-        $this->request->remove('clinics_id');
+      
 
-        // Force clinics_id from authenticated user only
-        if (auth()->check() && auth()->user()->clinic_id) {
-            $this->merge([
-                'clinics_id' => auth()->user()->clinic_id,
-            ]);
-        }
+     
 
         // Set default status_id to "Pending/New" if not provided
         if (!$this->has('status_id') || $this->status_id === null) {
