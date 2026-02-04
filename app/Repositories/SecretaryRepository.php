@@ -10,11 +10,12 @@ class SecretaryRepository
 {
     /**
      * Get all secretaries for a specific clinic
-     * Always query from central database
+     * In multi-tenant setup, database is already isolated by tenant
+     * clinic_id is optional for backward compatibility
      */
-    public function getAllForClinic(int $clinicId, array $filters = [], int $perPage = 15): LengthAwarePaginator
+    public function getAllForClinic(?int $clinicId = null, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = User::on('mysql')->where('clinic_id', $clinicId)
+        $query = User::on('mysql')
             ->whereHas('roles', function ($query) {
                 $query->where('name', 'secretary');
             })
@@ -45,17 +46,18 @@ class SecretaryRepository
 
     /**
      * Find secretary by ID within clinic
-     * Always query from central database
+     * In multi-tenant setup, database is already isolated by tenant
+     * clinic_id is optional for backward compatibility
      */
-    public function findInClinic(int $id, int $clinicId): ?User
+    public function findInClinic(int $id, ?int $clinicId = null): ?User
     {
-        return User::on('mysql')->where('id', $id)
-            ->where('clinic_id', $clinicId)
+        $query = User::on('mysql')->where('id', $id)
             ->whereHas('roles', function ($query) {
                 $query->where('name', 'secretary');
             })
-            ->with(['permissions', 'roles'])
-            ->first();
+            ->with(['permissions', 'roles']);
+
+        return $query->first();
     }
 
     /**

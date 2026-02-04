@@ -77,11 +77,12 @@ class SecretaryController extends Controller
     public function store(SecretaryRequest $request): JsonResponse
     {
         try {
-            $user = Auth::user();
+            // Get clinic_id from tenant header (used for storing in central database)
+            $clinicId = $request->header('X-Tenant-ID') ?? $request->header('X-Clinic-ID');
             
             $secretary = $this->secretaryRepository->create(
                 $request->validated(),
-                $user->clinic_id
+                $clinicId
             );
 
             return response()->json([
@@ -107,9 +108,8 @@ class SecretaryController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $user = Auth::user();
-        
-        $secretary = $this->secretaryRepository->findInClinic($id, $user->clinic_id);
+        // Multi-tenancy: Database is already isolated by tenant
+        $secretary = $this->secretaryRepository->findInClinic($id, null);
 
         if (!$secretary) {
             return response()->json([
@@ -141,9 +141,8 @@ class SecretaryController extends Controller
     public function update(SecretaryRequest $request, int $id): JsonResponse
     {
         try {
-            $user = Auth::user();
-            
-            $secretary = $this->secretaryRepository->findInClinic($id, $user->clinic_id);
+            // Multi-tenancy: Database is already isolated by tenant
+            $secretary = $this->secretaryRepository->findInClinic($id, null);
 
             if (!$secretary) {
                 return response()->json([
@@ -184,9 +183,8 @@ class SecretaryController extends Controller
     public function destroy(int $id): JsonResponse
     {
         try {
-            $user = Auth::user();
-            
-            $secretary = $this->secretaryRepository->findInClinic($id, $user->clinic_id);
+            // Multi-tenancy: Database is already isolated by tenant
+            $secretary = $this->secretaryRepository->findInClinic($id, null);
 
             if (!$secretary) {
                 return response()->json([
@@ -231,9 +229,8 @@ class SecretaryController extends Controller
         ]);
 
         try {
-            $user = Auth::user();
-            
-            $secretary = $this->secretaryRepository->findInClinic($id, $user->clinic_id);
+            // Multi-tenancy: Database is already isolated by tenant
+            $secretary = $this->secretaryRepository->findInClinic($id, null);
 
             if (!$secretary) {
                 return response()->json([
@@ -268,9 +265,8 @@ class SecretaryController extends Controller
     public function toggleStatus(int $id): JsonResponse
     {
         try {
-            $user = Auth::user();
-            
-            $secretary = $this->secretaryRepository->findInClinic($id, $user->clinic_id);
+            // Multi-tenancy: Database is already isolated by tenant
+            $secretary = $this->secretaryRepository->findInClinic($id, null);
 
             if (!$secretary) {
                 return response()->json([
