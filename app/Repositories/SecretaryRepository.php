@@ -73,10 +73,7 @@ class SecretaryRepository
         $authUser = Auth::user();
      
         
-        if (!$clinicId) {
-            throw new \Exception('Cannot create secretary: User is not associated with any clinic');
-        }
-        
+     
         $secretary = User::reate([
             'name' => $data['name'],
             'phone' => $data['phone'],
