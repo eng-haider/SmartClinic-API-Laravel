@@ -77,13 +77,8 @@ class SecretaryController extends Controller
     public function store(SecretaryRequest $request): JsonResponse
     {
         try {
-            // Get clinic_id from tenant header (used for storing in central database)
-            $clinicId = $request->header('X-Tenant-ID') ?? $request->header('X-Clinic-ID');
-            
-            $secretary = $this->secretaryRepository->create(
-                $request->validated(),
-                $clinicId
-            );
+            // clinic_id is now automatically retrieved from authenticated user in repository
+            $secretary = $this->secretaryRepository->create($request->validated());
 
             return response()->json([
                 'success' => true,

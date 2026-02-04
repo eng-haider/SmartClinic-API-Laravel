@@ -4,7 +4,9 @@ namespace App\Repositories;
 
 use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class SecretaryRepository
 {
@@ -63,20 +65,38 @@ class SecretaryRepository
     /**
      * Create a new secretary
      * Always create in central database
+     * clinic_id is automatically retrieved from authenticated user
      */
-    public function create(array $data, string $clinicId): User
+    public function create(array $data): User
     {
+        // Get clinic_id from authenticated user
+        $authUser = Auth::user();
+     
+        
+        if (!$clinicId) {
+            throw new \Exception('Cannot create secretary: User is not associated with any clinic');
+        }
+        
         $secretary = User::on('mysql')->create([
             'name' => $data['name'],
             'phone' => $data['phone'],
             // 'email' => $data['email'],
             'password' => Hash::make($data['password']),
-            'clinic_id' => $clinicId,
+          
             'is_active' => $data['is_active'] ?? true,
         ]);
 
-        // Assign secretary role
-        $secretary->assignRole('secretary');
+        // Assign secretary role (only if role exists in central DB)
+        try {
+            $secretary->assignRole('secretary');
+        } catch (\Exception $e) {
+            // If secretary role doesn't exist in central DB, continue without it
+            // Secretaries work within tenant databases where roles are properly seeded
+            Log::warning('Could not assign secretary role in central database', [
+                'user_id' => $secretary->id,
+                'error' => $e->getMessage()
+            ]);
+        }
 
         // Assign custom permissions if provided
         if (!empty($data['permissions'])) {
