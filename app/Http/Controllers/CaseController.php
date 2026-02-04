@@ -78,7 +78,7 @@ class CaseController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Case created successfully',
-                'data' => new CaseResource($case->load(['patient', 'doctor', 'clinic', 'category', 'status'])),
+                'data' => new CaseResource($case->load(['patient', 'doctor', 'category', 'status'])),
             ], 201);
         } catch (\Exception $e) {
             return response()->json([

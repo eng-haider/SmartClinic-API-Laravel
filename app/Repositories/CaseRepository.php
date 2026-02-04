@@ -27,7 +27,6 @@ class CaseRepository
             ->allowedFilters([
                 'patient_id',
                 'doctor_id',
-                'clinic_id',
                 'case_categores_id',
                 'status_id',
                 'is_paid',
@@ -37,7 +36,6 @@ class CaseRepository
                 AllowedFilter::exact('status_id'),
                 AllowedFilter::exact('patient_id'),
                 AllowedFilter::exact('doctor_id'),
-                AllowedFilter::exact('clinic_id'),
                 AllowedFilter::exact('case_categores_id'),
                 AllowedFilter::scope('paid'),
                 AllowedFilter::scope('unpaid'),
@@ -47,7 +45,6 @@ class CaseRepository
                 'id',
                 'patient_id',
                 'doctor_id',
-                'clinic_id',
                 'status_id',
                 'price',
                 'is_paid',
@@ -57,7 +54,6 @@ class CaseRepository
             ->allowedIncludes([
                 'patient',
                 'doctor',
-                'clinic',
                 'category',
                 'status',
                 'notes',
@@ -72,11 +68,6 @@ class CaseRepository
     public function getAllWithFilters(array $filters, int $perPage = 15, ?int $clinicId = null, ?int $doctorId = null): LengthAwarePaginator
     {
         $query = $this->queryBuilder();
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinic_id', $clinicId);
-        }
         
         // Filter by doctor if provided (for doctors to see only their own cases)
         if ($doctorId !== null) {
@@ -93,11 +84,6 @@ class CaseRepository
     {
         $query = $this->query()
             ->with(['patient', 'doctor', 'category', 'status']);
-        
-        // Filter by clinic if provided
-        if ($clinicId !== null) {
-            $query->where('clinic_id', $clinicId);
-        }
         
         // Filter by doctor if provided (for doctors to see only their own cases)
         if ($doctorId !== null) {
@@ -194,7 +180,7 @@ class CaseRepository
     public function getByCategoryId(int $categoryId, int $perPage = 15): LengthAwarePaginator
     {
         return $this->query()
-            ->with(['patient', 'doctor', 'clinic', 'category', 'status'])
+            ->with(['patient', 'doctor', 'category', 'status'])
             ->where('case_categores_id', $categoryId)
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
@@ -202,12 +188,13 @@ class CaseRepository
 
     /**
      * Get cases by clinic ID
+     * DEPRECATED: clinic_id not used in multi-tenant setup
+     * Database is already isolated by tenant
      */
     public function getByClinicId(int $clinicId, int $perPage = 15): LengthAwarePaginator
     {
         return $this->query()
             ->with(['patient', 'doctor', 'category', 'status'])
-            ->where('clinic_id', $clinicId)
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
     }
@@ -340,11 +327,6 @@ class CaseRepository
             $query->where('created_at', '<=', $filters['date_to']);
         }
 
-        // Apply clinic filter if provided
-        if (isset($filters['clinic_id'])) {
-            $query->where('clinic_id', $filters['clinic_id']);
-        }
-
         // Apply doctor filter if provided
         if (isset($filters['doctor_id'])) {
             $query->where('doctor_id', $filters['doctor_id']);
@@ -410,9 +392,7 @@ class CaseRepository
             ->where('is_paid', true)
             ->whereBetween('created_at', [$startDate, $endDate]);
 
-        if ($clinicId) {
-            $query->where('clinic_id', $clinicId);
-        }
+        // clinic_id not needed in multi-tenant setup - database already isolated
 
         return $query->groupBy('date')
             ->orderBy('date')
