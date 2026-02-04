@@ -77,7 +77,7 @@ class SecretaryRepository
             throw new \Exception('Cannot create secretary: User is not associated with any clinic');
         }
         
-        $secretary = User::on('mysql')->create([
+        $secretary = User::reate([
             'name' => $data['name'],
             'phone' => $data['phone'],
             // 'email' => $data['email'],
