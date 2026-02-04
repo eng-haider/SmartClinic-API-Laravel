@@ -17,8 +17,7 @@ class SecretaryRepository
      */
     public function getAllForClinic(?string $clinicId = null, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = User::on('mysql')
-            ->whereHas('roles', function ($query) {
+        $query = User::whereHas('roles', function ($query) {
                 $query->where('name', 'secretary');
             })
             ->with(['permissions', 'roles']);
