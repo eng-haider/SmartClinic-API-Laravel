@@ -74,7 +74,7 @@ class SecretaryRepository
      
         
      
-        $secretary = User::reate([
+        $secretary = User::create([
             'name' => $data['name'],
             'phone' => $data['phone'],
             // 'email' => $data['email'],
