@@ -104,15 +104,18 @@ class TenantController extends Controller
 
         // Generate unique tenant ID from name
         $tenantId = $this->generateUniqueTenantId($validated['name']);
-        // Database name: u876784197_tenant_haider (prefix + tenant_ + cleaned name)
+        // Database name: u876784197_tenant_haider (manually created on Hostinger)
         $cleanName = ltrim($tenantId, '_'); // Remove leading underscore from _haider -> haider
         $databaseName = config('tenancy.database.prefix') . '_' . $cleanName;
+        $databaseUsername = $databaseName; // Username = database name on Hostinger
+        $databasePassword = '9!iSeEys:6sO'; // Hostinger database password
         $centralConnection = config('tenancy.database.central_connection');
         
         Log::info('=== CREATING NEW TENANT ===', [
             'name' => $validated['name'],
             'generated_id' => $tenantId,
             'database' => $databaseName,
+            'note' => 'Database must be manually created on Hostinger first',
         ]);
 
         // Check if tenant already exists
@@ -162,8 +165,8 @@ class TenantController extends Controller
                 'whatsapp_phone' => $validated['whatsapp_phone'] ?? null,
                 'logo' => $validated['logo'] ?? null,
                 'db_name' => $databaseName,
-                'db_username' => $databaseName,
-                'db_password' => env('TENANT_DB_PASSWORD'),
+                'db_username' => $databaseUsername,
+                'db_password' => $databasePassword,
             ]);
             
             Log::info('✓ Tenant created', ['id' => $tenant->id]);
@@ -212,14 +215,28 @@ class TenantController extends Controller
             
             config([
                 'database.connections.tenant.database' => $databaseName,
-                'database.connections.tenant.username' => $databaseName,
-                'database.connections.tenant.password' => env('TENANT_DB_PASSWORD'),
+                'database.connections.tenant.username' => $databaseUsername,
+                'database.connections.tenant.password' => $databasePassword,
                 'database.connections.tenant.host' => $centralConfig['host'],
                 'database.connections.tenant.port' => $centralConfig['port'],
             ]);
             
             DB::purge('tenant');
-            DB::connection('tenant')->getPdo();
+            
+            // Test the connection to manually created database
+            try {
+                DB::connection('tenant')->getPdo();
+                Log::info('✓ Connected to manually created database', ['database' => $databaseName]);
+            } catch (\Exception $e) {
+                throw new \Exception(
+                    "Cannot connect to database '{$databaseName}'. " .
+                    "Please manually create it on Hostinger with:\n" .
+                    "- Database name: {$databaseName}\n" .
+                    "- Username: {$databaseUsername}\n" .
+                    "- Password: {$databasePassword}\n" .
+                    "Error: " . $e->getMessage()
+                );
+            }
             
             Log::info('✓ Tenant database connected', ['database' => $databaseName]);
             
@@ -308,6 +325,7 @@ class TenantController extends Controller
 
     /**
      * Generate a unique tenant ID based on clinic name
+     * Note: Database must be manually created on Hostinger
      */
     private function generateUniqueTenantId(string $clinicName): string
     {
@@ -321,30 +339,12 @@ class TenantController extends Controller
             }
         }
         
-        $prefix = config('tenancy.database.prefix', 'tenant');
         $counter = 1;
         $attemptId = '_' . $baseId;
         
-        // Keep trying until we find a unique ID
-        while (true) {
-            // Check if ID exists in tenants table
-            if (Tenant::where('id', $attemptId)->exists()) {
-                $attemptId = '_' . $baseId . '_' . $counter++;
-                continue;
-            }
-            
-            // Check if database exists (using new format: u876784197_tenant_haider)
-            $cleanName = ltrim($attemptId, '_'); // Remove leading underscore
-            $dbName = $prefix . '_' . $cleanName; // u876784197_tenant + _ + haider
-            $dbExists = DB::select("SHOW DATABASES LIKE '{$dbName}'");
-            
-            if (!empty($dbExists)) {
-                $attemptId = '_' . $baseId . '_' . $counter++;
-                continue;
-            }
-            
-            // Found unique ID
-            break;
+        // Keep trying until we find a unique tenant ID (only check tenant table, not database)
+        while (Tenant::where('id', $attemptId)->exists()) {
+            $attemptId = '_' . $baseId . '_' . $counter++;
         }
         
         return $attemptId;
