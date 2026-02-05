@@ -112,6 +112,7 @@ Route::middleware([
 
     // Note routes
     Route::middleware('jwt')->group(function () {
+        Route::get('notes/{noteableType}/{noteableId}', [NoteController::class, 'byNoteable']);
         Route::apiResource('notes', NoteController::class);
     });
 
