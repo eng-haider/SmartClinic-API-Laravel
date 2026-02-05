@@ -103,7 +103,9 @@ class TenantController extends Controller
 
         // Generate unique tenant ID from name
         $tenantId = $this->generateUniqueTenantId($validated['name']);
-        $databaseName = config('tenancy.database.prefix') . $tenantId;
+        // Database name: u876784197_tenant_haider (prefix + tenant_ + cleaned name)
+        $cleanName = ltrim($tenantId, '_'); // Remove leading underscore from _haider -> haider
+        $databaseName = config('tenancy.database.prefix') . '_' . $cleanName;
         $centralConnection = config('tenancy.database.central_connection');
         
         Log::info('=== CREATING NEW TENANT ===', [
