@@ -88,7 +88,6 @@ class TenantController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'id' => 'nullable|string',
             'name' => 'required|string|max:255',
             'address' => 'nullable|string|max:500',
             'rx_img' => 'nullable|string',
@@ -102,97 +101,73 @@ class TenantController extends Controller
             'user_password' => 'required|string|min:6',
         ]);
 
-        // Log the incoming request data
-        Log::info('=== TENANT CREATION REQUEST ===', [
-            'validated_data' => $validated,
-            'raw_request' => $request->all(),
-        ]);
-
-        // ALWAYS generate tenant ID from the name (ignore any provided ID)
-        // This ensures consistency and prevents conflicts
-        $validated['id'] = $this->generateUniqueTenantId($validated['name']);
-        
-        Log::info('Generated tenant ID from name', [
-            'name' => $validated['name'],
-            'generated_id' => $validated['id']
-        ]);
-
+        // Generate unique tenant ID from name
+        $tenantId = $this->generateUniqueTenantId($validated['name']);
+        $databaseName = config('tenancy.database.prefix') . $tenantId;
         $centralConnection = config('tenancy.database.central_connection');
         
-        // Step 0: Check if tenant/clinic already exists
-        $existingTenant = Tenant::find($validated['id']);
-        if ($existingTenant) {
+        Log::info('=== CREATING NEW TENANT ===', [
+            'name' => $validated['name'],
+            'generated_id' => $tenantId,
+            'database' => $databaseName,
+        ]);
+
+        // Check if tenant already exists
+        if (Tenant::find($tenantId)) {
             return response()->json([
                 'success' => false,
-                'message' => "Tenant with ID '{$validated['id']}' already exists. Use a different clinic name or delete the existing tenant first.",
-                'message_ar' => "العيادة بمعرف '{$validated['id']}' موجودة بالفعل. استخدم اسماً مختلفاً أو احذف العيادة الموجودة أولاً.",
+                'message' => "Tenant '{$tenantId}' already exists.",
+                'message_ar' => "العيادة '{$tenantId}' موجودة بالفعل.",
             ], 422);
         }
         
-        $existingClinic = Clinic::on($centralConnection)->find($validated['id']);
-        if ($existingClinic) {
+        if (Clinic::on($centralConnection)->find($tenantId)) {
             return response()->json([
                 'success' => false,
-                'message' => "Clinic with ID '{$validated['id']}' already exists. Use a different clinic name or delete the existing clinic first.",
-                'message_ar' => "العيادة بمعرف '{$validated['id']}' موجودة بالفعل. استخدم اسماً مختلفاً أو احذف العيادة الموجودة أولاً.",
+                'message' => "Clinic '{$tenantId}' already exists.",
+                'message_ar' => "العيادة '{$tenantId}' موجودة بالفعل.",
+            ], 422);
+        }
+        
+        // Check if user phone exists
+        if (User::on($centralConnection)->where('phone', $validated['user_phone'])->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Phone number already registered',
+                'message_ar' => 'رقم الهاتف مسجل مسبقاً',
+            ], 422);
+        }
+        
+        if (!empty($validated['user_email']) && User::on($centralConnection)->where('email', $validated['user_email'])->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email already registered',
+                'message_ar' => 'البريد الإلكتروني مسجل مسبقاً',
             ], 422);
         }
         
         DB::connection($centralConnection)->beginTransaction();
         
         try {
-            // Step 1: Check if user already exists in central database
-            $existingUser = User::on($centralConnection)
-                ->where('phone', $validated['user_phone'])
-                ->first();
-                
-            if ($existingUser) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Phone number already registered',
-                    'message_ar' => 'رقم الهاتف مسجل مسبقاً',
-                ], 422);
-            }
+            // Create tenant
+            $tenant = Tenant::create([
+                'id' => $tenantId,
+                'name' => $validated['name'],
+                'address' => $validated['address'] ?? null,
+                'rx_img' => $validated['rx_img'] ?? null,
+                'whatsapp_template_sid' => $validated['whatsapp_template_sid'] ?? null,
+                'whatsapp_phone' => $validated['whatsapp_phone'] ?? null,
+                'logo' => $validated['logo'] ?? null,
+                'db_name' => $databaseName,
+                'db_username' => $databaseName,
+                'db_password' => env('TENANT_DB_PASSWORD'),
+            ]);
             
-            if (!empty($validated['user_email'])) {
-                $existingEmail = User::on($centralConnection)
-                    ->where('email', $validated['user_email'])
-                    ->first();
-                    
-                if ($existingEmail) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Email already registered',
-                        'message_ar' => 'البريد الإلكتروني مسجل مسبقاً',
-                    ], 422);
-                }
-            }
+            Log::info('✓ Tenant created', ['id' => $tenant->id]);
             
-            // Step 2: Create tenant record (this IS the clinic)
-            $tenant = new Tenant();
-            $tenant->setAttribute('id', $validated['id']);
-            $tenant->exists = false;
-            
-            foreach ($validated as $key => $value) {
-                if ($key !== 'id' && !str_starts_with($key, 'user_')) {
-                    $tenant->setAttribute($key, $value);
-                }
-            }
-            
-            // Store database credentials for Hostinger (one user per database)
-            $databaseName = config('tenancy.database.prefix') . $validated['id'];
-            $tenant->setAttribute('db_name', $databaseName);
-            $tenant->setAttribute('db_username', $databaseName); // On Hostinger, username = database name
-            $tenant->setAttribute('db_password', env('TENANT_DB_PASSWORD'));
-            
-            $tenant->saveQuietly();
-            $tenant->refresh();
-            
-            Log::info('Tenant created with ID:', ['id' => $tenant->id, 'db_name' => $databaseName]);
-            $validated['id'] = $this->generateUniqueTenantId($validated['name']);
-            // Step 2.5: Create clinic record in central database (mirror of tenant)
+            // Create clinic in central database
             $clinic = Clinic::on($centralConnection)->create([
-                'id' => $validated['id'],
+                'id' => $tenantId,
                 'name' => $validated['name'],
                 'address' => $validated['address'] ?? null,
                 'rx_img' => $validated['rx_img'] ?? null,
@@ -201,131 +176,105 @@ class TenantController extends Controller
                 'logo' => $validated['logo'] ?? null,
             ]);
             
-            Log::info('Clinic record created in central DB:', ['clinic_id' => $clinic->id]);
+            Log::info('✓ Clinic created in central DB', ['id' => $clinic->id]);
             
-            // Step 3: Create user in central database
+            // Create user in central database
             $centralUser = User::on($centralConnection)->create([
                 'name' => $validated['user_name'],
                 'phone' => $validated['user_phone'],
                 'email' => $validated['user_email'] ?? null,
                 'password' => Hash::make($validated['user_password']),
-                'clinic_id' => $tenant->id, // tenant ID is the clinic ID
+                'clinic_id' => $tenantId,
                 'is_active' => true,
             ]);
             
-            Log::info('User created in central DB:', ['user_id' => $centralUser->id]);
+            Log::info('✓ User created in central DB', ['id' => $centralUser->id]);
             
             DB::connection($centralConnection)->commit();
             
         } catch (\Exception $e) {
             DB::connection($centralConnection)->rollBack();
-            Log::error('Failed to create tenant/user in central database:', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'attempted_id' => $validated['id'] ?? 'unknown',
-                'requested_name' => $validated['name'] ?? 'unknown',
-            ]);
+            Log::error('Failed to create tenant/clinic/user:', ['error' => $e->getMessage()]);
             
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create tenant/user: ' . $e->getMessage() . " (Attempted ID: " . ($validated['id'] ?? 'unknown') . ")",
-                'message_ar' => 'فشل في إنشاء العيادة والمستخدم: ' . $e->getMessage(),
-                'debug' => [
-                    'attempted_tenant_id' => $validated['id'] ?? 'unknown',
-                    'requested_name' => $validated['name'] ?? 'unknown',
-                ],
+                'message' => 'Failed to create tenant: ' . $e->getMessage(),
+                'message_ar' => 'فشل في إنشاء العيادة: ' . $e->getMessage(),
             ], 500);
         }
         
-        // Step 4: Setup tenant database (assumes database already exists on shared hosting)
+        // Setup tenant database
         try {
-            // Get database credentials from tenant record (or use defaults)
-            $databaseName = $tenant->db_name ?? (config('tenancy.database.prefix') . $tenant->id);
-            $tenantUsername = $tenant->db_username ?? $databaseName;
-            $tenantPassword = $tenant->db_password ?? env('TENANT_DB_PASSWORD');
-            
             $centralConfig = config('database.connections.' . $centralConnection);
             
-            // Configure the tenant connection dynamically
             config([
                 'database.connections.tenant.database' => $databaseName,
-                'database.connections.tenant.username' => $tenantUsername,
-                'database.connections.tenant.password' => $tenantPassword,
+                'database.connections.tenant.username' => $databaseName,
+                'database.connections.tenant.password' => env('TENANT_DB_PASSWORD'),
                 'database.connections.tenant.host' => $centralConfig['host'],
                 'database.connections.tenant.port' => $centralConfig['port'],
             ]);
             
-            // Purge and reconnect
             DB::purge('tenant');
+            DB::connection('tenant')->getPdo();
             
-            // Test the connection
-            try {
-                DB::connection('tenant')->getPdo();
-                Log::info('Tenant database connection verified:', [
-                    'database' => $databaseName,
-                    'username' => $tenantUsername
-                ]);
-            } catch (\Exception $e) {
-                $errorMessage = "Database '{$databaseName}' cannot be accessed. " .
-                    "On Hostinger: (1) Create database: {$databaseName}. " .
-                    "(2) Username should be: {$databaseName}. " .
-                    "(3) Password should match TENANT_DB_PASSWORD in .env. " .
-                    "Error: " . $e->getMessage();
-                throw new \Exception($errorMessage);
-            }
+            Log::info('✓ Tenant database connected', ['database' => $databaseName]);
             
-            // Step 5: Run migrations directly on tenant connection (bypass Stancl)
-            $userPassword = $validated['user_password'];
-            
-            // Run migrations on tenant database
+            // Run migrations
             Artisan::call('migrate', [
                 '--database' => 'tenant',
                 '--path' => 'database/migrations/tenant',
                 '--force' => true,
             ]);
-            Log::info('Tenant migrations completed');
+            Log::info('✓ Migrations completed');
             
-            // Run seeders on tenant database
+            // Seed roles and permissions
             Artisan::call('db:seed', [
                 '--database' => 'tenant',
                 '--class' => 'RoleAndPermissionSeeder',
                 '--force' => true,
             ]);
-            Log::info('RoleAndPermissionSeeder completed');
+            Log::info('✓ Roles seeded');
             
+            // Seed tenant data
             Artisan::call('db:seed', [
                 '--database' => 'tenant',
                 '--class' => 'TenantDatabaseSeeder',
                 '--force' => true,
             ]);
-            Log::info('TenantDatabaseSeeder completed');
+            Log::info('✓ Tenant data seeded');
             
             // Create user in tenant database
             $tenantUser = User::on('tenant')->create([
                 'name' => $validated['user_name'],
                 'phone' => $validated['user_phone'],
                 'email' => $validated['user_email'] ?? null,
-                'password' => Hash::make($userPassword),
+                'password' => Hash::make($validated['user_password']),
                 'is_active' => true,
             ]);
             
-            // Assign role (need to use tenant connection for roles)
+            // Assign super doctor role
+            $roleId = DB::connection('tenant')->table('roles')
+                ->where('name', 'clinic_super_doctor')
+                ->value('id') ?? 1;
+                
             DB::connection('tenant')->table('model_has_roles')->insert([
-                'role_id' => DB::connection('tenant')->table('roles')->where('name', 'clinic_super_doctor')->value('id') ?? 1,
+                'role_id' => $roleId,
                 'model_type' => 'App\\Models\\User',
                 'model_id' => $tenantUser->id,
             ]);
             
-            Log::info('User created in tenant DB:', ['user_id' => $tenantUser->id]);
-            Log::info('Tenant setup completed:', ['id' => $tenant->id]);
+            Log::info('✓ User created in tenant DB with role', ['id' => $tenantUser->id]);
+            Log::info('=== TENANT SETUP COMPLETE ===', ['tenant_id' => $tenantId]);
             
             return response()->json([
                 'success' => true,
-                'message' => 'Tenant and user created successfully. You can now login.',
-                'message_ar' => 'تم إنشاء العيادة والمستخدم بنجاح. يمكنك الآن تسجيل الدخول.',
+                'message' => 'Tenant created successfully. You can now login.',
+                'message_ar' => 'تم إنشاء العيادة بنجاح. يمكنك الآن تسجيل الدخول.',
                 'data' => [
-                    'tenant_id' => $tenant->id,
+                    'tenant_id' => $tenantId,
                     'tenant_name' => $tenant->name,
+                    'database' => $databaseName,
                     'user' => [
                         'name' => $centralUser->name,
                         'phone' => $centralUser->phone,
@@ -335,22 +284,13 @@ class TenantController extends Controller
             ], 201);
             
         } catch (\Exception $e) {
-            Log::error('Database creation/setup failed:', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            Log::error('Tenant database setup failed:', ['error' => $e->getMessage()]);
             
-            // Rollback: Delete tenant and user
+            // Cleanup on failure
             try {
-                if (isset($tenant)) {
-                    $tenant->delete();
-                }
-                if (isset($clinic)) {
-                    $clinic->forceDelete();
-                }
-                if (isset($centralUser)) {
-                    $centralUser->forceDelete();
-                }
+                $tenant->delete();
+                $clinic->forceDelete();
+                $centralUser->forceDelete();
             } catch (\Exception $cleanupError) {
                 Log::error('Cleanup failed:', ['error' => $cleanupError->getMessage()]);
             }
