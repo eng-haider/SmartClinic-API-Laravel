@@ -57,7 +57,8 @@ class TenantController extends Controller
 
         $generatedId = $this->generateUniqueTenantId($name);
         $prefix = config('tenancy.database.prefix', 'tenant');
-        $databaseName = $prefix . $generatedId;
+        $cleanName = ltrim($generatedId, '_'); // Remove leading underscore
+        $databaseName = $prefix . '_' . $cleanName; // u876784197_tenant_haider
 
         // Check availability
         $tenantExists = Tenant::where('id', $generatedId)->exists();
@@ -332,8 +333,9 @@ class TenantController extends Controller
                 continue;
             }
             
-            // Check if database exists
-            $dbName = $prefix . $attemptId;
+            // Check if database exists (using new format: u876784197_tenant_haider)
+            $cleanName = ltrim($attemptId, '_'); // Remove leading underscore
+            $dbName = $prefix . '_' . $cleanName; // u876784197_tenant + _ + haider
             $dbExists = DB::select("SHOW DATABASES LIKE '{$dbName}'");
             
             if (!empty($dbExists)) {
