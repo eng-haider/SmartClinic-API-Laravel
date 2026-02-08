@@ -26,7 +26,7 @@ class ReportsRepository
     /**
      * Get dashboard overview statistics
      */
-    public function getDashboardOverview(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getDashboardOverview($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         return [
             'patients' => $this->getPatientsSummary($clinicId, $dateFrom, $dateTo),
@@ -45,11 +45,11 @@ class ReportsRepository
         $today = Carbon::today()->format('Y-m-d');
         
         return [
-            'new_patients' => $this->getNewPatientsCount($clinicId, $today, $today),
+            'new_patients' => $this->getNewPatientsCount(null, $today, $today),
             'reservations_today' => $this->getReservationsCountByDate($today),
-            'revenue_today' => $this->getRevenueByDateRange($clinicId, $today, $today),
-            'cases_today' => $this->getCasesCountByDateRange($clinicId, $today, $today),
-            'expenses_today' => $this->getExpensesTotalByDateRange($clinicId, $today, $today),
+            'revenue_today' => $this->getRevenueByDateRange(null, $today, $today),
+            'cases_today' => $this->getCasesCountByDateRange(null, $today, $today),
+            'expenses_today' => $this->getExpensesTotalByDateRange(null, $today, $today),
         ];
     }
 
@@ -62,7 +62,7 @@ class ReportsRepository
     /**
      * Get patients summary counts
      */
-    public function getPatientsSummary(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getPatientsSummary($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Patient::query();
         
@@ -88,7 +88,7 @@ class ReportsRepository
     /**
      * Get new patients count by date range
      */
-    public function getNewPatientsCount(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): int
+    public function getNewPatientsCount($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): int
     {
         $query = Patient::query();
         
@@ -104,7 +104,7 @@ class ReportsRepository
     /**
      * Get patients grouped by source (from_where_come)
      */
-    public function getPatientsBySource(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getPatientsBySource($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Patient::query()
             ->select('from_where_come_id', DB::raw('COUNT(*) as count'))
@@ -132,7 +132,7 @@ class ReportsRepository
     /**
      * Get patients grouped by doctor
      */
-    public function getPatientsByDoctor(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getPatientsByDoctor($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Patient::query()
             ->select('doctor_id', DB::raw('COUNT(*) as count'))
@@ -160,7 +160,7 @@ class ReportsRepository
     /**
      * Get patients trend (grouped by period)
      */
-    public function getPatientsTrend(?string|int $clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getPatientsTrend($clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Patient::query();
         
@@ -176,7 +176,7 @@ class ReportsRepository
     /**
      * Get patients age distribution
      */
-    public function getPatientsAgeDistribution(): array
+    public function getPatientsAgeDistribution($clinicId = null): array
     {
         $query = Patient::query();
         
@@ -213,7 +213,7 @@ class ReportsRepository
     /**
      * Get bills summary
      */
-    public function getBillsSummary(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getBillsSummary($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Bill::query();
         
@@ -242,7 +242,7 @@ class ReportsRepository
     /**
      * Get revenue by date range
      */
-    public function getRevenueByDateRange(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): int
+    public function getRevenueByDateRange($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): int
     {
         $query = Bill::query()->where('is_paid', true);
         
@@ -258,7 +258,7 @@ class ReportsRepository
     /**
      * Get revenue trend
      */
-    public function getRevenueTrend(?string|int $clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getRevenueTrend($clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Bill::query()->where('is_paid', true);
         
@@ -274,7 +274,7 @@ class ReportsRepository
     /**
      * Get revenue by doctor
      */
-    public function getRevenueByDoctor(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getRevenueByDoctor($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Bill::query()
             ->select('doctor_id', DB::raw('SUM(price) as total_revenue'), DB::raw('COUNT(*) as bills_count'))
@@ -304,7 +304,7 @@ class ReportsRepository
     /**
      * Get bills by payment status
      */
-    public function getBillsByPaymentStatus(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getBillsByPaymentStatus($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Bill::query();
         
@@ -333,7 +333,7 @@ class ReportsRepository
     /**
      * Get reservations summary
      */
-    public function getReservationsSummary(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getReservationsSummary($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Reservation::query();
         
@@ -358,7 +358,7 @@ class ReportsRepository
     /**
      * Get reservations count for a specific date
      */
-    public function getReservationsCountByDate(string $date): int
+    public function getReservationsCountByDate(string $date, $clinicId = null): int
     {
         $query = Reservation::query()
             ->whereDate('reservation_start_date', '<=', $date)
@@ -374,7 +374,7 @@ class ReportsRepository
     /**
      * Get reservations by status
      */
-    public function getReservationsByStatus(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getReservationsByStatus($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Reservation::query()
             ->select('status_id', DB::raw('COUNT(*) as count'))
@@ -404,7 +404,7 @@ class ReportsRepository
     /**
      * Get reservations by doctor
      */
-    public function getReservationsByDoctor(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getReservationsByDoctor($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Reservation::query()
             ->select('doctor_id', DB::raw('COUNT(*) as count'))
@@ -432,7 +432,7 @@ class ReportsRepository
     /**
      * Get reservations trend
      */
-    public function getReservationsTrend(?string|int $clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getReservationsTrend($clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Reservation::query();
         
@@ -454,7 +454,7 @@ class ReportsRepository
     /**
      * Get cases summary
      */
-    public function getCasesSummary(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getCasesSummary($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = CaseModel::query();
         
@@ -481,7 +481,7 @@ class ReportsRepository
     /**
      * Get cases count by date range
      */
-    public function getCasesCountByDateRange(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): int
+    public function getCasesCountByDateRange($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): int
     {
         $query = CaseModel::query();
         
@@ -497,7 +497,7 @@ class ReportsRepository
     /**
      * Get cases by category
      */
-    public function getCasesByCategory(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getCasesByCategory($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = CaseModel::query()
             ->select('case_categores_id', DB::raw('COUNT(*) as count'), DB::raw('SUM(price) as total_value'))
@@ -526,7 +526,7 @@ class ReportsRepository
     /**
      * Get cases by status
      */
-    public function getCasesByStatus(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getCasesByStatus($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = CaseModel::query()
             ->select('status_id', DB::raw('COUNT(*) as count'))
@@ -556,7 +556,7 @@ class ReportsRepository
     /**
      * Get cases by doctor
      */
-    public function getCasesByDoctor(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getCasesByDoctor($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = CaseModel::query()
             ->select('doctor_id', DB::raw('COUNT(*) as count'), DB::raw('SUM(price) as total_value'))
@@ -585,7 +585,7 @@ class ReportsRepository
     /**
      * Get cases trend
      */
-    public function getCasesTrend(?string|int $clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getCasesTrend($clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = CaseModel::query();
         
@@ -607,7 +607,7 @@ class ReportsRepository
     /**
      * Get expenses summary
      */
-    public function getExpensesSummary(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getExpensesSummary($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = ClinicExpense::query();
         
@@ -637,7 +637,7 @@ class ReportsRepository
     /**
      * Get expenses total by date range
      */
-    public function getExpensesTotalByDateRange(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): float
+    public function getExpensesTotalByDateRange($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): float
     {
         $query = ClinicExpense::query();
         
@@ -653,7 +653,7 @@ class ReportsRepository
     /**
      * Get expenses by category
      */
-    public function getExpensesByCategory(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getExpensesByCategory($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = ClinicExpense::query()
             ->select('clinic_expense_category_id', DB::raw('COUNT(*) as count'), DB::raw('SUM(COALESCE(quantity, 1) * price) as total_amount'))
@@ -682,7 +682,7 @@ class ReportsRepository
     /**
      * Get expenses trend
      */
-    public function getExpensesTrend(?string|int $clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getExpensesTrend($clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = ClinicExpense::query();
         
@@ -704,7 +704,7 @@ class ReportsRepository
     /**
      * Get profit/loss report
      */
-    public function getProfitLossReport(?string|int $clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getProfitLossReport($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $revenue = $this->getRevenueByDateRange($clinicId, $dateFrom, $dateTo);
         $expenses = $this->getExpensesTotalByDateRange($clinicId, $dateFrom, $dateTo);
@@ -722,7 +722,7 @@ class ReportsRepository
     /**
      * Get profit/loss trend
      */
-    public function getProfitLossTrend(?string|int $clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getProfitLossTrend($clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $revenueTrend = $this->getRevenueTrend($clinicId, $period, $dateFrom, $dateTo);
         $expensesTrend = $this->getExpensesTrend($clinicId, $period, $dateFrom, $dateTo);
@@ -773,7 +773,7 @@ class ReportsRepository
     /**
      * Get doctor performance statistics
      */
-    public function getDoctorPerformance(?string|int $clinicId = null, ?int $doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getDoctorPerformance($clinicId = null, ?int $doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = User::query()
             ->whereHas('roles', function ($q) {
