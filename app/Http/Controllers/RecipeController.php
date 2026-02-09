@@ -33,7 +33,7 @@ class RecipeController extends Controller
         // Only filter by doctor_id for regular doctors
         $doctorId = $this->getDoctorIdFilter();
         
-        $recipes = $this->recipeRepository->getAll($request, null, $doctorId);
+        $recipes = $this->recipeRepository->getAll($request, $doctorId);
         
         return RecipeResource::collection($recipes);
     }

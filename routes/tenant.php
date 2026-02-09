@@ -56,6 +56,14 @@ Route::middleware([
     Route::post('auth/register', [AuthController::class, 'register']);
     Route::post('auth/login', [AuthController::class, 'login']);
     
+    // Public patient routes (no authentication required)
+    Route::prefix('public/patients')->group(function () {
+        Route::get('/{token}', [PublicPatientController::class, 'show']);
+        Route::get('/{token}/cases', [PublicPatientController::class, 'cases']);
+        Route::get('/{token}/images', [PublicPatientController::class, 'images']);
+        Route::get('/{token}/reservations', [PublicPatientController::class, 'reservations']);
+    });
+    
     Route::middleware('jwt')->group(function () {
         Route::get('auth/me', [AuthController::class, 'me']);
         Route::post('auth/logout', [AuthController::class, 'logout']);

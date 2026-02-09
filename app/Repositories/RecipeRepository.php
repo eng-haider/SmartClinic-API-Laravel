@@ -13,7 +13,6 @@ class RecipeRepository
      * Get all recipes with optional filters.
      *
      * @param Request $request
-     * @param int|null $clinicId
      * @param int|null $doctorId
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
@@ -30,13 +29,6 @@ class RecipeRepository
             ])
             ->allowedSorts(['id', 'created_at', 'updated_at'])
             ->defaultSort('-created_at');
-
-        // Filter by clinic through doctor's clinic_id
-        if ($clinicId !== null) {
-            $query->whereHas('doctor', function ($q) use ($clinicId) {
-                $q->where('clinic_id');
-            });
-        }
 
         // Filter by specific doctor
         if ($doctorId !== null) {
