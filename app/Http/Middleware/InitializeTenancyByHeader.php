@@ -27,14 +27,17 @@ class InitializeTenancyByHeader
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Get tenant ID from header
-        $tenantId = $request->header('X-Tenant-ID') ?? $request->header('X-Clinic-ID');
+        // Get tenant ID from header or query parameter (for public links)
+        // Query parameter 'clinic' is used for QR codes and public access
+        $tenantId = $request->header('X-Tenant-ID') 
+                    ?? $request->header('X-Clinic-ID')
+                    ?? $request->query('clinic');
 
         if (!$tenantId) {
             return response()->json([
                 'success' => false,
-                'message' => 'Tenant ID is required. Please provide X-Tenant-ID or X-Clinic-ID header.',
-                'message_ar' => 'معرف العيادة مطلوب. يرجى توفير رأس X-Tenant-ID أو X-Clinic-ID.',
+                'message' => 'Tenant ID is required. Please provide X-Tenant-ID header or clinic parameter.',
+                'message_ar' => 'معرف العيادة مطلوب. يرجى توفير رأس X-Tenant-ID أو معامل clinic.',
             ], 400);
         }
 
