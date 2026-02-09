@@ -133,8 +133,9 @@ class ClinicSettingController extends Controller
             $skipped = [];
 
             foreach ($request->input('settings') as $settingData) {
-                // Skip settings without a value (null or not provided)
-                if (!array_key_exists('value', $settingData) || $settingData['value'] === null) {
+                // Skip settings without a key or value (null or not provided)
+                if (!array_key_exists('key', $settingData) || $settingData['key'] === null ||
+                    !array_key_exists('value', $settingData) || $settingData['value'] === null) {
                     continue;
                 }
                 

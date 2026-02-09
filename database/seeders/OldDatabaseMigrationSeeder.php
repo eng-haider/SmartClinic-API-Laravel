@@ -30,7 +30,7 @@ class OldDatabaseMigrationSeeder extends Seeder
      * Set the old clinic ID to migrate data for.
      * Each clinic becomes a tenant in the new system.
      */
-    private int $oldClinicId =1; // <-- CHANGE THIS to the clinic ID you want to migrate
+    private int $oldClinicId =102; // <-- CHANGE THIS to the clinic ID you want to migrate
 
     /**
      * The tenant ID to use (will be generated from clinic name)
@@ -311,18 +311,20 @@ class OldDatabaseMigrationSeeder extends Seeder
                 continue;
             }
 
-            $newUser = User::create([
+            // Use the old password hash directly (bypass Laravel's hash validation)
+            // Insert directly into database to avoid model password hashing
+            $userId = DB::table('users')->insertGetId([
                 'name' => $oldUser->name,
                 'email' => $oldUser->email,
                 'phone' => $phone,
                 'password' => $oldUser->password ?? Hash::make('12345678'),
                 'is_active' => true,
+                'created_at' => $oldUser->created_at,
+                'updated_at' => $oldUser->updated_at,
             ]);
 
-            // Preserve original timestamps
-            $newUser->created_at = $oldUser->created_at;
-            $newUser->updated_at = $oldUser->updated_at;
-            $newUser->saveQuietly();
+            // Get the created user instance for role assignment
+            $newUser = User::find($userId);
 
             // Assign Spatie role
             $newUser->assignRole($newRole);
@@ -334,13 +336,21 @@ class OldDatabaseMigrationSeeder extends Seeder
 
     /**
      * Map old role_id to new Spatie role name.
+     * 
+     * Old roles:
+     *   1 = admin
+     *   2 = doctor
+     *   3 = secretary
+     *   4 = patient (don't migrate as user)
+     *   5 = adminDoctor (super doctor)
+     *   6 = secretary (alternative)
      */
     private function mapOldRoleToNew(?int $roleId): ?string
     {
         return match ($roleId) {
-            5 => 'clinic_super_doctor',
-            4 => 'doctor',
-            3, 6 => 'secretary',
+            5 => 'clinic_super_doctor',  // adminDoctor
+            2, 4 => 'doctor',             // doctor (role_id 2 or 4)
+            3, 6 => 'secretary',          // secretary
             default => null,
         };
     }
@@ -728,19 +738,19 @@ class OldDatabaseMigrationSeeder extends Seeder
     }
 
     /**
-     * Migrate conjugations_categoriesv2 → clinic_expense_categories.
+     * Migrate conjugations_categories → clinic_expense_categories.
      * 
-     * Old: conjugations_categoriesv2 (id, name, doctors_id, clinic_id)
+     * Old: conjugations_categories (id, name, doctors_id, clinic_id)
      * New: clinic_expense_categories (id, name, description, is_active, creator_id, updator_id)
      * 
-     * Note: Migrates categories that are USED by this clinic's expenses,
-     * not just categories where clinic_id matches (since categories can be shared).
+     * Note: Categories can be shared across clinics in the old system.
+     * We migrate only the categories that are ACTUALLY USED by this clinic's expenses.
      */
     private function migrateExpenseCategories(): void
     {
-        $this->command->info('📂 Migrating expense categories (conjugations_categoriesv2)...');
+        $this->command->info('📂 Migrating expense categories (conjugations_categories)...');
 
-        // Get category IDs used by this clinic's expenses
+        // Get category IDs that are actually used by this clinic's expenses
         $usedCategoryIds = DB::connection($this->oldDb)
             ->table('conjugationsv3')
             ->where('clinics_id', $this->oldClinicId)
@@ -756,11 +766,16 @@ class OldDatabaseMigrationSeeder extends Seeder
 
         $this->command->info("   Found " . count($usedCategoryIds) . " categories used by clinic expenses");
 
-        // Get these categories
+        // Get these categories (they might belong to different clinics in old system)
         $oldCategories = DB::connection($this->oldDb)
-            ->table('conjugations_categoriesv2')
+            ->table('conjugations_categories')
             ->whereIn('id', $usedCategoryIds)
             ->get();
+
+        if ($oldCategories->isEmpty()) {
+            $this->command->warn('   ⚠ Could not find category details');
+            return;
+        }
 
         foreach ($oldCategories as $oldCategory) {
             $creatorId = null;
