@@ -92,9 +92,9 @@ class ClinicSettingRepository extends BaseRepository
      * Update only the value of a clinic setting.
      * Does not allow creating new settings (must exist from definition).
      */
-    public function updateValue( string $key, $value): ?ClinicSetting
+    public function updateValue(string $key, $value): ?ClinicSetting
     {
-        $setting = $this->getByKey($clinicId, $key);
+        $setting = $this->getByKey($key);
         
         if (!$setting) {
             return null;

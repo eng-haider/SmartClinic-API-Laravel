@@ -128,7 +128,6 @@ class ClinicSettingController extends Controller
         ]);
 
         try {
-            $clinicId = $this->getClinicIdByRole();
             $updated = [];
             $skipped = [];
 
@@ -140,7 +139,6 @@ class ClinicSettingController extends Controller
                 }
                 
                 $setting = $this->clinicSettingRepository->updateValue(
-                    $clinicId,
                     $settingData['key'],
                     $settingData['value']
                 );
