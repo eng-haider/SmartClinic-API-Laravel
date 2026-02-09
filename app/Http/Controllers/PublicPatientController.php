@@ -32,7 +32,6 @@ class PublicPatientController extends Controller
         // Load relationships for public display
         $patient->load([
             'doctor:id,name',
-            'clinic:id,name,address,whatsapp_phone',
             'cases' => function ($query) {
                 $query->with(['category:id,name,name_en,name_ar', 'status:id,name_en,name_ar,color'])
                     ->select('id', 'patient_id', 'case_categores_id', 'status_id', 'tooth_num', 'notes', 'created_at');
