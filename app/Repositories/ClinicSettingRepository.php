@@ -160,8 +160,8 @@ class ClinicSettingRepository extends BaseRepository
         return match ($type) {
             'boolean' => $value ? '1' : '0',
             'integer' => (string) (int) $value,
-            'json' => is_array($value) ? json_encode($value) : $value,
-            default => (string) $value,
+            'json' => is_string($value) ? $value : json_encode($value),
+            default => is_array($value) ? json_encode($value) : (string) $value,
         };
     }
 
