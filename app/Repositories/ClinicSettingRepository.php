@@ -92,9 +92,9 @@ class ClinicSettingRepository extends BaseRepository
      * Update only the value of a clinic setting.
      * Does not allow creating new settings (must exist from definition).
      */
-    public function updateValue( string $key, $value): ?ClinicSetting
+    public function updateValue(string $key, $value): ?ClinicSetting
     {
-        $setting = $this->getByKey($clinicId, $key);
+        $setting = $this->getByKey($key);
         
         if (!$setting) {
             return null;
@@ -109,7 +109,7 @@ class ClinicSettingRepository extends BaseRepository
     /**
      * Update or create a clinic setting.
      */
-    public function updateOrCreate( string $key, array $data): ClinicSetting
+    public function updateOrCreate(string $key, array $data): ClinicSetting
     {
         $settingData = [
             'setting_key' => $key,
@@ -118,15 +118,8 @@ class ClinicSettingRepository extends BaseRepository
             'description' => $data['description'] ?? null,
             'is_active' => $data['is_active'] ?? true,
         ];
-        
-        if ($clinicId !== null) {
-            $settingData['clinic_id'] = $clinicId;
-        }
 
         $whereConditions = ['setting_key' => $key];
-        if ($clinicId !== null) {
-            $whereConditions['clinic_id'] = $clinicId;
-        }
 
         return $this->model->updateOrCreate($whereConditions, $settingData);
     }
@@ -193,14 +186,14 @@ class ClinicSettingRepository extends BaseRepository
     }
 
     /**
-     * Bulk update settings.
+     * Bulk update clinic settings.
      */
-    public function bulkUpdate( array $settings): Collection
+    public function bulkUpdate(array $settings): Collection
     {
         $results = collect();
 
         foreach ($settings as $key => $value) {
-            $setting = $this->updateOrCreate($clinicId, $key, [
+            $setting = $this->updateOrCreate($key, [
                 'setting_value' => $value,
                 'setting_type' => $this->inferType($value),
             ]);

@@ -35,15 +35,7 @@ class ClinicSettingController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-        
-        // Sync any missing settings from definitions
-        $clinic = \App\Models\Clinic::find($clinicId);
-        if ($clinic) {
-            $this->clinicSettingService->syncAllDefinitionsToClinic($clinic);
-        }
-        
-        $settings = $this->clinicSettingRepository->getAllByClinicGrouped($clinicId);
+        $settings = $this->clinicSettingRepository->getAllByClinicGrouped();
 
         return response()->json([
             'success' => true,
@@ -57,8 +49,7 @@ class ClinicSettingController extends Controller
      */
     public function show(string $key): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-        $setting = $this->clinicSettingRepository->getByKey($clinicId, $key);
+        $setting = $this->clinicSettingRepository->getByKey($key);
 
         if (!$setting) {
             return response()->json([
@@ -82,10 +73,8 @@ class ClinicSettingController extends Controller
     public function update(ClinicSettingRequest $request, string $key): JsonResponse
     {
         try {
-            $clinicId = $this->getClinicIdByRole();
-            
             // Check if setting exists (must be defined by super admin)
-            $setting = $this->clinicSettingRepository->getByKey($clinicId, $key);
+            $setting = $this->clinicSettingRepository->getByKey($key);
             
             if (!$setting) {
                 return response()->json([
@@ -96,7 +85,6 @@ class ClinicSettingController extends Controller
 
             // Update only the value
             $setting = $this->clinicSettingRepository->updateValue(
-                $clinicId,
                 $key,
                 $request->input('setting_value')
             );
@@ -128,18 +116,19 @@ class ClinicSettingController extends Controller
         ]);
 
         try {
-            $clinicId = $this->getClinicIdByRole();
             $updated = [];
             $skipped = [];
 
             foreach ($request->input('settings') as $settingData) {
-                // Skip settings without a value (null or not provided)
-                if (!array_key_exists('value', $settingData) || $settingData['value'] === null) {
+                // Skip settings without a key or value (null, empty string, or not provided)
+                if (!array_key_exists('key', $settingData) || 
+                    $settingData['key'] === null || 
+                    $settingData['key'] === '' ||
+                    !array_key_exists('value', $settingData)) {
                     continue;
                 }
                 
                 $setting = $this->clinicSettingRepository->updateValue(
-                    $clinicId,
                     $settingData['key'],
                     $settingData['value']
                 );
@@ -182,10 +171,8 @@ class ClinicSettingController extends Controller
         ]);
 
         try {
-            $clinicId = $this->getClinicIdByRole();
-
             // Get the old logo setting to delete old file
-            $oldSetting = $this->clinicSettingRepository->getByKey($clinicId, 'logo');
+            $oldSetting = $this->clinicSettingRepository->getByKey('logo');
             
             if ($oldSetting && $oldSetting->setting_value) {
                 // Delete old logo file
@@ -197,7 +184,6 @@ class ClinicSettingController extends Controller
 
             // Update setting
             $setting = $this->clinicSettingRepository->updateOrCreate(
-                $clinicId,
                 'logo',
                 [
                     'setting_value' => $path,
@@ -229,8 +215,7 @@ class ClinicSettingController extends Controller
     public function destroy(string $key): JsonResponse
     {
         try {
-            $clinicId = $this->getClinicIdByRole();
-            $setting = $this->clinicSettingRepository->getByKey($clinicId, $key);
+            $setting = $this->clinicSettingRepository->getByKey($key);
 
             if (!$setting) {
                 return response()->json([
@@ -256,19 +241,5 @@ class ClinicSettingController extends Controller
                 'message' => $e->getMessage(),
             ], 422);
         }
-    }
-
-    /**
-     * Get clinic ID based on user role.
-     */
-    private function getClinicIdByRole(): ?int
-    {
-        $user = Auth::user();
-        
-        if (!$user) {
-            return null;
-        }
-
-        return $user->clinic_id;
     }
 }
