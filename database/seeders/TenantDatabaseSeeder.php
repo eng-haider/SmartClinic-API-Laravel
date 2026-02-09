@@ -32,81 +32,34 @@ class TenantRolesAndPermissionsSeeder extends Seeder
         // Reset cached roles and permissions
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // Create permissions
-        $permissions = [
-            // Patient permissions
-            'view patients',
-            'create patients',
-            'edit patients',
-            'delete patients',
-            
-            // Case permissions
-            'view cases',
-            'create cases',
-            'edit cases',
-            'delete cases',
-            
-            // Reservation permissions
-            'view reservations',
-            'create reservations',
-            'edit reservations',
-            'delete reservations',
-            
-            // Bill permissions
-            'view bills',
-            'create bills',
-            'edit bills',
-            'delete bills',
-            
-            // Recipe permissions
-            'view recipes',
-            'create recipes',
-            'edit recipes',
-            'delete recipes',
-            
-            // Settings permissions
-            'view settings',
-            'edit settings',
-            
-            // User management
-            'view users',
-            'create users',
-            'edit users',
-            'delete users',
-            
-            // Reports
-            'view reports',
-        ];
+        // Get permissions from config file
+        $rolesConfig = config('rolesAndPermissions.roles', []);
+        
+        // Collect all unique permissions from all roles
+        $allPermissions = [];
+        foreach ($rolesConfig as $roleConfig) {
+            if (isset($roleConfig['permissions'])) {
+                $allPermissions = array_merge($allPermissions, $roleConfig['permissions']);
+            }
+        }
+        $allPermissions = array_unique($allPermissions);
 
-        foreach ($permissions as $permission) {
+        // Create all permissions
+        foreach ($allPermissions as $permission) {
             Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
 
-        // Create roles
-        $superDoctorRole = Role::firstOrCreate(['name' => 'clinic_super_doctor', 'guard_name' => 'web']);
-        $doctorRole = Role::firstOrCreate(['name' => 'doctor', 'guard_name' => 'web']);
-        $secretaryRole = Role::firstOrCreate(['name' => 'secretary', 'guard_name' => 'web']);
+        // Create roles and assign their permissions
+        foreach ($rolesConfig as $roleName => $roleConfig) {
+            $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+            
+            if (isset($roleConfig['permissions'])) {
+                // Sync permissions (remove old, add new)
+                $role->syncPermissions($roleConfig['permissions']);
+            }
+        }
 
-        // Assign all permissions to clinic_super_doctor
-        $superDoctorRole->givePermissionTo(Permission::all());
-
-        // Assign doctor permissions
-        $doctorRole->givePermissionTo([
-            'view patients', 'create patients', 'edit patients',
-            'view cases', 'create cases', 'edit cases',
-            'view reservations', 'create reservations', 'edit reservations',
-            'view bills', 'create bills', 'edit bills',
-            'view recipes', 'create recipes', 'edit recipes',
-            'view settings',
-            'view reports',
-        ]);
-
-        // Assign secretary permissions
-        $secretaryRole->givePermissionTo([
-            'view patients', 'create patients', 'edit patients',
-            'view reservations', 'create reservations', 'edit reservations',
-            'view bills',
-        ]);
+        $this->command->info('✅ Roles and permissions seeded successfully');
     }
 }
 
