@@ -234,4 +234,24 @@ class Patient extends Model
     {
         return $query->where('is_public_profile_enabled', true);
     }
+
+    /**
+     * Scope a query to only include patients with unpaid cases.
+     */
+    public function scopeHasUnpaidCases($query)
+    {
+        return $query->whereHas('cases', function ($q) {
+            $q->where('is_paid', false);
+        });
+    }
+
+    /**
+     * Scope a query to only include patients with all cases paid.
+     */
+    public function scopeAllCasesPaid($query)
+    {
+        return $query->whereDoesntHave('cases', function ($q) {
+            $q->where('is_paid', false);
+        })->whereHas('cases'); // Must have at least one case
+    }
 }

@@ -6,6 +6,7 @@ use App\Models\Patient;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Spatie\QueryBuilder\QueryBuilder;
+use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\Filters\Filter;
 use Spatie\QueryBuilder\Sorts\Sort;
 
@@ -36,6 +37,8 @@ class PatientRepository
                 'state',
                 'country',
                 'is_active',
+                AllowedFilter::scope('has_unpaid_cases', 'hasUnpaidCases'),
+                AllowedFilter::scope('all_cases_paid', 'allCasesPaid'),
             ])
             ->allowedSorts([
                 'id',
