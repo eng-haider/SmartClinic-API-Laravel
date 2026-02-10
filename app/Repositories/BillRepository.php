@@ -39,8 +39,15 @@ class BillRepository
                 AllowedFilter::scope('unpaid'),
                 AllowedFilter::scope('by_patient', 'byPatient'),
                 AllowedFilter::scope('by_doctor', 'byDoctor'),
-                AllowedFilter::scope('date_from', 'dateFrom'),
-                AllowedFilter::scope('date_to', 'dateTo'),
+                AllowedFilter::callback('date_from', function ($query, $value) {
+                    $filters = request('filter');
+                    if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
+                        $query->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]);
+                    }
+                }),
+                AllowedFilter::callback('date_to', function ($query, $value) {
+                    // Handled by date_from callback
+                }),
             ])
             ->allowedSorts([
                 'id',
@@ -260,11 +267,7 @@ class BillRepository
 
         if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
             $query->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]);
-        } elseif (!empty($filters['date_from'])) {
-            $query->where('created_at', '>=', $filters['date_from']);
-        } elseif (!empty($filters['date_to'])) {
-            $query->where('created_at', '<=', $filters['date_to']);
-        }
+        } 
 
         $totalBills = $query->count();
         $paidBills = (clone $query)->paid()->count();
