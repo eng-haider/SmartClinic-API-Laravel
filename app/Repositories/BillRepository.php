@@ -39,6 +39,8 @@ class BillRepository
                 AllowedFilter::scope('unpaid'),
                 AllowedFilter::scope('by_patient', 'byPatient'),
                 AllowedFilter::scope('by_doctor', 'byDoctor'),
+                AllowedFilter::scope('date_from', 'dateFrom'),
+                AllowedFilter::scope('date_to', 'dateTo'),
             ])
             ->allowedSorts([
                 'id',

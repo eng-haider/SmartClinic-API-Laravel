@@ -160,6 +160,22 @@ class Bill extends Model
     }
 
     /**
+     * Scope a query to filter bills from a specific date.
+     */
+    public function scopeDateFrom($query, $date)
+    {
+        return $query->where('created_at', '>=', $date);
+    }
+
+    /**
+     * Scope a query to filter bills until a specific date.
+     */
+    public function scopeDateTo($query, $date)
+    {
+        return $query->where('created_at', '<=', $date);
+    }
+
+    /**
      * Scope a query to filter by doctor.
      */
     public function scopeByDoctor($query, int $doctorId)
