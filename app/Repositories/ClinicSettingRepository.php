@@ -18,21 +18,24 @@ class ClinicSettingRepository extends BaseRepository
      */
     public function getAllByClinic(): Collection
     {
-        $query = $this->query()->with('definition');
+        // Don't eager load 'definition' - it's in central DB, not tenant DB
+        $query = $this->query();
         
         return $query->orderBy('setting_key')->get();
     }
 
     /**
      * Get all settings grouped by category.
+     * Groups settings by inferring category from setting key prefix.
      */
     public function getAllByClinicGrouped(): array
     {
-        $query = $this->query()->with('definition');
+        // Don't eager load 'definition' - it's in central DB, not tenant DB
+        $query = $this->query();
         
         $settings = $query->get();
 
-        // Group by category from definition
+        // Group by category (inferred from setting key or default)
         $grouped = [];
         $categories = SettingDefinition::categories();
 
@@ -44,7 +47,8 @@ class ClinicSettingRepository extends BaseRepository
         }
 
         foreach ($settings as $setting) {
-            $category = $setting->definition?->category ?? 'general';
+            // Infer category from setting key
+            $category = $this->inferCategory($setting->setting_key);
             
             if (!isset($grouped[$category])) {
                 $grouped[$category] = [
@@ -60,8 +64,8 @@ class ClinicSettingRepository extends BaseRepository
                 'setting_value_raw' => $setting->setting_value,
                 'setting_type' => $setting->setting_type,
                 'description' => $setting->description,
-                'is_required' => $setting->definition?->is_required ?? false,
-                'display_order' => $setting->definition?->display_order ?? 0,
+                'is_required' => false, // Default since we don't have definition
+                'display_order' => $this->getDisplayOrder($setting->setting_key),
                 'is_active' => $setting->is_active,
                 'updated_at' => $setting->updated_at?->format('Y-m-d H:i:s'),
             ];
@@ -83,7 +87,8 @@ class ClinicSettingRepository extends BaseRepository
      */
     public function getByKey( string $key): ?ClinicSetting
     {
-        $query = $this->query()->where('setting_key', $key)->with('definition');
+        // Don't eager load 'definition' - it's in central DB, not tenant DB
+        $query = $this->query()->where('setting_key', $key);
         
         return $query->first();
     }
@@ -213,6 +218,7 @@ class ClinicSettingRepository extends BaseRepository
             return 'boolean';
         }
         
+        
         if (is_int($value)) {
             return 'integer';
         }
@@ -223,4 +229,104 @@ class ClinicSettingRepository extends BaseRepository
         
         return 'string';
     }
+
+    /**
+     * Infer category from setting key.
+     * Maps setting keys to their categories without relying on central DB.
+     */
+    private function inferCategory(string $key): string
+    {
+        // General category
+        if (in_array($key, ['clinic_name', 'logo', 'phone', 'email', 'address', 'clinic_reg_num', 'timezone', 'language', 'currency'])) {
+            return 'general';
+        }
+
+        // Appointment category
+        if (in_array($key, ['appointment_duration', 'working_hours', 'enable_online_booking', 'max_appointments_per_day'])) {
+            return 'appointment';
+        }
+
+        // Notification category
+        if (in_array($key, ['enable_sms', 'enable_email', 'enable_whatsapp', 'whatsapp_number', 'reminder_before_hours'])) {
+            return 'notification';
+        }
+
+        // Financial category
+        if (in_array($key, ['tax_rate', 'enable_invoicing', 'default_payment_method'])) {
+            return 'financial';
+        }
+
+        // Display category
+        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors'])) {
+            return 'display';
+        }
+
+        // Social category
+        if (in_array($key, ['facebook_url', 'instagram_url', 'twitter_url'])) {
+            return 'social';
+        }
+
+        // Medical category
+        if (in_array($key, ['specializations'])) {
+            return 'medical';
+        }
+
+        // Default to general
+        return 'general';
+    }
+
+    /**
+     * Get display order for a setting key.
+     * Provides ordering without relying on central DB.
+     */
+    private function getDisplayOrder(string $key): int
+    {
+        $order = [
+            // General (1-9)
+            'clinic_name' => 1,
+            'logo' => 2,
+            'phone' => 3,
+            'email' => 4,
+            'address' => 5,
+            'clinic_reg_num' => 6,
+            'timezone' => 7,
+            'language' => 8,
+            'currency' => 9,
+
+            // Appointment (10-13)
+            'appointment_duration' => 10,
+            'working_hours' => 11,
+            'enable_online_booking' => 12,
+            'max_appointments_per_day' => 13,
+
+            // Notification (14-18)
+            'enable_sms' => 14,
+            'enable_email' => 15,
+            'enable_whatsapp' => 16,
+            'whatsapp_number' => 17,
+            'reminder_before_hours' => 18,
+
+            // Financial (19-21)
+            'tax_rate' => 19,
+            'enable_invoicing' => 20,
+            'default_payment_method' => 21,
+
+            // Display (22-25)
+            'show_image_case' => 22,
+            'show_rx_id' => 23,
+            'teeth_v2' => 24,
+            'tooth_colors' => 25,
+
+            // Social (26-28)
+            'facebook_url' => 26,
+            'instagram_url' => 27,
+            'twitter_url' => 28,
+
+            // Medical (29)
+            'specializations' => 29,
+        ];
+
+        return $order[$key] ?? 999; // Unknown settings go to the end
+    }
 }
+

@@ -47,6 +47,7 @@ The clinic settings system uses a **two-database architecture**:
 ### Why Two Tables?
 
 #### **`setting_definitions`** (Central Database)
+
 - **Purpose**: Master catalog of ALL available settings
 - **Who manages**: Super Admin only
 - **When created**: Once globally
@@ -54,6 +55,7 @@ The clinic settings system uses a **two-database architecture**:
 - **Example**: "clinic_name", "appointment_duration", "enable_whatsapp"
 
 #### **`clinic_settings`** (Tenant Database)
+
 - **Purpose**: Actual setting values for THIS specific clinic
 - **Who manages**: Clinic doctors (clinic_super_doctor, doctor roles)
 - **When created**: When tenant is created (via seeder)
@@ -93,6 +95,7 @@ The clinic settings system uses a **two-database architecture**:
 **Root Cause**: `TenantDatabaseSeeder` was not seeding default clinic settings.
 
 **Solution**: ✅ Created `TenantClinicSettingsSeeder.php`
+
 - Seeds 30 default settings when tenant is created
 - Called automatically by `TenantDatabaseSeeder`
 - No longer depends on central DB's `setting_definitions`
@@ -120,6 +123,7 @@ public function run(): void
 **Root Cause**: `setting_definitions` is in the **central database**, not tenant database.
 
 **Why This Happens**:
+
 - `ClinicSetting` model has: `belongsTo(SettingDefinition::class)`
 - When queried, Eloquent tries to join with `setting_definitions`
 - But tenant DB doesn't have this table
@@ -127,9 +131,11 @@ public function run(): void
 **Solution Options**:
 
 #### Option 1: Remove the Relationship (Recommended for Tenants)
+
 The `definition()` relationship on `ClinicSetting` is optional. Tenant operations don't need it.
 
 #### Option 2: Use Central Connection for Definitions
+
 ```php
 public function definition()
 {
@@ -139,6 +145,7 @@ public function definition()
 ```
 
 #### Option 3: Eager Load Only When Needed
+
 ```php
 // ClinicSettingRepository.php
 $settings = $this->query()->get(); // Don't eager load definition
@@ -179,6 +186,7 @@ GET /api/tenant/clinic-settings
 ```
 
 **Headers:**
+
 ```
 Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
 X-Tenant-ID: _haider
@@ -186,6 +194,7 @@ Content-Type: application/json
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "success": true,
@@ -272,6 +281,7 @@ GET /api/tenant/clinic-settings/{key}
 ```
 
 **Example:**
+
 ```bash
 curl -X GET "https://api.smartclinic.software/api/tenant/clinic-settings/clinic_name" \
   -H "Authorization: Bearer YOUR_TOKEN" \
@@ -279,6 +289,7 @@ curl -X GET "https://api.smartclinic.software/api/tenant/clinic-settings/clinic_
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "success": true,
@@ -298,6 +309,7 @@ curl -X GET "https://api.smartclinic.software/api/tenant/clinic-settings/clinic_
 ```
 
 **Response (404 Not Found):**
+
 ```json
 {
   "success": false,
@@ -316,6 +328,7 @@ PUT /api/tenant/clinic-settings/{key}
 ```
 
 **Headers:**
+
 ```
 Authorization: Bearer YOUR_TOKEN
 X-Tenant-ID: _haider
@@ -325,6 +338,7 @@ Content-Type: application/json
 **Request Body:**
 
 #### String Setting:
+
 ```json
 {
   "setting_value": "عيادة الأمل للأسنان"
@@ -332,6 +346,7 @@ Content-Type: application/json
 ```
 
 #### Boolean Setting:
+
 ```json
 {
   "setting_value": true
@@ -339,6 +354,7 @@ Content-Type: application/json
 ```
 
 #### Integer Setting:
+
 ```json
 {
   "setting_value": 45
@@ -346,6 +362,7 @@ Content-Type: application/json
 ```
 
 #### JSON Setting (Working Hours):
+
 ```json
 {
   "setting_value": {
@@ -361,6 +378,7 @@ Content-Type: application/json
 ```
 
 #### JSON Setting (Tooth Colors):
+
 ```json
 {
   "setting_value": {
@@ -374,6 +392,7 @@ Content-Type: application/json
 ```
 
 **Example (Bash):**
+
 ```bash
 curl -X PUT "https://api.smartclinic.software/api/tenant/clinic-settings/clinic_name" \
   -H "Authorization: Bearer YOUR_TOKEN" \
@@ -385,6 +404,7 @@ curl -X PUT "https://api.smartclinic.software/api/tenant/clinic-settings/clinic_
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "success": true,
@@ -402,6 +422,7 @@ curl -X PUT "https://api.smartclinic.software/api/tenant/clinic-settings/clinic_
 ```
 
 **Response (404 Not Found):**
+
 ```json
 {
   "success": false,
@@ -420,6 +441,7 @@ POST /api/tenant/clinic-settings/bulk-update
 ```
 
 **Request Body:**
+
 ```json
 {
   "settings": [
@@ -448,6 +470,7 @@ POST /api/tenant/clinic-settings/bulk-update
 ```
 
 **Example (Bash):**
+
 ```bash
 curl -X POST "https://api.smartclinic.software/api/tenant/clinic-settings/bulk-update" \
   -H "Authorization: Bearer YOUR_TOKEN" \
@@ -462,6 +485,7 @@ curl -X POST "https://api.smartclinic.software/api/tenant/clinic-settings/bulk-u
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "success": true,
@@ -490,10 +514,10 @@ curl -X POST "https://api.smartclinic.software/api/tenant/clinic-settings/bulk-u
 
 ### Required Permissions
 
-| Action | Permission | Roles with Access |
-|--------|-----------|-------------------|
+| Action        | Permission             | Roles with Access                        |
+| ------------- | ---------------------- | ---------------------------------------- |
 | View settings | `view-clinic-settings` | super_admin, clinic_super_doctor, doctor |
-| Edit settings | `edit-clinic-settings` | super_admin, clinic_super_doctor |
+| Edit settings | `edit-clinic-settings` | super_admin, clinic_super_doctor         |
 
 ### Permission Check Example
 
@@ -510,67 +534,67 @@ if (!auth()->user()->can('edit-clinic-settings')) {
 
 ### General Information (Category: `general`)
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `clinic_name` | string | "" | Official clinic name |
-| `logo` | string | "" | Clinic logo image path |
-| `phone` | string | "" | Primary contact phone |
-| `email` | string | "" | Primary contact email |
-| `address` | string | "" | Physical address |
-| `clinic_reg_num` | string | "" | Registration/license number |
-| `timezone` | string | "Asia/Baghdad" | Clinic timezone |
-| `language` | string | "ar" | Default language (ar/en) |
-| `currency` | string | "IQD" | Currency code |
+| Key              | Type   | Default        | Description                 |
+| ---------------- | ------ | -------------- | --------------------------- |
+| `clinic_name`    | string | ""             | Official clinic name        |
+| `logo`           | string | ""             | Clinic logo image path      |
+| `phone`          | string | ""             | Primary contact phone       |
+| `email`          | string | ""             | Primary contact email       |
+| `address`        | string | ""             | Physical address            |
+| `clinic_reg_num` | string | ""             | Registration/license number |
+| `timezone`       | string | "Asia/Baghdad" | Clinic timezone             |
+| `language`       | string | "ar"           | Default language (ar/en)    |
+| `currency`       | string | "IQD"          | Currency code               |
 
 ### Appointment Settings (Category: `appointment`)
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `appointment_duration` | integer | 30 | Duration in minutes |
-| `working_hours` | json | {...} | Weekly schedule |
-| `enable_online_booking` | boolean | false | Online booking toggle |
-| `max_appointments_per_day` | integer | 20 | Daily appointment limit |
+| Key                        | Type    | Default | Description             |
+| -------------------------- | ------- | ------- | ----------------------- |
+| `appointment_duration`     | integer | 30      | Duration in minutes     |
+| `working_hours`            | json    | {...}   | Weekly schedule         |
+| `enable_online_booking`    | boolean | false   | Online booking toggle   |
+| `max_appointments_per_day` | integer | 20      | Daily appointment limit |
 
 ### Notification Settings (Category: `notification`)
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `enable_sms` | boolean | false | SMS notifications |
-| `enable_email` | boolean | false | Email notifications |
-| `enable_whatsapp` | boolean | false | WhatsApp notifications |
-| `whatsapp_number` | string | "" | WhatsApp business number |
-| `reminder_before_hours` | integer | 24 | Reminder timing |
+| Key                     | Type    | Default | Description              |
+| ----------------------- | ------- | ------- | ------------------------ |
+| `enable_sms`            | boolean | false   | SMS notifications        |
+| `enable_email`          | boolean | false   | Email notifications      |
+| `enable_whatsapp`       | boolean | false   | WhatsApp notifications   |
+| `whatsapp_number`       | string  | ""      | WhatsApp business number |
+| `reminder_before_hours` | integer | 24      | Reminder timing          |
 
 ### Financial Settings (Category: `financial`)
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `tax_rate` | integer | 0 | Tax percentage |
-| `enable_invoicing` | boolean | true | Invoice generation |
-| `default_payment_method` | string | "cash" | Default payment method |
+| Key                      | Type    | Default | Description            |
+| ------------------------ | ------- | ------- | ---------------------- |
+| `tax_rate`               | integer | 0       | Tax percentage         |
+| `enable_invoicing`       | boolean | true    | Invoice generation     |
+| `default_payment_method` | string  | "cash"  | Default payment method |
 
 ### Display Settings (Category: `display`)
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `show_image_case` | boolean | true | Show case images |
-| `show_rx_id` | boolean | true | Show prescription ID |
-| `teeth_v2` | boolean | true | Use v2 teeth diagram |
-| `tooth_colors` | json | {...} | Dental chart colors |
+| Key               | Type    | Default | Description          |
+| ----------------- | ------- | ------- | -------------------- |
+| `show_image_case` | boolean | true    | Show case images     |
+| `show_rx_id`      | boolean | true    | Show prescription ID |
+| `teeth_v2`        | boolean | true    | Use v2 teeth diagram |
+| `tooth_colors`    | json    | {...}   | Dental chart colors  |
 
 ### Social Media (Category: `social`)
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `facebook_url` | string | "" | Facebook page |
-| `instagram_url` | string | "" | Instagram profile |
-| `twitter_url` | string | "" | Twitter/X profile |
+| Key             | Type   | Default | Description       |
+| --------------- | ------ | ------- | ----------------- |
+| `facebook_url`  | string | ""      | Facebook page     |
+| `instagram_url` | string | ""      | Instagram profile |
+| `twitter_url`   | string | ""      | Twitter/X profile |
 
 ### Medical/Dental Settings (Category: `medical`)
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `specializations` | json | [...] | Available specializations |
+| Key               | Type | Default | Description               |
+| ----------------- | ---- | ------- | ------------------------- |
+| `specializations` | json | [...]   | Available specializations |
 
 ---
 
@@ -579,6 +603,7 @@ if (!auth()->user()->can('edit-clinic-settings')) {
 ### Adding New Settings
 
 #### Step 1: Add to Central Database (Super Admin)
+
 ```sql
 -- Add to setting_definitions table in central DB
 INSERT INTO setting_definitions (setting_key, setting_type, default_value, description, category, display_order)
@@ -586,7 +611,9 @@ VALUES ('new_setting', 'string', 'default value', 'Description', 'general', 100)
 ```
 
 #### Step 2: Add to Tenant Seeder
+
 Update `TenantClinicSettingsSeeder.php`:
+
 ```php
 [
     'setting_key' => 'new_setting',
@@ -598,11 +625,13 @@ Update `TenantClinicSettingsSeeder.php`:
 ```
 
 #### Step 3: For Existing Tenants
+
 Run a migration script to add to all existing tenant databases.
 
 ### Working with Settings in Code
 
 #### Get a Setting Value
+
 ```php
 use App\Repositories\ClinicSettingRepository;
 
@@ -614,11 +643,13 @@ $value = $setting ? $setting->getValue() : null;
 ```
 
 #### Update a Setting
+
 ```php
 $repository->updateValue('clinic_name', 'New Clinic Name');
 ```
 
 #### Check Boolean Setting
+
 ```php
 $showImages = $repository->getByKey('show_image_case')?->getValue();
 if ($showImages) {
@@ -664,6 +695,7 @@ curl -X GET "https://api.smartclinic.software/api/tenant/clinic-settings" \
 ```
 
 ### Expected Result
+
 Should return 30 default settings grouped by category.
 
 ---
@@ -674,7 +706,8 @@ Should return 30 default settings grouped by category.
 
 **Cause**: Setting key doesn't exist in tenant's `clinic_settings` table.
 
-**Solution**: 
+**Solution**:
+
 1. Check if setting exists: `GET /api/tenant/clinic-settings/{key}`
 2. If missing, run tenant seeder again or manually insert
 
@@ -683,6 +716,7 @@ Should return 30 default settings grouped by category.
 **Cause**: Code is looking for `setting_definitions` in tenant DB.
 
 **Solution**: Remove the eager loading of `definition` relationship in tenant context:
+
 ```php
 // Instead of:
 $settings = ClinicSetting::with('definition')->get();
@@ -696,6 +730,7 @@ $settings = ClinicSetting::get();
 **Cause**: `TenantClinicSettingsSeeder` not called.
 
 **Solution**: Check `TenantDatabaseSeeder.php` includes the seeder:
+
 ```php
 $this->call([
     TenantClinicSettingsSeeder::class,
@@ -707,11 +742,13 @@ $this->call([
 ## 📝 Summary
 
 ✅ **Fixed Issues:**
+
 1. Created `TenantClinicSettingsSeeder` to initialize settings on tenant creation
 2. Updated `TenantDatabaseSeeder` to call the new seeder
 3. Documented complete architecture and API
 
 ✅ **Key Points:**
+
 - `setting_definitions` → Central DB (managed by Super Admin)
 - `clinic_settings` → Tenant DB (managed by clinic doctors)
 - Settings auto-initialized when creating new tenants
@@ -719,6 +756,7 @@ $this->call([
 - Full CRUD API with permissions
 
 ✅ **API Endpoints:**
+
 - `GET /api/tenant/clinic-settings` - Get all settings
 - `GET /api/tenant/clinic-settings/{key}` - Get single setting
 - `PUT /api/tenant/clinic-settings/{key}` - Update setting
