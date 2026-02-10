@@ -220,6 +220,7 @@ class BillRepository
         $totalBills = $query->count();
         $paidBills = (clone $query)->paid()->count();
         $unpaidBills = (clone $query)->unpaid()->count();
+        $totalPrice = (clone $query)->sum('price') ?? 0;
         $totalPaidPrice = (clone $query)->paid()->sum('price') ?? 0;
         $totalUnpaidPrice = (clone $query)->unpaid()->sum('price') ?? 0;
 
@@ -227,10 +228,12 @@ class BillRepository
             'total_bills' => $totalBills,
             'paid_bills' => $paidBills,
             'unpaid_bills' => $unpaidBills,
+            'total_price' => $totalPrice, // Total price of all bills (paid + unpaid)
             'total_paid_price' => $totalPaidPrice,
             'total_unpaid_price' => $totalUnpaidPrice,
-            'total_revenue' => $totalPaidPrice,
-            'total_outstanding' => $totalUnpaidPrice,
+            'remaining_amount' => $totalUnpaidPrice, // Remaining to be paid
+            'total_revenue' => $totalPaidPrice, // Alias for backward compatibility
+            'total_outstanding' => $totalUnpaidPrice, // Alias for backward compatibility
         ];
     }
 
@@ -261,6 +264,7 @@ class BillRepository
         $totalBills = $query->count();
         $paidBills = (clone $query)->paid()->count();
         $unpaidBills = (clone $query)->unpaid()->count();
+        $totalPrice = (clone $query)->sum('price') ?? 0;
         $totalPaidPrice = (clone $query)->paid()->sum('price') ?? 0;
         $totalUnpaidPrice = (clone $query)->unpaid()->sum('price') ?? 0;
 
@@ -268,8 +272,10 @@ class BillRepository
             'total_bills' => $totalBills,
             'paid_bills' => $paidBills,
             'unpaid_bills' => $unpaidBills,
+            'total_price' => $totalPrice, // Total price of all bills (paid + unpaid)
             'total_paid_price' => $totalPaidPrice,
             'total_unpaid_price' => $totalUnpaidPrice,
+            'remaining_amount' => $totalUnpaidPrice, // Remaining to be paid
             'total_revenue' => $totalPaidPrice, // Alias for backward compatibility
             'total_outstanding' => $totalUnpaidPrice, // Alias for backward compatibility
         ];
