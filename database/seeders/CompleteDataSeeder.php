@@ -201,9 +201,8 @@ class CompleteDataSeeder extends Seeder
 
         foreach ($categories as $category) {
             ClinicExpenseCategory::firstOrCreate(
-                ['name' => $category['name'], 'clinic_id' => $this->clinic->id],
+                ['name' => $category['name']],
                 array_merge($category, [
-                    'clinic_id' => $this->clinic->id,
                     'is_active' => true,
                     'creator_id' => $this->user->id,
                     'updator_id' => $this->user->id,
@@ -438,7 +437,7 @@ class CompleteDataSeeder extends Seeder
     {
         $this->command->info('💸 Seeding clinic expenses...');
 
-        $categories = ClinicExpenseCategory::where('clinic_id', $this->clinic->id)->get();
+        $categories = ClinicExpenseCategory::all();
 
         $expenses = [
             ['category' => 'Rent', 'name' => 'Monthly clinic rent - January 2026', 'price' => 500000, 'quantity' => 1],

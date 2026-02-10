@@ -36,10 +36,7 @@ class ClinicExpenseCategoryController extends Controller
 
         $perPage = $request->input('per_page', 15);
         
-        // Get clinic_id based on user role
-        $clinicId = $this->getClinicIdByRole();
-        
-        $categories = $this->repository->getAllWithFilters($filters, $perPage, $clinicId);
+        $categories = $this->repository->getAllWithFilters($filters, $perPage);
 
         return response()->json([
             'success' => true,
@@ -82,8 +79,7 @@ class ClinicExpenseCategoryController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-        $category = $this->repository->getById($id, $clinicId);
+        $category = $this->repository->getById($id);
 
         if (!$category) {
             return response()->json([
@@ -145,38 +141,12 @@ class ClinicExpenseCategoryController extends Controller
      */
     public function active(Request $request): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-        
-        if (!$clinicId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Clinic ID is required',
-            ], 400);
-        }
-
-        $categories = $this->repository->getActiveByClinic($clinicId);
+        $categories = $this->repository->getActiveByClinic();
 
         return response()->json([
             'success' => true,
             'message' => 'Active expense categories retrieved successfully',
             'data' => ClinicExpenseCategoryResource::collection($categories),
         ]);
-    }
-
-    /**
-     * Get clinic ID based on user role.
-     * Super admin sees all, others see only their clinic.
-     */
-    private function getClinicIdByRole(): ?int
-    {
-        $user = Auth::user();
-        
-        // If user is super admin, return null to see all
-        if ($user && $user->hasRole('super-admin')) {
-            return null;
-        }
-        
-        // Otherwise, return the user's clinic_id
-        return $user?->clinic_id;
     }
 }
