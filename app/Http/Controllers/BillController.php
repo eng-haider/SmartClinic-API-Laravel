@@ -211,15 +211,26 @@ class BillController extends Controller
     /**
      * Get bill statistics.
      */
-    public function statistics(): JsonResponse
+    public function statistics(Request $request): JsonResponse
     {
+        $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+        ]);
+
+        $filters = [
+            'date_from' => $request->input('date_from'),
+            'date_to' => $request->input('date_to'),
+        ];
+
         // Multi-tenancy: Database is already isolated by tenant
-        $statistics = $this->billRepository->getStatistics(null);
+        $statistics = $this->billRepository->getStatisticsWithFilters($filters);
 
         return response()->json([
             'success' => true,
             'message' => 'Bill statistics retrieved successfully',
             'data' => $statistics,
+            'filters' => $filters,
         ]);
     }
 }

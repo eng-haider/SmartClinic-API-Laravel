@@ -3,8 +3,11 @@
 namespace App\Repositories;
 
 use App\Models\Bill;
+use App\Models\CaseModel;
+use App\Models\ClinicExpense;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Spatie\QueryBuilder\QueryBuilder;
 use Spatie\QueryBuilder\AllowedFilter;
 
@@ -232,7 +235,7 @@ class BillRepository
             'total_paid_price' => $totalPaidPrice,
             'total_unpaid_price' => $totalUnpaidPrice,
             'remaining_amount' => $totalUnpaidPrice, // Remaining to be paid
-            'total_revenue' => $totalPaidPrice, // Alias for backward compatibility
+            'total_revenue' => $totalUnpaidPrice, // Unpaid cases price (total_price - total_paid_price)
             'total_outstanding' => $totalUnpaidPrice, // Alias for backward compatibility
         ];
     }
@@ -264,20 +267,55 @@ class BillRepository
         $totalBills = $query->count();
         $paidBills = (clone $query)->paid()->count();
         $unpaidBills = (clone $query)->unpaid()->count();
-        $totalPrice = (clone $query)->sum('price') ?? 0;
         $totalPaidPrice = (clone $query)->paid()->sum('price') ?? 0;
         $totalUnpaidPrice = (clone $query)->unpaid()->sum('price') ?? 0;
+
+        // Get cases with same date filter to calculate total case prices
+        $casesQuery = CaseModel::query();
+        
+        if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
+            $casesQuery->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]);
+        } elseif (!empty($filters['date_from'])) {
+            $casesQuery->where('created_at', '>=', $filters['date_from']);
+        } elseif (!empty($filters['date_to'])) {
+            $casesQuery->where('created_at', '<=', $filters['date_to']);
+        }
+
+        $totalPrice = $casesQuery->sum('price') ?? 0; // Total of all cases price
+        $totalPaidCases = (clone $casesQuery)->where('is_paid', true)->sum('price') ?? 0;
+
+        // Get expenses with same date filter
+        $expensesQuery = ClinicExpense::query();
+        
+        if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
+            $expensesQuery->whereBetween('date', [$filters['date_from'], $filters['date_to']]);
+        } elseif (!empty($filters['date_from'])) {
+            $expensesQuery->where('date', '>=', $filters['date_from']);
+        } elseif (!empty($filters['date_to'])) {
+            $expensesQuery->where('date', '<=', $filters['date_to']);
+        }
+
+        $totalExpenses = $expensesQuery->sum(DB::raw('price * COALESCE(quantity, 1)')) ?? 0;
+        $totalPaidExpenses = (clone $expensesQuery)->where('is_paid', true)->sum(DB::raw('price * COALESCE(quantity, 1)')) ?? 0;
+        $totalUnpaidExpenses = (clone $expensesQuery)->where('is_paid', false)->sum(DB::raw('price * COALESCE(quantity, 1)')) ?? 0;
+
+        // Calculate unpaid case price (total_price - total_paid_price)
+        $unpaidCasePrice = $totalPrice - $totalPaidCases;
 
         return [
             'total_bills' => $totalBills,
             'paid_bills' => $paidBills,
             'unpaid_bills' => $unpaidBills,
-            'total_price' => $totalPrice, // Total price of all bills (paid + unpaid)
-            'total_paid_price' => $totalPaidPrice,
+            'total_price' => $totalPrice, // Total of ALL cases price (not bills)
+            'total_paid_price' => $totalPaidCases, // Total paid cases price
             'total_unpaid_price' => $totalUnpaidPrice,
+            'unpaid_case_price' => $unpaidCasePrice, // total_price - total_paid_price
             'remaining_amount' => $totalUnpaidPrice, // Remaining to be paid
-            'total_revenue' => $totalPaidPrice, // Alias for backward compatibility
+            'total_revenue' => $totalUnpaidPrice, // Unpaid cases price (total_price - total_paid_price)
             'total_outstanding' => $totalUnpaidPrice, // Alias for backward compatibility
+            'total_expenses' => $totalExpenses, // Total expenses (paid + unpaid)
+            'total_paid_expenses' => $totalPaidExpenses,
+            'total_unpaid_expenses' => $totalUnpaidExpenses,
         ];
     }
 }
