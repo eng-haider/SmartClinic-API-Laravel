@@ -245,13 +245,41 @@ class TenantClinicSettingsSeeder extends Seeder
             [
                 'setting_key' => 'tooth_colors',
                 'setting_value' => json_encode([
-                    'healthy' => '#FFFFFF',
-                    'cavity' => '#E74C3C',
-                    'filling' => '#4ECDC4',
-                    'crown' => '#FFD93D',
-                    'missing' => '#95A5A6',
-                    'implant' => '#3498DB',
-                    'root_canal' => '#9B59B6',
+                    [
+                        'id' => 'healthy',
+                        'name' => 'Healthy',
+                        'color' => '#FFFFFF',
+                    ],
+                    [
+                        'id' => 'cavity',
+                        'name' => 'Cavity',
+                        'color' => '#FF6B6B',
+                    ],
+                    [
+                        'id' => 'filling',
+                        'name' => 'Filling',
+                        'color' => '#4ECDC4',
+                    ],
+                    [
+                        'id' => 'crown',
+                        'name' => 'Crown',
+                        'color' => '#FFD93D',
+                    ],
+                    [
+                        'id' => 'missing',
+                        'name' => 'Missing',
+                        'color' => '#95A5A6',
+                    ],
+                    [
+                        'id' => 'implant',
+                        'name' => 'Implant',
+                        'color' => '#3498DB',
+                    ],
+                    [
+                        'id' => 'root_canal',
+                        'name' => 'Root Canal',
+                        'color' => '#9B59B6',
+                    ],
                 ]),
                 'setting_type' => 'json',
                 'description' => 'Tooth status colors for dental chart',
