@@ -39,15 +39,7 @@ class BillRepository
                 AllowedFilter::scope('unpaid'),
                 AllowedFilter::scope('by_patient', 'byPatient'),
                 AllowedFilter::scope('by_doctor', 'byDoctor'),
-                AllowedFilter::callback('date_from', function ($query, $value) {
-                    $filters = request('filter');
-                    if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
-                        $query->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]);
-                    }
-                }),
-                AllowedFilter::callback('date_to', function ($query, $value) {
-                    // Handled by date_from callback
-                }),
+       
             ])
             ->allowedSorts([
                 'id',
@@ -68,8 +60,12 @@ class BillRepository
                 'billable.status',
                 'notes',
             ])
-            ->defaultSort('-created_at');
 
+            
+            ->defaultSort('-created_at');
+        if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
+            $query->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]);
+        }
 
         // If billable is requested, automatically load nested relationships
         $includes = request()->get('include', []);
