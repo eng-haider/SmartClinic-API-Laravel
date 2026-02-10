@@ -27,7 +27,6 @@ class ClinicExpenseRepository
         return QueryBuilder::for(ClinicExpense::class)
             ->allowedFilters([
                 'name',
-                'clinic_id',
                 'clinic_expense_category_id',
                 'is_paid',
                 'doctor_id',
@@ -129,11 +128,11 @@ class ClinicExpenseRepository
     }
 
     /**
-     * Get total expenses for a clinic
+     * Get total expenses
      */
-    public function getTotalByClinic( ?string $startDate = null, ?string $endDate = null): float
+    public function getTotal(?string $startDate = null, ?string $endDate = null): float
     {
-        $query = $this->query()->where('clinic_id');
+        $query = $this->query();
         
         if ($startDate && $endDate) {
             $query->whereBetween('date', [$startDate, $endDate]);
@@ -143,9 +142,9 @@ class ClinicExpenseRepository
     }
 
     /**
-     * Get unpaid expenses for a clinic
+     * Get unpaid expenses
      */
-    public function getUnpaidByClinic(): \Illuminate\Database\Eloquent\Collection
+    public function getUnpaid(): \Illuminate\Database\Eloquent\Collection
     {
         return $this->query()
             ->where('is_paid', false)
@@ -177,11 +176,11 @@ class ClinicExpenseRepository
     }
 
     /**
-     * Get expense statistics for a clinic
+     * Get expense statistics
      */
-    public function getStatistics( ?string $startDate = null, ?string $endDate = null): array
+    public function getStatistics(?string $startDate = null, ?string $endDate = null): array
     {
-        $query = $this->query()->where('clinic_id');
+        $query = $this->query();
         
         if ($startDate && $endDate) {
             $query->whereBetween('date', [$startDate, $endDate]);

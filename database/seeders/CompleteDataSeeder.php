@@ -452,7 +452,6 @@ class CompleteDataSeeder extends Seeder
 
             if ($category) {
                 ClinicExpense::create([
-                    'clinic_id' => $this->clinic->id,
                     'clinic_expense_category_id' => $category->id,
                     'name' => $expenseData['name'],
                     'quantity' => $expenseData['quantity'],

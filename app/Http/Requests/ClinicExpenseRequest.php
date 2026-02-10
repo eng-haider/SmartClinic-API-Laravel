@@ -16,7 +16,7 @@ class ClinicExpenseRequest extends FormRequest
 
     /**
      * Prepare the data for validation.
-     * Force clinic_id and doctor_id from authenticated user only.
+     * Force doctor_id from authenticated user only.
      */
     protected function prepareForValidation(): void
     {
@@ -25,13 +25,6 @@ class ClinicExpenseRequest extends FormRequest
         // Remove clinic_id and doctor_id from request if sent (security measure)
         $this->request->remove('clinic_id');
         $this->request->remove('doctor_id');
-        
-        // Force clinic_id from authenticated user only
-        if ($user && $user->clinic_id) {
-            $this->merge([
-                'clinic_id' => $user->clinic_id,
-            ]);
-        }
         
         // Force doctor_id from authenticated user only
         if ($user) {
@@ -52,7 +45,6 @@ class ClinicExpenseRequest extends FormRequest
             'name' => 'required|string|max:255',
             'quantity' => 'nullable|integer|min:1',
             'clinic_expense_category_id' => 'nullable|exists:clinic_expense_categories,id',
-            'clinic_id' => 'nullable|exists:clinics,id',
             'date' => 'required|date',
             'price' => 'required|numeric|min:0',
             'is_paid' => 'nullable|boolean',
@@ -62,7 +54,6 @@ class ClinicExpenseRequest extends FormRequest
         // For updates, make some fields optional
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
             $rules['name'] = 'sometimes|required|string|max:255';
-            $rules['clinic_id'] = 'sometimes|nullable|exists:clinics,id';
             $rules['date'] = 'sometimes|required|date';
             $rules['price'] = 'sometimes|required|numeric|min:0';
         }
@@ -84,7 +75,6 @@ class ClinicExpenseRequest extends FormRequest
             'quantity.integer' => 'Quantity must be an integer',
             'quantity.min' => 'Quantity must be at least 1',
             'clinic_expense_category_id.exists' => 'The selected expense category does not exist',
-            'clinic_id.exists' => 'The selected clinic does not exist',
             'date.required' => 'Date is required',
             'date.date' => 'Date must be a valid date',
             'price.required' => 'Price is required',

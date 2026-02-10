@@ -208,7 +208,7 @@ class ClinicExpenseController extends Controller
     public function unpaid(Request $request): JsonResponse
     {
         // Multi-tenancy: No need for clinic_id filter, database is already isolated by tenant
-        $expenses = $this->repository->getUnpaidByClinic(null);
+        $expenses = $this->repository->getUnpaid();
 
         return response()->json([
             'success' => true,
