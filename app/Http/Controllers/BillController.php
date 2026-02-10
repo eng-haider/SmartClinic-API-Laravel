@@ -27,27 +27,11 @@ class BillController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $filters = $request->only([
-            'search',
-            'filter',
-            'sort',
-            'include',
-        ]);
-
-        $request->validate([
-            'date_from' => 'nullable|date',
-            'date_to' => 'nullable|date|after_or_equal:date_from',
-        ]);
-
-        $filters = [
-            'date_from' => $request->input('date_from'),
-            'date_to' => $request->input('date_to'),
-        ];
-
         $perPage = $request->input('per_page', 15);
 
         // Multi-tenancy: Database is already isolated by tenant
-        $bills = $this->billRepository->getAllWithFilters($filters, $perPage, null);
+        $bills = $this->billRepository->getAllWithFilters([], $perPage, null);
+
 
         return response()->json([
             'success' => true,
