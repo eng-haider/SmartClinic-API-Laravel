@@ -213,12 +213,26 @@ class BillController extends Controller
         $request->validate([
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
+            'doctor_id' => 'nullable|integer|exists:users,id',
         ]);
 
         $filters = [
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
         ];
+
+        // Get doctor_id filter based on user role
+        $doctorId = $this->getDoctorIdFilter();
+        
+        // If super admin or clinic_super_doctor, allow filtering by doctor_id from request
+        $user = Auth::user();
+        if (($user->hasRole('super_admin') || $user->hasRole('clinic_super_doctor') || $user->hasRole('secretary')) 
+            && $request->has('doctor_id')) {
+            $filters['doctor_id'] = $request->input('doctor_id');
+        } elseif ($doctorId !== null) {
+            // Regular doctor: force their own doctor_id
+            $filters['doctor_id'] = $doctorId;
+        }
 
         // Multi-tenancy: Database is already isolated by tenant
         $statistics = $this->billRepository->getStatisticsWithFilters($filters);
