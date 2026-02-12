@@ -16,7 +16,7 @@ class BillController extends Controller
      */
     public function __construct(private BillRepository $billRepository)
     {
-        $this->middleware('permission:view-all-bills')->only(['index', 'show', 'statistics']);
+        // $this->middleware('permission:view-all-bills')->only(['index', 'show', 'statistics']);
         $this->middleware('permission:create-bill')->only(['store']);
         $this->middleware('permission:edit-bill')->only(['update', 'markAsPaid', 'markAsUnpaid']);
         $this->middleware('permission:delete-bill')->only(['destroy']);
@@ -30,7 +30,10 @@ class BillController extends Controller
         $perPage = $request->input('per_page', 15);
 
         // Multi-tenancy: Database is already isolated by tenant
-        $bills = $this->billRepository->getAllWithFilters([], $perPage, null);
+        // Get doctor_id filter based on user role
+        $doctorId = $this->getDoctorIdFilter();
+        
+        $bills = $this->billRepository->getAllWithFilters([], $perPage, $doctorId);
 
 
         return response()->json([
@@ -226,5 +229,33 @@ class BillController extends Controller
             'data' => $statistics,
             'filters' => $filters,
         ]);
+    }
+
+    /**
+     * Get doctor_id filter based on user role.
+     * Returns doctor_id or null.
+     * 
+     * Multi-tenancy: Database is already isolated by tenant via middleware.
+     * We only need to filter by doctor for regular doctors who should only see their own bills.
+     * 
+     * - Super Doctor/Secretary: sees all bills in their tenant database [null]
+     * - Doctor: sees ONLY their own bills [user_id]
+     */
+    private function getDoctorIdFilter(): ?int
+    {
+        $user = Auth::user();
+        
+        // Super doctor and secretary see all bills in this tenant
+        if ($user->hasRole('clinic_super_doctor') || $user->hasRole('secretary') || $user->hasRole('super_admin')) {
+            return null;
+        }
+        
+        // Doctor sees only their own bills
+        if ($user->hasRole('doctor')) {
+            return $user->id;
+        }
+        
+        // Default: show all bills in this tenant
+        return null;
     }
 }

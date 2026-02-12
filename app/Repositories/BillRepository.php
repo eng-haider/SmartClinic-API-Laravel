@@ -92,9 +92,14 @@ class BillRepository
     /**
      * Get all bills with filters and pagination
      */
-    public function getAllWithFilters(array $filters, int $perPage = 15): LengthAwarePaginator
+    public function getAllWithFilters(array $filters, int $perPage = 15, ?int $doctorId = null): LengthAwarePaginator
     {
         $query = $this->queryBuilder();
+
+        // Filter by doctor if provided
+        if ($doctorId !== null) {
+            $query->where('doctor_id', $doctorId);
+        }
 
         return $query->paginate($perPage);
     }
