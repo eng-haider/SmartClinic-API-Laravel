@@ -252,6 +252,10 @@ return [
 
                 // Reports
                 'view-reports',
+
+                'view-clinic-reservations',
+                'view-all-bills'
+
             ],
         ],
 
