@@ -237,7 +237,7 @@ class BillController extends Controller
         }
 
         // Multi-tenancy: Database is already isolated by tenant
-        $statistics = $this->billRepository->getStatisticsWithFilters($filters, $doctorId);
+        $statistics = $this->billRepository->getStatisticsWithFilters([], $perPage=15, $doctorId);;
 
         return response()->json([
             'success' => true,

@@ -263,7 +263,7 @@ class BillRepository
      * - date_to (Y-m-d or Y-m-d H:i:s)
      * - doctor_id
      */
-    public function getStatisticsWithFilters(array $filters = [], $doctorId = null): array
+    public function getStatisticsWithFilters(array $filters, int $perPage = 15, ?int $doctorId = null): array
     {
         $query = $this->query();
 
