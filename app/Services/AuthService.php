@@ -139,22 +139,6 @@ class AuthService
             throw new \Exception('User account is inactive in tenant database');
         }
 
-        // Ensure user has the clinic_super_doctor role (auto-assign if missing)
-        if (!$tenantUser->hasRole('clinic_super_doctor', 'web')) {
-            try {
-                $tenantUser->assignRole('clinic_super_doctor');
-                \Illuminate\Support\Facades\Log::info('Auto-assigned clinic_super_doctor role to user', [
-                    'user_id' => $tenantUser->id,
-                    'phone' => $phone,
-                ]);
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error('Failed to auto-assign role', [
-                    'user_id' => $tenantUser->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
         // Load roles and permissions explicitly
         $tenantUser->load(['roles.permissions', 'permissions']);
         
