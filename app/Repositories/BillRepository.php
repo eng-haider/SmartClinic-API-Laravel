@@ -263,9 +263,15 @@ class BillRepository
      * - date_to (Y-m-d or Y-m-d H:i:s)
      * - doctor_id
      */
-    public function getStatisticsWithFilters(array $filters = []): array
+    public function getStatisticsWithFilters(array $filters = [], $doctorId = null): array
     {
         $query = $this->query();
+
+
+        if ($doctorId !== null) {
+            $query->where('doctor_id', $doctorId);
+        }
+
 
         if (!empty($filters['doctor_id'])) {
             $query->where('doctor_id', $filters['doctor_id']);

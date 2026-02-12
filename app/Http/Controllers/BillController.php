@@ -228,14 +228,16 @@ class BillController extends Controller
         $user = Auth::user();
         if (($user->hasRole('super_admin') || $user->hasRole('clinic_super_doctor') || $user->hasRole('secretary')) 
             && $request->has('doctor_id')) {
-            $filters['doctor_id'] = $request->input('doctor_id');
-        } elseif ($doctorId !== null) {
-            // Regular doctor: force their own doctor_id
+            $doctorId = $request->input('doctor_id');
+        }
+
+        // Add doctor_id to filters if set
+        if ($doctorId !== null) {
             $filters['doctor_id'] = $doctorId;
         }
 
         // Multi-tenancy: Database is already isolated by tenant
-        $statistics = $this->billRepository->getStatisticsWithFilters($filters);
+        $statistics = $this->billRepository->getStatisticsWithFilters($filters, $doctorId);
 
         return response()->json([
             'success' => true,
