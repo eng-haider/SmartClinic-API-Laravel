@@ -63,15 +63,18 @@ class Image extends Model
         // Get the actual storage path (which includes tenant folder for tenant context)
         $fullStoragePath = Storage::disk($this->disk)->path($this->path);
         
-        // Get the base storage path
-        $baseStoragePath = storage_path('');
+        // Extract the path starting from 'storage/' folder
+        // This will capture paths like: storage/tenant_haider/app/public/images/...
+        // or: storage/app/public/images/...
+        if (preg_match('#(storage/.+)$#', $fullStoragePath, $matches)) {
+            $relativePath = $matches[1];
+        } else {
+            // Fallback to simple path
+            $relativePath = 'storage/app/public/' . $this->path;
+        }
         
-        // Get the relative path from storage root
-        $relativePath = str_replace($baseStoragePath, '', $fullStoragePath);
-        $relativePath = ltrim($relativePath, '/');
-        
-        // Build the URL with the full storage path including tenant folder
-        return rtrim(config('app.url'), '/') . '/storage/' . $relativePath;
+        // Build the URL
+        return rtrim(config('app.url'), '/') . '/' . $relativePath;
     }
 
     /**
