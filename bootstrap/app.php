@@ -12,6 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // CORS - run first on every request (handles OPTIONS preflight)
+        $middleware->prepend(\App\Http\Middleware\CorsMiddleware::class);
+
         // Enable CORS for API routes
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
