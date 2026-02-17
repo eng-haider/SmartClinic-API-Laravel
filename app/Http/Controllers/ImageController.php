@@ -71,7 +71,7 @@ class ImageController extends Controller
     public function store(ImageRequest $request): JsonResponse
     {
         try {
-            $imageableType = 'App\Models\Patient';
+            $imageableType = $request->input('imageable_type');
             $imageableId = $request->input('imageable_id');
             $type = $request->input('type');
             $altText = $request->input('alt_text');

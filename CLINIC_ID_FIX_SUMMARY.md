@@ -6,8 +6,8 @@ When creating users (doctors, secretaries) in tenant databases, the system was t
 
 ```json
 {
-    "success": false,
-    "message": "SQLSTATE[42S22]: Column not found: 1054 Unknown column 'clinic_id' in 'INSERT INTO' (Connection: tenant, SQL: insert into `users` (`name`, `email`, `phone`, `password`, `is_active`, `clinic_id`, `updated_at`, `created_at`) values (...))"
+  "success": false,
+  "message": "SQLSTATE[42S22]: Column not found: 1054 Unknown column 'clinic_id' in 'INSERT INTO' (Connection: tenant, SQL: insert into `users` (`name`, `email`, `phone`, `password`, `is_active`, `clinic_id`, `updated_at`, `created_at`) values (...))"
 }
 ```
 
@@ -73,7 +73,7 @@ public function create(array $data): User
 {
     // Remove clinic_id from data for tenant databases
     $userData = collect($data)->except(['clinic_id'])->toArray();
-    
+
     $doctor = User::create($userData);
     // ...
 }
@@ -110,11 +110,11 @@ try {
     $authUser = Auth::user();
     if ($authUser && $authUser->clinic_id) {
         $centralConnection = config('tenancy.database.central_connection');
-        
+
         $existingCentralUser = User::on($centralConnection)
             ->where('phone', $doctor->phone)
             ->first();
-        
+
         if (!$existingCentralUser) {
             $centralUser = User::on($centralConnection)->create([
                 'name' => $doctor->name,
@@ -123,7 +123,7 @@ try {
                 'password' => $doctor->password,
                 'is_active' => $doctor->is_active,
             ]);
-            
+
             $centralUser->clinic_id = $authUser->clinic_id;
             $centralUser->save();
         }
@@ -200,7 +200,8 @@ Body:
 }
 ```
 
-**Expected Result**: 
+**Expected Result**:
+
 - ✅ Doctor created in tenant database
 - ✅ Doctor also created in central database (for smart login)
 - ✅ No error about clinic_id column
@@ -224,6 +225,7 @@ Body:
 ```
 
 **Expected Result**:
+
 - ✅ Secretary created in tenant database
 - ✅ Secretary also created in central database (for smart login)
 - ✅ No error about clinic_id column
@@ -243,6 +245,7 @@ Body:
 ```
 
 **Expected Result**:
+
 - ✅ User authenticated from central database
 - ✅ Tenant context initialized
 - ✅ User data loaded from tenant database
@@ -258,6 +261,7 @@ Body:
 ## Summary
 
 The fix ensures that:
+
 - ✅ Tenant users tables don't require `clinic_id` column
 - ✅ Central database users have `clinic_id` set properly
 - ✅ New users created in tenant DBs are also added to central DB for smart login

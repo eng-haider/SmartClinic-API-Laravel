@@ -128,6 +128,12 @@ Route::middleware([
 
     // Image routes
     Route::middleware('jwt')->group(function () {
+        // Custom routes must come BEFORE apiResource
+        Route::get('images/by-imageable', [ImageController::class, 'getByImageable'])->name('images.by-imageable');
+        Route::get('images/statistics/summary', [ImageController::class, 'statistics'])->name('images.statistics');
+        Route::patch('images/{id}/order', [ImageController::class, 'updateOrder'])->name('images.update-order');
+        
+        // Standard CRUD operations
         Route::apiResource('images', ImageController::class);
     });
 
