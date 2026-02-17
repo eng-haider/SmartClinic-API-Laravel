@@ -60,14 +60,18 @@ class Image extends Model
      */
     public function getUrlAttribute(): string
     {
-        $storageUrl = Storage::disk($this->disk)->url($this->path);
+        // Get the actual storage path (which includes tenant folder for tenant context)
+        $fullStoragePath = Storage::disk($this->disk)->path($this->path);
         
-        // If the URL is relative, prepend the app URL
-        if (!str_starts_with($storageUrl, 'http')) {
-            return rtrim(config('app.url'), '/') . '/' . ltrim($storageUrl, '/');
-        }
+        // Get the base storage path
+        $baseStoragePath = storage_path('');
         
-        return $storageUrl;
+        // Get the relative path from storage root
+        $relativePath = str_replace($baseStoragePath, '', $fullStoragePath);
+        $relativePath = ltrim($relativePath, '/');
+        
+        // Build the URL with the full storage path including tenant folder
+        return rtrim(config('app.url'), '/') . '/storage/' . $relativePath;
     }
 
     /**
