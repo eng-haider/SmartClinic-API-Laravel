@@ -64,7 +64,7 @@ class Image extends Model
         if (function_exists('tenant') && tenant()) {
             $tenantId = tenant()->id;
             // Build API route URL for tenant-specific file serving
-            return rtrim(config('app.url'), '/') . '/api/file/tenant/' . $tenantId . '/' . $this->path;
+            return rtrim(config('app.url'), '/') . '/file/tenant/' . $tenantId . '/' . $this->path;
         }
         
         // Fallback for non-tenant context (central database)
