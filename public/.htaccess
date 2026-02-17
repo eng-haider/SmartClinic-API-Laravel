@@ -5,13 +5,7 @@
 
     RewriteEngine On
 
-    # CORS Headers
-    Header always set Access-Control-Allow-Origin "*"
-    Header always set Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Tenant-ID, X-Clinic-ID"
-    Header always set Access-Control-Max-Age "3600"
-
-    # Handle preflight OPTIONS requests
+    # Handle preflight OPTIONS requests - return 200 immediately
     RewriteCond %{REQUEST_METHOD} OPTIONS
     RewriteRule ^(.*)$ $1 [R=200,L]
 
@@ -32,4 +26,12 @@
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
+</IfModule>
+
+# CORS Headers - wrapped in IfModule so it doesn't crash if mod_headers is disabled
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Tenant-ID, X-Clinic-ID, Accept, Origin"
+    Header always set Access-Control-Max-Age "3600"
 </IfModule>
