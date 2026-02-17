@@ -5,9 +5,9 @@
 
     RewriteEngine On
 
-    # Handle preflight OPTIONS requests - return 200 immediately
+    # Handle preflight OPTIONS requests - send directly to index.php which returns 200
     RewriteCond %{REQUEST_METHOD} OPTIONS
-    RewriteRule ^(.*)$ $1 [R=200,L]
+    RewriteRule .* index.php [L]
 
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
@@ -28,10 +28,10 @@
     RewriteRule ^ index.php [L]
 </IfModule>
 
-# CORS Headers - wrapped in IfModule so it doesn't crash if mod_headers is disabled
+# CORS Headers - always set on every response including OPTIONS
 <IfModule mod_headers.c>
     Header always set Access-Control-Allow-Origin "*"
     Header always set Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
     Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Tenant-ID, X-Clinic-ID, Accept, Origin"
-    Header always set Access-Control-Max-Age "3600"
+    Header always set Access-Control-Max-Age "86400"
 </IfModule>
