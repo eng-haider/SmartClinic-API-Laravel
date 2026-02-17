@@ -190,9 +190,12 @@ class TenantController extends Controller
                 'phone' => $validated['user_phone'],
                 'email' => $validated['user_email'] ?? null,
                 'password' => Hash::make($validated['user_password']),
-                'clinic_id' => $tenantId,
                 'is_active' => true,
             ]);
+            
+            // Set clinic_id separately (not in fillable to avoid issues with tenant databases)
+            $centralUser->clinic_id = $tenantId;
+            $centralUser->save();
             
             Log::info('✓ User created in central DB', ['id' => $centralUser->id]);
             

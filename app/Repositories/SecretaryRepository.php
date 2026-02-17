@@ -70,15 +70,15 @@ class SecretaryRepository
     {
         // Get clinic_id from authenticated user
         $authUser = Auth::user();
+        $hashedPassword = Hash::make($data['password']);
      
-        
-     
+        // Remove clinic_id from data for tenant databases (they don't have this column)
+        // clinic_id is only used in central database
         $secretary = User::create([
             'name' => $data['name'],
             'phone' => $data['phone'],
             // 'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-          
+            'password' => $hashedPassword,
             'is_active' => $data['is_active'] ?? true,
         ]);
 
@@ -97,6 +97,45 @@ class SecretaryRepository
         // Assign custom permissions if provided
         if (!empty($data['permissions'])) {
             $secretary->givePermissionTo($data['permissions']);
+        }
+
+        // Also create user in central database for smart login (if in tenant context)
+        try {
+            if ($authUser && $authUser->clinic_id) {
+                $centralConnection = config('tenancy.database.central_connection');
+                
+                // Check if user already exists in central database
+                $existingCentralUser = User::on($centralConnection)
+                    ->where('phone', $secretary->phone)
+                    ->first();
+                
+                if (!$existingCentralUser) {
+                    // Create user in central database for smart login
+                    $centralUser = User::on($centralConnection)->create([
+                        'name' => $secretary->name,
+                        'phone' => $secretary->phone,
+                        'email' => $secretary->email ?? null,
+                        'password' => $hashedPassword,
+                        'is_active' => $secretary->is_active,
+                    ]);
+                    
+                    // Set clinic_id separately
+                    $centralUser->clinic_id = $authUser->clinic_id;
+                    $centralUser->save();
+                    
+                    Log::info('Secretary created in central database for smart login', [
+                        'tenant_user_id' => $secretary->id,
+                        'central_user_id' => $centralUser->id,
+                        'phone' => $secretary->phone,
+                    ]);
+                }
+            }
+        } catch (\Exception $e) {
+            // Log but don't fail the operation if central DB creation fails
+            Log::warning('Failed to create secretary in central database', [
+                'phone' => $secretary->phone,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         return $secretary->fresh(['permissions', 'roles']);

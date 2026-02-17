@@ -57,13 +57,17 @@ class AuthService
                 'phone' => $data['phone'],
                 'email' => $data['email'] ?? null,
                 'password' => Hash::make($data['password']),
-                'clinic_id' => $clinic->id,
             ];
 
             // Always set role to clinic_super_doctor for registration
             $roleName = 'clinic_super_doctor';
 
             $user = $this->userRepository->create($userData);
+            
+            // Set clinic_id separately for central database users
+            // (clinic_id is not in fillable to avoid issues with tenant databases)
+            $user->clinic_id = $clinic->id;
+            $user->save();
 
             // Assign role using Spatie
             $user->assignRole($roleName);
