@@ -25,6 +25,24 @@ use App\Http\Controllers\Report\CaseReportController;
 use App\Http\Controllers\Report\ReservationReportController;
 use App\Http\Controllers\Report\FinancialReportController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
+
+// ============================================
+// FILE SERVING ROUTES (Public file access)
+// ============================================
+Route::get('/file/tenant/{tenant}/{path}', function ($tenant, $path) {
+    $fullPath = "tenant_{$tenant}/app/public/{$path}";
+    
+    if (!Storage::disk('public')->exists($fullPath)) {
+        abort(404, "File not found");
+    }
+    
+    $file = Storage::disk('public')->path($fullPath);
+    
+    return response()->file($file, [
+        'Cache-Control' => 'public, max-age=31536000',
+    ]);
+})->where('path', '.+')->name('file.tenant');
 
 // ============================================
 // TENANT MANAGEMENT ROUTES (Central Database)

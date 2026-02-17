@@ -60,21 +60,21 @@ class Image extends Model
      */
     public function getUrlAttribute(): string
     {
-        // Get the actual storage path (which includes tenant folder for tenant context)
-        $fullStoragePath = Storage::disk($this->disk)->path($this->path);
-        
-        // Extract the path starting from 'storage/' folder
-        // This will capture paths like: storage/tenant_haider/app/public/images/...
-        // or: storage/app/public/images/...
-        if (preg_match('#(storage/.+)$#', $fullStoragePath, $matches)) {
-            $relativePath = $matches[1];
-        } else {
-            // Fallback to simple path
-            $relativePath = 'storage/app/public/' . $this->path;
+        // Try to get the current tenant ID from the tenancy context
+        if (function_exists('tenant') && tenant()) {
+            $tenantId = tenant()->id;
+            // Build API route URL for tenant-specific file serving
+            return rtrim(config('app.url'), '/') . '/api/file/tenant/' . $tenantId . '/' . $this->path;
         }
         
-        // Build the URL
-        return rtrim(config('app.url'), '/') . '/' . $relativePath;
+        // Fallback for non-tenant context (central database)
+        $storageUrl = Storage::disk($this->disk)->url($this->path);
+        
+        if (!str_starts_with($storageUrl, 'http')) {
+            return rtrim(config('app.url'), '/') . '/' . ltrim($storageUrl, '/');
+        }
+        
+        return $storageUrl;
     }
 
     /**
