@@ -15,6 +15,7 @@ use App\Http\Controllers\DoctorController;
 use App\Http\Controllers\SecretaryController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\ImageController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PublicPatientController;
 use App\Http\Controllers\PatientPublicProfileController;
 use App\Http\Controllers\TenantController;
@@ -207,6 +208,45 @@ Route::middleware('jwt')->group(function () {
     
     // Standard CRUD operations
     Route::apiResource('images', ImageController::class);
+});
+
+// ============================================
+// NOTIFICATION ROUTES (JWT required)
+// Manage notifications and push notifications via OneSignal
+// ============================================
+Route::middleware('jwt')->prefix('notifications')->group(function () {
+    // Get all notifications for authenticated user
+    Route::get('/', [NotificationController::class, 'index'])->name('notifications.index');
+    
+    // Get unread count
+    Route::get('/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
+    
+    // Get notification statistics
+    Route::get('/statistics', [NotificationController::class, 'statistics'])->name('notifications.statistics');
+    
+    // Mark all as read
+    Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+    
+    // Mark multiple as read
+    Route::post('/mark-multiple-read', [NotificationController::class, 'markMultipleAsRead'])->name('notifications.mark-multiple-read');
+    
+    // Update OneSignal player ID
+    Route::post('/player-id', [NotificationController::class, 'updatePlayerID'])->name('notifications.update-player-id');
+    
+    // Send test notification
+    Route::post('/test', [NotificationController::class, 'sendTest'])->name('notifications.test');
+    
+    // Get specific notification
+    Route::get('/{id}', [NotificationController::class, 'show'])->name('notifications.show');
+    
+    // Mark notification as read
+    Route::patch('/{id}/mark-read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
+    
+    // Delete notification
+    Route::delete('/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+    
+    // Send notification (admin/authorized users only)
+    Route::post('/', [NotificationController::class, 'store'])->name('notifications.store');
 });
 
 // ============================================

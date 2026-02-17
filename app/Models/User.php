@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasNotifications;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -12,7 +13,7 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
 class User extends Authenticatable implements JWTSubject
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles, SoftDeletes;
+    use HasFactory, Notifiable, HasRoles, SoftDeletes, HasNotifications;
 
     /**
      * The guard name for Spatie Permission
@@ -33,6 +34,7 @@ class User extends Authenticatable implements JWTSubject
         'password',
         'phone',
         'is_active',
+        'onesignal_player_id',
     ];
 
     /**
