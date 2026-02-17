@@ -30,7 +30,7 @@ use Illuminate\Support\Facades\Storage;
 // ============================================
 // FILE SERVING ROUTES (Public file access)
 // ============================================
-Route::get('/file/tenant/{tenant}/{path}', function ($tenant, $path) {
+Route::get('file/tenant/{tenant}/{path}', function ($tenant, $path) {
     $fullPath = "tenant_{$tenant}/app/public/{$path}";
     
     if (!Storage::disk('public')->exists($fullPath)) {
@@ -43,6 +43,11 @@ Route::get('/file/tenant/{tenant}/{path}', function ($tenant, $path) {
         'Cache-Control' => 'public, max-age=31536000',
     ]);
 })->where('path', '.+')->name('file.tenant');
+
+// Test route
+Route::get('file/test', function () {
+    return response()->json(['message' => 'File serving route is working']);
+})->name('file.test');
 
 // ============================================
 // TENANT MANAGEMENT ROUTES (Central Database)
