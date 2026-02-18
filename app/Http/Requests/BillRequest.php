@@ -47,12 +47,9 @@ class BillRequest extends FormRequest
 
         // Set clinic_id from authenticated user
         if (auth()->check()) {
-            $data['clinics_id'] = auth()->user()->clinic_id ?? auth()->user()->clinics_id ?? null;
-            
+          
             // Set doctor_id if not provided
-            if (!$this->has('doctor_id')) {
-                $data['doctor_id'] = auth()->id();
-            }
+             $data['doctor_id'] = auth()->id();
         }
 
         if (!empty($data)) {
@@ -69,7 +66,7 @@ class BillRequest extends FormRequest
 
         // Add clinics_id and doctor_id to validated data
         if (auth()->check()) {
-            $validated['clinics_id'] = auth()->user()->clinic_id ?? auth()->user()->clinics_id ?? null;
+            
             
             if (!isset($validated['doctor_id'])) {
                 $validated['doctor_id'] = auth()->id();
