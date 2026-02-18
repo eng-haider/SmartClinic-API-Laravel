@@ -104,15 +104,15 @@ class ReportsRepository
     /**
      * Get patients grouped by source (from_where_come)
      */
-    public function getPatientsBySource($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getPatientsBySource($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Patient::query()
             ->select('from_where_come_id', DB::raw('COUNT(*) as count'))
             ->with('fromWhereCome:id,name,name_ar')
             ->groupBy('from_where_come_id');
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -132,7 +132,7 @@ class ReportsRepository
     /**
      * Get patients grouped by doctor
      */
-    public function getPatientsByDoctor($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getPatientsByDoctor($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Patient::query()
             ->select('doctor_id', DB::raw('COUNT(*) as count'))
@@ -140,8 +140,8 @@ class ReportsRepository
             ->whereNotNull('doctor_id')
             ->groupBy('doctor_id');
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -160,12 +160,12 @@ class ReportsRepository
     /**
      * Get patients trend (grouped by period)
      */
-    public function getPatientsTrend($clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getPatientsTrend($doctorId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Patient::query();
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -176,12 +176,12 @@ class ReportsRepository
     /**
      * Get patients age distribution
      */
-    public function getPatientsAgeDistribution($clinicId = null): array
+    public function getPatientsAgeDistribution($doctorId = null): array
     {
         $query = Patient::query();
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $results = $query->select(
@@ -213,12 +213,12 @@ class ReportsRepository
     /**
      * Get bills summary
      */
-    public function getBillsSummary($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getBillsSummary($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Bill::query();
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -304,12 +304,12 @@ class ReportsRepository
     /**
      * Get bills by payment status
      */
-    public function getBillsByPaymentStatus($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getBillsByPaymentStatus($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Bill::query();
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -497,7 +497,7 @@ class ReportsRepository
     /**
      * Get cases by category
      */
-    public function getCasesByCategory($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getCasesByCategory($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = CaseModel::query()
             ->select('case_categores_id', DB::raw('COUNT(*) as count'), DB::raw('SUM(price) as total_value'))
@@ -505,8 +505,8 @@ class ReportsRepository
             ->whereNotNull('case_categores_id')
             ->groupBy('case_categores_id');
         
-        if ($clinicId) {
-            $query->where('clinic_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -526,7 +526,7 @@ class ReportsRepository
     /**
      * Get cases by status
      */
-    public function getCasesByStatus($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getCasesByStatus($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = CaseModel::query()
             ->select('status_id', DB::raw('COUNT(*) as count'))
@@ -534,8 +534,8 @@ class ReportsRepository
             ->whereNotNull('status_id')
             ->groupBy('status_id');
         
-        if ($clinicId) {
-            $query->where('clinic_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -653,7 +653,7 @@ class ReportsRepository
     /**
      * Get expenses by category
      */
-    public function getExpensesByCategory($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getExpensesByCategory($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = ClinicExpense::query()
             ->select('clinic_expense_category_id', DB::raw('COUNT(*) as count'), DB::raw('SUM(COALESCE(quantity, 1) * price) as total_amount'))
@@ -661,8 +661,8 @@ class ReportsRepository
             ->whereNotNull('clinic_expense_category_id')
             ->groupBy('clinic_expense_category_id');
         
-        if ($clinicId) {
-            $query->where('clinic_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'date');
@@ -773,16 +773,12 @@ class ReportsRepository
     /**
      * Get doctor performance statistics
      */
-    public function getDoctorPerformance($clinicId = null, ?int $doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getDoctorPerformance($doctorIdFilter = null, ?int $doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = User::query()
             ->whereHas('roles', function ($q) {
                 $q->whereIn('name', ['doctor', 'clinic_super_doctor', 'super_admin']);
             });
-        
-        if ($clinicId) {
-            $query->where('clinic_id');
-        }
         
         if ($doctorId) {
             $query->where('id', $doctorId);
@@ -796,13 +792,6 @@ class ReportsRepository
             $billsQuery = Bill::where('doctor_id', $doctor->id)->where('is_paid', true);
             $reservationsQuery = Reservation::where('doctor_id', $doctor->id);
             $patientsQuery = Patient::where('doctor_id', $doctor->id);
-            
-            if ($clinicId) {
-                $casesQuery->where('clinic_id');
-                $billsQuery->where('clinics_id');
-                $reservationsQuery->where('clinics_id');
-                $patientsQuery->where('clinics_id');
-            }
             
             $this->applyDateFilter($casesQuery, $dateFrom, $dateTo, 'created_at');
             $this->applyDateFilter($billsQuery, $dateFrom, $dateTo, 'created_at');
