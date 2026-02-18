@@ -99,9 +99,9 @@ class BillController extends Controller
      */
     public function update(BillRequest $request, int $id): JsonResponse
     {
-        try {
-            // Multi-tenancy: Database is already isolated by tenant
-            $bill = $this->billRepository->update($id, $request->validated(), null);
+        // try {
+        //     // Multi-tenancy: Database is already isolated by tenant
+        //     $bill = $this->billRepository->update($id, $request->validated(), null);
 
             return response()->json([
                 'success' => true,
@@ -221,22 +221,10 @@ class BillController extends Controller
             'date_to' => $request->input('date_to'),
         ];
 
-        // Get doctor_id filter based on user role
         $doctorId = $this->getDoctorIdFilter();
-        
-        // If super admin or clinic_super_doctor, allow filtering by doctor_id from request
-        $user = Auth::user();
-        if (($user->hasRole('super_admin') || $user->hasRole('clinic_super_doctor') || $user->hasRole('secretary')) 
-            && $request->has('doctor_id')) {
-            $doctorId = $request->input('doctor_id');
-        }
 
-        // Add doctor_id to filters if set
-        if ($doctorId !== null) {
-            $filters['doctor_id'] = $doctorId;
-        }
+      
 
-        // Multi-tenancy: Database is already isolated by tenant
         $statistics = $this->billRepository->getStatisticsWithFilters([], $perPage=15, $doctorId);;
 
         return response()->json([
