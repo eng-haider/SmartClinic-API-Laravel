@@ -254,7 +254,8 @@ return [
                 'view-reports',
 
                 'view-clinic-reservations',
-                'view-all-bills'
+                'view-all-bills',
+                'view-clinic-cases',
 
             ],
         ],
