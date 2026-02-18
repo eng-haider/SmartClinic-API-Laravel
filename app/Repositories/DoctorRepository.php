@@ -109,35 +109,54 @@ class DoctorRepository
 
         // Also create user in central database for smart login (if in tenant context)
         try {
-            $authUser = Auth::user();
-            if ($authUser && $authUser->clinic_id) {
+            // Use tenant() helper to get current clinic ID reliably
+            $clinicId = function_exists('tenant') && tenant() ? tenant()->id : null;
+
+            if (!$clinicId) {
+                // Fallback: try from authenticated user's clinic_id attribute
+                $authUser = Auth::user();
+                $clinicId = $authUser ? DB::connection(config('tenancy.database.central_connection'))
+                    ->table('users')
+                    ->where('phone', $authUser->phone)
+                    ->value('clinic_id') : null;
+            }
+
+            if ($clinicId) {
                 $centralConnection = config('tenancy.database.central_connection');
-                
+
                 // Check if user already exists in central database
                 $existingCentralUser = User::on($centralConnection)
                     ->where('phone', $doctor->phone)
                     ->first();
-                
+
                 if (!$existingCentralUser) {
                     // Create user in central database for smart login
-                    $centralUser = User::on($centralConnection)->create([
-                        'name' => $doctor->name,
-                        'phone' => $doctor->phone,
-                        'email' => $doctor->email ?? null,
-                        'password' => $doctor->password, // Already hashed
-                        'is_active' => $doctor->is_active,
-                    ]);
-                    
-                    // Set clinic_id separately
-                    $centralUser->clinic_id = $authUser->clinic_id;
+                    $centralUser = new User();
+                    $centralUser->setConnection($centralConnection);
+                    $centralUser->name      = $doctor->name;
+                    $centralUser->phone     = $doctor->phone;
+                    $centralUser->email     = $doctor->email ?? null;
+                    $centralUser->password  = $doctor->password; // Already hashed
+                    $centralUser->is_active = $doctor->is_active ?? true;
+                    $centralUser->clinic_id = $clinicId;
                     $centralUser->save();
-                    
+
                     Log::info('Doctor created in central database for smart login', [
                         'tenant_user_id' => $doctor->id,
                         'central_user_id' => $centralUser->id,
-                        'phone' => $doctor->phone,
+                        'clinic_id'       => $clinicId,
+                        'phone'           => $doctor->phone,
+                    ]);
+                } else {
+                    Log::info('Doctor already exists in central database, skipping creation', [
+                        'phone'      => $doctor->phone,
+                        'central_id' => $existingCentralUser->id,
                     ]);
                 }
+            } else {
+                Log::warning('Could not determine clinic_id for central DB sync, skipping', [
+                    'phone' => $doctor->phone,
+                ]);
             }
         } catch (\Exception $e) {
             // Log but don't fail the operation if central DB creation fails

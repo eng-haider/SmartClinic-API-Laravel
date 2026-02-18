@@ -68,8 +68,6 @@ class SecretaryRepository
      */
     public function create(array $data): User
     {
-        // Get clinic_id from authenticated user
-        $authUser = Auth::user();
         $hashedPassword = Hash::make($data['password']);
      
         // Remove clinic_id from data for tenant databases (they don't have this column)
@@ -101,34 +99,54 @@ class SecretaryRepository
 
         // Also create user in central database for smart login (if in tenant context)
         try {
-            if ($authUser && $authUser->clinic_id) {
+            // Use tenant() helper to get current clinic ID reliably
+            $clinicId = function_exists('tenant') && tenant() ? tenant()->id : null;
+
+            if (!$clinicId) {
+                // Fallback: try from authenticated user's clinic_id attribute
+                $authUser = Auth::user();
+                $clinicId = $authUser ? \Illuminate\Support\Facades\DB::connection(config('tenancy.database.central_connection'))
+                    ->table('users')
+                    ->where('phone', $authUser->phone)
+                    ->value('clinic_id') : null;
+            }
+
+            if ($clinicId) {
                 $centralConnection = config('tenancy.database.central_connection');
-                
+
                 // Check if user already exists in central database
                 $existingCentralUser = User::on($centralConnection)
                     ->where('phone', $secretary->phone)
                     ->first();
-                
+
                 if (!$existingCentralUser) {
                     // Create user in central database for smart login
-                    $centralUser = User::on($centralConnection)->create([
-                        'name' => $secretary->name,
-                        'phone' => $secretary->phone,
-                        'email' => $secretary->email ?? null,
-                        'password' => $hashedPassword,
-                        'is_active' => $secretary->is_active,
-                    ]);
-                    
-                    // Set clinic_id separately
-                    $centralUser->clinic_id = $authUser->clinic_id;
+                    $centralUser = new User();
+                    $centralUser->setConnection($centralConnection);
+                    $centralUser->name      = $secretary->name;
+                    $centralUser->phone     = $secretary->phone;
+                    $centralUser->email     = $secretary->email ?? null;
+                    $centralUser->password  = $hashedPassword;
+                    $centralUser->is_active = $secretary->is_active ?? true;
+                    $centralUser->clinic_id = $clinicId;
                     $centralUser->save();
-                    
+
                     Log::info('Secretary created in central database for smart login', [
                         'tenant_user_id' => $secretary->id,
                         'central_user_id' => $centralUser->id,
-                        'phone' => $secretary->phone,
+                        'clinic_id'       => $clinicId,
+                        'phone'           => $secretary->phone,
+                    ]);
+                } else {
+                    Log::info('Secretary already exists in central database, skipping creation', [
+                        'phone'      => $secretary->phone,
+                        'central_id' => $existingCentralUser->id,
                     ]);
                 }
+            } else {
+                Log::warning('Could not determine clinic_id for central DB sync, skipping', [
+                    'phone' => $secretary->phone,
+                ]);
             }
         } catch (\Exception $e) {
             // Log but don't fail the operation if central DB creation fails
