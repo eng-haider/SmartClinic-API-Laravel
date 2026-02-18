@@ -103,17 +103,17 @@ class BillController extends Controller
         //     // Multi-tenancy: Database is already isolated by tenant
         //     $bill = $this->billRepository->update($id, $request->validated(), null);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Bill updated successfully',
-                'data' => new BillResource($bill),
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
-        }
+        //     return response()->json([
+        //         'success' => true,
+        //         'message' => 'Bill updated successfully',
+        //         'data' => new BillResource($bill),
+        //     ]);
+        // } catch (\Exception $e) {
+        //     return response()->json([
+        //         'success' => false,
+        //         'message' => $e->getMessage(),
+        //     ], 422);
+        // }
     }
 
     /**
