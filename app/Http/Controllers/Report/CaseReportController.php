@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Report;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\DoctorFilterTrait;
 use App\Repositories\Reports\ReportsRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,6 +11,8 @@ use Illuminate\Support\Facades\Auth;
 
 class CaseReportController extends Controller
 {
+    use DoctorFilterTrait;
+
     public function __construct(private ReportsRepository $reportsRepository)
     {
         // Permissions can be added here if needed
@@ -20,6 +23,7 @@ class CaseReportController extends Controller
      * Get cases summary statistics.
      * 
      * Returns total count, paid/unpaid distribution, and total value.
+     * Role-based filtering: Doctors see only their own cases.
      *
      * @param Request $request
      * @return JsonResponse
@@ -31,18 +35,18 @@ class CaseReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $clinicId = $this->getClinicIdByRole();
+        $doctorId = $this->getDoctorIdFilter();
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
-        $summary = $this->reportsRepository->getCasesSummary($clinicId, $dateFrom, $dateTo);
+        $summary = $this->reportsRepository->getCasesSummary($doctorId, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
             'message' => 'Cases summary retrieved successfully',
             'data' => $summary,
             'filters' => [
-                'clinic_id' => $clinicId,
+                'doctor_id' => $doctorId,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
             ],
@@ -135,18 +139,18 @@ class CaseReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $clinicId = $this->getClinicIdByRole();
+        $doctorId = $this->getDoctorIdFilter();
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
-        $data = $this->reportsRepository->getCasesByDoctor($clinicId, $dateFrom, $dateTo);
+        $data = $this->reportsRepository->getCasesByDoctor($doctorId, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
             'message' => 'Cases by doctor retrieved successfully',
             'data' => $data,
             'filters' => [
-                'clinic_id' => $clinicId,
+                'doctor_id' => $doctorId,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
             ],

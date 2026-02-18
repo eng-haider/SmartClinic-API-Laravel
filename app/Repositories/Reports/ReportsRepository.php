@@ -26,30 +26,30 @@ class ReportsRepository
     /**
      * Get dashboard overview statistics
      */
-    public function getDashboardOverview($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getDashboardOverview($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         return [
-            'patients' => $this->getPatientsSummary($clinicId, $dateFrom, $dateTo),
-            'bills' => $this->getBillsSummary($clinicId, $dateFrom, $dateTo),
-            'reservations' => $this->getReservationsSummary($clinicId, $dateFrom, $dateTo),
-            'cases' => $this->getCasesSummary($clinicId, $dateFrom, $dateTo),
-            'expenses' => $this->getExpensesSummary($clinicId, $dateFrom, $dateTo),
+            'patients' => $this->getPatientsSummary($doctorId, $dateFrom, $dateTo),
+            'bills' => $this->getBillsSummary($doctorId, $dateFrom, $dateTo),
+            'reservations' => $this->getReservationsSummary($doctorId, $dateFrom, $dateTo),
+            'cases' => $this->getCasesSummary($doctorId, $dateFrom, $dateTo),
+            'expenses' => $this->getExpensesSummary($doctorId, $dateFrom, $dateTo),
         ];
     }
 
     /**
      * Get today's summary for quick stats
      */
-    public function getTodaySummary(): array
+    public function getTodaySummary($doctorId = null): array
     {
         $today = Carbon::today()->format('Y-m-d');
         
         return [
-            'new_patients' => $this->getNewPatientsCount(null, $today, $today),
-            'reservations_today' => $this->getReservationsCountByDate($today),
-            'revenue_today' => $this->getRevenueByDateRange(null, $today, $today),
-            'cases_today' => $this->getCasesCountByDateRange(null, $today, $today),
-            'expenses_today' => $this->getExpensesTotalByDateRange(null, $today, $today),
+            'new_patients' => $this->getNewPatientsCount($doctorId, $today, $today),
+            'reservations_today' => $this->getReservationsCountByDate($today, $doctorId),
+            'revenue_today' => $this->getRevenueByDateRange($doctorId, $today, $today),
+            'cases_today' => $this->getCasesCountByDateRange($doctorId, $today, $today),
+            'expenses_today' => $this->getExpensesTotalByDateRange($doctorId, $today, $today),
         ];
     }
 
@@ -62,12 +62,12 @@ class ReportsRepository
     /**
      * Get patients summary counts
      */
-    public function getPatientsSummary($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getPatientsSummary($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Patient::query();
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -88,12 +88,12 @@ class ReportsRepository
     /**
      * Get new patients count by date range
      */
-    public function getNewPatientsCount($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): int
+    public function getNewPatientsCount($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): int
     {
         $query = Patient::query();
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -242,12 +242,12 @@ class ReportsRepository
     /**
      * Get revenue by date range
      */
-    public function getRevenueByDateRange($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): int
+    public function getRevenueByDateRange($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): int
     {
         $query = Bill::query()->where('is_paid', true);
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -258,12 +258,12 @@ class ReportsRepository
     /**
      * Get revenue trend
      */
-    public function getRevenueTrend($clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getRevenueTrend($doctorId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Bill::query()->where('is_paid', true);
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -274,7 +274,7 @@ class ReportsRepository
     /**
      * Get revenue by doctor
      */
-    public function getRevenueByDoctor($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getRevenueByDoctor($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Bill::query()
             ->select('doctor_id', DB::raw('SUM(price) as total_revenue'), DB::raw('COUNT(*) as bills_count'))
@@ -283,8 +283,8 @@ class ReportsRepository
             ->whereNotNull('doctor_id')
             ->groupBy('doctor_id');
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -333,12 +333,12 @@ class ReportsRepository
     /**
      * Get reservations summary
      */
-    public function getReservationsSummary($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getReservationsSummary($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Reservation::query();
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'reservation_start_date');
@@ -358,14 +358,14 @@ class ReportsRepository
     /**
      * Get reservations count for a specific date
      */
-    public function getReservationsCountByDate(string $date, $clinicId = null): int
+    public function getReservationsCountByDate(string $date, $doctorId = null): int
     {
         $query = Reservation::query()
             ->whereDate('reservation_start_date', '<=', $date)
             ->whereDate('reservation_end_date', '>=', $date);
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         return $query->count();
@@ -374,7 +374,7 @@ class ReportsRepository
     /**
      * Get reservations by status
      */
-    public function getReservationsByStatus($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getReservationsByStatus($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Reservation::query()
             ->select('status_id', DB::raw('COUNT(*) as count'))
@@ -382,8 +382,8 @@ class ReportsRepository
             ->whereNotNull('status_id')
             ->groupBy('status_id');
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'reservation_start_date');
@@ -404,7 +404,7 @@ class ReportsRepository
     /**
      * Get reservations by doctor
      */
-    public function getReservationsByDoctor($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getReservationsByDoctor($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Reservation::query()
             ->select('doctor_id', DB::raw('COUNT(*) as count'))
@@ -412,8 +412,8 @@ class ReportsRepository
             ->whereNotNull('doctor_id')
             ->groupBy('doctor_id');
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'reservation_start_date');
@@ -432,12 +432,12 @@ class ReportsRepository
     /**
      * Get reservations trend
      */
-    public function getReservationsTrend($clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getReservationsTrend($doctorId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = Reservation::query();
         
-        if ($clinicId) {
-            $query->where('clinics_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'reservation_start_date');
@@ -454,12 +454,12 @@ class ReportsRepository
     /**
      * Get cases summary
      */
-    public function getCasesSummary($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getCasesSummary($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = CaseModel::query();
         
-        if ($clinicId) {
-            $query->where('clinic_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -481,12 +481,12 @@ class ReportsRepository
     /**
      * Get cases count by date range
      */
-    public function getCasesCountByDateRange($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): int
+    public function getCasesCountByDateRange($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): int
     {
         $query = CaseModel::query();
         
-        if ($clinicId) {
-            $query->where('clinic_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -556,7 +556,7 @@ class ReportsRepository
     /**
      * Get cases by doctor
      */
-    public function getCasesByDoctor($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getCasesByDoctor($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = CaseModel::query()
             ->select('doctor_id', DB::raw('COUNT(*) as count'), DB::raw('SUM(price) as total_value'))
@@ -564,8 +564,8 @@ class ReportsRepository
             ->whereNotNull('doctor_id')
             ->groupBy('doctor_id');
         
-        if ($clinicId) {
-            $query->where('clinic_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -585,12 +585,12 @@ class ReportsRepository
     /**
      * Get cases trend
      */
-    public function getCasesTrend($clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getCasesTrend($doctorId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = CaseModel::query();
         
-        if ($clinicId) {
-            $query->where('clinic_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
@@ -607,12 +607,12 @@ class ReportsRepository
     /**
      * Get expenses summary
      */
-    public function getExpensesSummary($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getExpensesSummary($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = ClinicExpense::query();
         
-        if ($clinicId) {
-            $query->where('clinic_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'date');
@@ -637,12 +637,12 @@ class ReportsRepository
     /**
      * Get expenses total by date range
      */
-    public function getExpensesTotalByDateRange($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): float
+    public function getExpensesTotalByDateRange($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): float
     {
         $query = ClinicExpense::query();
         
-        if ($clinicId) {
-            $query->where('clinic_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'date');
@@ -682,12 +682,12 @@ class ReportsRepository
     /**
      * Get expenses trend
      */
-    public function getExpensesTrend($clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getExpensesTrend($doctorId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $query = ClinicExpense::query();
         
-        if ($clinicId) {
-            $query->where('clinic_id');
+        if ($doctorId) {
+            $query->where('doctor_id', $doctorId);
         }
         
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'date');
@@ -704,10 +704,10 @@ class ReportsRepository
     /**
      * Get profit/loss report
      */
-    public function getProfitLossReport($clinicId = null, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getProfitLossReport($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
-        $revenue = $this->getRevenueByDateRange($clinicId, $dateFrom, $dateTo);
-        $expenses = $this->getExpensesTotalByDateRange($clinicId, $dateFrom, $dateTo);
+        $revenue = $this->getRevenueByDateRange($doctorId, $dateFrom, $dateTo);
+        $expenses = $this->getExpensesTotalByDateRange($doctorId, $dateFrom, $dateTo);
         $profitLoss = $revenue - $expenses;
         
         return [
@@ -722,10 +722,10 @@ class ReportsRepository
     /**
      * Get profit/loss trend
      */
-    public function getProfitLossTrend($clinicId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
+    public function getProfitLossTrend($doctorId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
     {
-        $revenueTrend = $this->getRevenueTrend($clinicId, $period, $dateFrom, $dateTo);
-        $expensesTrend = $this->getExpensesTrend($clinicId, $period, $dateFrom, $dateTo);
+        $revenueTrend = $this->getRevenueTrend($doctorId, $period, $dateFrom, $dateTo);
+        $expensesTrend = $this->getExpensesTrend($doctorId, $period, $dateFrom, $dateTo);
         
         // Combine trends
         $combined = [];

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Report;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\DoctorFilterTrait;
 use App\Repositories\Reports\ReportsRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 
 class DashboardReportController extends Controller
 {
+    use DoctorFilterTrait;
     public function __construct(private ReportsRepository $reportsRepository)
     {
         // Permissions can be added here if needed
@@ -23,6 +25,7 @@ class DashboardReportController extends Controller
      * Supports date filtering.
      * 
      * Multi-tenancy: Database is already isolated by tenant via middleware.
+     * Role-based filtering: Doctors see only their own data.
      *
      * @param Request $request
      * @return JsonResponse
@@ -36,9 +39,11 @@ class DashboardReportController extends Controller
 
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
+        $doctorId = $this->getDoctorIdFilter();
 
         // Multi-tenancy: No need for clinic_id filter
-        $overview = $this->reportsRepository->getDashboardOverview(null, $dateFrom, $dateTo);
+        // Doctor ID filter applied - doctors see only their own data
+        $overview = $this->reportsRepository->getDashboardOverview($doctorId, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
@@ -58,13 +63,17 @@ class DashboardReportController extends Controller
      * reservations, revenue, cases, and expenses.
      * 
      * Multi-tenancy: Database is already isolated by tenant via middleware.
+     * Role-based filtering: Doctors see only their own data.
      *
      * @return JsonResponse
      */
     public function today(): JsonResponse
     {
+        $doctorId = $this->getDoctorIdFilter();
+
         // Multi-tenancy: No need for clinic_id filter
-        $todaySummary = $this->reportsRepository->getTodaySummary(null);
+        // Doctor ID filter applied - doctors see only their own data
+        $todaySummary = $this->reportsRepository->getTodaySummary($doctorId);
 
         return response()->json([
             'success' => true,

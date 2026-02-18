@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Report;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\DoctorFilterTrait;
 use App\Repositories\Reports\ReportsRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 
 class ReservationReportController extends Controller
 {
+    use DoctorFilterTrait;
     public function __construct(private ReportsRepository $reportsRepository)
     {
         // Permissions can be added here if needed
@@ -35,8 +37,11 @@ class ReservationReportController extends Controller
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
+        // Get doctor ID filter based on user role
+        $doctorIdFilter = $this->getDoctorIdFilter();
+
         // Multi-tenancy: No need for clinic_id filter
-        $summary = $this->reportsRepository->getReservationsSummary(null, $dateFrom, $dateTo);
+        $summary = $this->reportsRepository->getReservationsSummary($doctorIdFilter, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
@@ -69,8 +74,11 @@ class ReservationReportController extends Controller
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
+        // Get doctor ID filter based on user role
+        $doctorIdFilter = $this->getDoctorIdFilter();
+
         // Multi-tenancy: No need for clinic_id filter
-        $data = $this->reportsRepository->getReservationsByStatus(null, $dateFrom, $dateTo);
+        $data = $this->reportsRepository->getReservationsByStatus($doctorIdFilter, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
@@ -104,8 +112,11 @@ class ReservationReportController extends Controller
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
+        // Get doctor ID filter based on user role
+        $doctorIdFilter = $this->getDoctorIdFilter();
+        
         // Multi-tenancy: No need for clinic_id filter
-        $data = $this->reportsRepository->getReservationsByDoctor(null, $dateFrom, $dateTo);
+        $data = $this->reportsRepository->getReservationsByDoctor($doctorIdFilter, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
@@ -142,7 +153,10 @@ class ReservationReportController extends Controller
         $dateTo = $request->input('date_to');
         $period = $request->input('period', 'month');
 
-        $data = $this->reportsRepository->getReservationsTrend(null, $period, $dateFrom, $dateTo);
+        // Get doctor ID filter based on user role
+        $doctorIdFilter = $this->getDoctorIdFilter();
+
+        $data = $this->reportsRepository->getReservationsTrend($doctorIdFilter, $period, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,

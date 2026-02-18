@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Report;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\DoctorFilterTrait;
 use App\Repositories\Reports\ReportsRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 
 class FinancialReportController extends Controller
 {
+    use DoctorFilterTrait;
     public function __construct(private ReportsRepository $reportsRepository)
     {
         // Permissions can be added here if needed
@@ -67,8 +69,11 @@ class FinancialReportController extends Controller
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
+        // Get doctor ID filter based on user role
+        $doctorIdFilter = $this->getDoctorIdFilter();
+
         // Multi-tenancy: No need for clinic_id, database is already isolated by tenant
-        $data = $this->reportsRepository->getRevenueByDoctor(null, $dateFrom, $dateTo);
+        $data = $this->reportsRepository->getRevenueByDoctor($doctorIdFilter, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,

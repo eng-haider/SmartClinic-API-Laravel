@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\BillRequest;
 use App\Http\Resources\BillResource;
+use App\Http\Controllers\Traits\DoctorFilterTrait;
 use App\Repositories\BillRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 
 class BillController extends Controller
 {
+    use DoctorFilterTrait;
     /**
      * Create a new controller instance
      */
@@ -99,21 +101,21 @@ class BillController extends Controller
      */
     public function update(BillRequest $request, int $id): JsonResponse
     {
-        // try {
-        //     // Multi-tenancy: Database is already isolated by tenant
-        //     $bill = $this->billRepository->update($id, $request->validated(), null);
+        try {
+            // Multi-tenancy: Database is already isolated by tenant
+            $bill = $this->billRepository->update($id, $request->validated());
 
-        //     return response()->json([
-        //         'success' => true,
-        //         'message' => 'Bill updated successfully',
-        //         'data' => new BillResource($bill),
-        //     ]);
-        // } catch (\Exception $e) {
-        //     return response()->json([
-        //         'success' => false,
-        //         'message' => $e->getMessage(),
-        //     ], 422);
-        // }
+            return response()->json([
+                'success' => true,
+                'message' => 'Bill updated successfully',
+                'data' => new BillResource($bill),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 
     /**
@@ -245,21 +247,6 @@ class BillController extends Controller
      * - Super Doctor/Secretary: sees all bills in their tenant database [null]
      * - Doctor: sees ONLY their own bills [user_id]
      */
-    private function getDoctorIdFilter(): ?int
-    {
-        $user = Auth::user();
-        
-        // Super doctor and secretary see all bills in this tenant
-        if ($user->hasRole('clinic_super_doctor') || $user->hasRole('secretary') || $user->hasRole('super_admin')) {
-            return null;
-        }
-        
-        // Doctor sees only their own bills
-        if ($user->hasRole('doctor')) {
-            return $user->id;
-        }
-        
-        // Default: show all bills in this tenant
-        return null;
-    }
+    // NOTE: This method is now provided by DoctorFilterTrait - removed to avoid duplication
 }
+
