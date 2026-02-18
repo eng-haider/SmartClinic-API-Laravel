@@ -267,11 +267,9 @@ class BillRepository
     {
         $query = $this->query();
 
-
         if ($doctorId !== null) {
             $query->where('doctor_id', $doctorId);
         }
-
 
         if (!empty($filters['doctor_id'])) {
             $query->where('doctor_id', $filters['doctor_id']);
@@ -290,6 +288,10 @@ class BillRepository
         // Get cases with same date filter to calculate total case prices
         $casesQuery = CaseModel::query();
         
+        if ($doctorId !== null) {
+            $casesQuery->where('doctor_id', $doctorId);
+        }
+        
         if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
             $casesQuery->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]);
         } elseif (!empty($filters['date_from'])) {
@@ -303,6 +305,10 @@ class BillRepository
 
         // Get expenses with same date filter
         $expensesQuery = ClinicExpense::query();
+        
+        if ($doctorId !== null) {
+            $expensesQuery->where('doctor_id', $doctorId);
+        }
         
         if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
             $expensesQuery->whereBetween('date', [$filters['date_from'], $filters['date_to']]);

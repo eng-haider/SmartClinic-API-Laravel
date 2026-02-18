@@ -223,11 +223,15 @@ class BillController extends Controller
             'date_to' => $request->input('date_to'),
         ];
 
+        // Get doctor ID filter based on user role
+        // If user is a doctor, they see only their own bills
+        // If user is admin/secretary, they can optionally filter by doctor_id from request
         $doctorId = $this->getDoctorIdFilter();
+        if (!$doctorId && $request->has('doctor_id') && $request->input('doctor_id')) {
+            $doctorId = $request->input('doctor_id');
+        }
 
-      
-
-        $statistics = $this->billRepository->getStatisticsWithFilters([], $perPage=15, $doctorId);;
+        $statistics = $this->billRepository->getStatisticsWithFilters($filters, $perPage=15, $doctorId);
 
         return response()->json([
             'success' => true,
