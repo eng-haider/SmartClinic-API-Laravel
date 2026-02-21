@@ -27,9 +27,9 @@ class DemoRegisterController extends Controller
     {
         // --- Validation ---
         $validated = $request->validate([
-            'name'                  => ['required', 'string', 'max:255'],
-            'phone'                 => ['required', 'string', 'max:20'],
-            'password'              => ['required', 'string', 'min:6', 'confirmed'],
+            'user_name'                  => ['required', 'string', 'max:255'],
+            'user_phone'                 => ['required', 'string', 'max:20'],
+            'user_password'              => ['required', 'string', 'min:6', 'confirmed'],
         ]);
 
         try {
