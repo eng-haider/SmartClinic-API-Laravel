@@ -46,7 +46,7 @@ class DemoRegisterController extends Controller
             // --- 3. Check phone uniqueness inside tenant DB ---
             $phoneExists = DB::connection('tenant')
                 ->table('users')
-                ->where('phone', $validated['phone'])
+                ->where('phone', $validated['user_phone'])
                 ->exists();
 
             if ($phoneExists) {
@@ -64,9 +64,9 @@ class DemoRegisterController extends Controller
 
             // --- 6. Create the user inside tenant DB ---
             $user = User::create([
-                'name'      => $validated['name'],
-                'phone'     => $validated['phone'],
-                'password'  => Hash::make($validated['password']),
+                'name'      => $validated['user_name'],
+                'phone'     => $validated['user_phone'],
+                'password'  => Hash::make($validated['user_password']),
                 'is_active' => true,
             ]);
 
