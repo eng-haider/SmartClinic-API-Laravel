@@ -64,11 +64,14 @@ class DemoRegisterController extends Controller
             // TENANCY_DB_PREFIX, turning 'u876784197_tenant_test' into
             // 'u876784197_tenantu876784197_tenant_test'. Instead we use the
             // 'tenant' connection we already configured manually.
+            $hashedPassword = Hash::make($validated['user_password']);
+
             $user = User::on('tenant')->create([
                 'name'      => $validated['user_name'],
                 'phone'     => $validated['user_phone'],
-                'password'  => Hash::make($validated['user_password']),
+                'password'  => $hashedPassword,
                 'is_active' => true,
+                'role'      => 'admin', // role column = 2 (admin enum value)
             ]);
 
             // --- 6. Assign super_admin role on the tenant connection ---
@@ -76,10 +79,39 @@ class DemoRegisterController extends Controller
             $user->setConnection('tenant');
             $user->assignRole('super_admin');
 
-            // --- 7. Reload with roles for the response ---
+            // --- 7. Create matching record in central (main) database ---
+            // Central DB uses a separate users table that drives smartLogin().
+            $centralConnection = config('tenancy.database.central_connection');
+            $centralUserExists = User::on($centralConnection)
+                ->where('phone', $validated['user_phone'])
+                ->exists();
+
+            if (!$centralUserExists) {
+                $centralUser = new User();
+                $centralUser->setConnection($centralConnection);
+                $centralUser->name      = $validated['user_name'];
+                $centralUser->phone     = $validated['user_phone'];
+                $centralUser->password  = $hashedPassword;
+                $centralUser->is_active = true;
+                $centralUser->save();
+
+                // clinic_id links this central user to the tenant_test tenant
+                $centralUser->clinic_id = self::DEMO_TENANT_ID;
+                $centralUser->save();
+
+                // Assign role in central DB as well (needed for smartLogin)
+                $centralUser->assignRole('super_admin');
+
+                Log::info('Central DB user created for demo', [
+                    'central_user_id' => $centralUser->id,
+                    'clinic_id'       => self::DEMO_TENANT_ID,
+                ]);
+            }
+
+            // --- 8. Reload with roles for the response ---
             $user->load(['roles.permissions', 'permissions']);
 
-            // --- 8. Generate JWT token ---
+            // --- 9. Generate JWT token ---
             $token = JWTAuth::fromUser($user);
 
             Log::info('Demo user registered', [
