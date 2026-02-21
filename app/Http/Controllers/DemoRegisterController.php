@@ -152,8 +152,8 @@ class DemoRegisterController extends Controller
             'database.connections.tenant.host'     => $centralConfig['host'],
             'database.connections.tenant.port'     => $centralConfig['port'],
             'database.connections.tenant.database' => $dbName,
-            'database.connections.tenant.username' => $dbUser,
-            'database.connections.tenant.password' => $dbPass,
+            'database.connections.tenant.username' => 'u876784197_tenant_test',
+            'database.connections.tenant.password' => 'Bs@f6kz:6Q4',
         ]);
 
         DB::purge('tenant');
