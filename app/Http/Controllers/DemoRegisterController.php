@@ -59,24 +59,27 @@ class DemoRegisterController extends Controller
             // --- 4. Seed roles/permissions if the tenant DB is fresh ---
             $this->seedIfNeeded();
 
-            // --- 5. Initialize tenancy (switches the default DB connection) ---
-            tenancy()->initialize($tenant);
-
-            // --- 6. Create the user inside tenant DB ---
-            $user = User::create([
+            // --- 5. Create the user directly on the 'tenant' connection ---
+            // We do NOT call tenancy()->initialize() because it re-applies the
+            // TENANCY_DB_PREFIX, turning 'u876784197_tenant_test' into
+            // 'u876784197_tenantu876784197_tenant_test'. Instead we use the
+            // 'tenant' connection we already configured manually.
+            $user = User::on('tenant')->create([
                 'name'      => $validated['user_name'],
                 'phone'     => $validated['user_phone'],
                 'password'  => Hash::make($validated['user_password']),
                 'is_active' => true,
             ]);
 
-            // --- 7. Assign super_admin role ---
+            // --- 6. Assign super_admin role on the tenant connection ---
+            // setConnection ensures Spatie permission queries also use 'tenant'.
+            $user->setConnection('tenant');
             $user->assignRole('super_admin');
 
-            // --- 8. Reload with roles for the response ---
+            // --- 7. Reload with roles for the response ---
             $user->load(['roles.permissions', 'permissions']);
 
-            // --- 9. Generate JWT token ---
+            // --- 8. Generate JWT token ---
             $token = JWTAuth::fromUser($user);
 
             Log::info('Demo user registered', [
