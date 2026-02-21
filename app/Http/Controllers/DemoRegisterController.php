@@ -29,7 +29,7 @@ class DemoRegisterController extends Controller
         $validated = $request->validate([
             'user_name'                  => ['required', 'string', 'max:255'],
             'user_phone'                 => ['required', 'string', 'max:20'],
-            'user_password'              => ['required', 'string', 'min:6', 'confirmed'],
+            'user_password'              => ['required', 'string', 'min:6'],
         ]);
 
         try {
