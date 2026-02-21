@@ -77,7 +77,7 @@ class DemoRegisterController extends Controller
             // --- 6. Assign super_admin role on the tenant connection ---
             // setConnection ensures Spatie permission queries also use 'tenant'.
             $user->setConnection('tenant');
-            $user->assignRole('super_admin');
+            $user->assignRole('clinic_super_doctor');
 
             // --- 7. Create matching record in central (main) database ---
             // Central DB uses a separate users table that drives smartLogin().
@@ -96,11 +96,11 @@ class DemoRegisterController extends Controller
                 $centralUser->save();
 
                 // clinic_id links this central user to the tenant_test tenant
-                $centralUser->clinic_id = self::DEMO_TENANT_ID;
+                $centralUser->clinic_id = '_test';
                 $centralUser->save();
 
                 // Assign role in central DB as well (needed for smartLogin)
-                $centralUser->assignRole('super_admin');
+                $centralUser->assignRole('clinic_super_doctor');
 
                 Log::info('Central DB user created for demo', [
                     'central_user_id' => $centralUser->id,
