@@ -116,44 +116,50 @@ class DemoRegisterController extends Controller
     /**
      * Create the tenant_test record in the central DB.
      * The actual MySQL database must already exist on the server.
+     * Credentials are read from env: DEMO_DB_NAME, DEMO_DB_USERNAME, DEMO_DB_PASSWORD
      */
     private function createDemoTenantRecord(): Tenant
     {
-        $dbName   = self::DEMO_TENANT_ID; // DB name = 'tenant_test'
-        $dbUser   = config('database.connections.mysql.username');
-        $dbPass   = config('database.connections.mysql.password');
+        $dbName = env('DEMO_DB_NAME',     'tenant_test');
+        $dbUser = env('DEMO_DB_USERNAME', config('database.connections.mysql.username'));
+        $dbPass = env('DEMO_DB_PASSWORD', config('database.connections.mysql.password'));
 
         $tenant = new Tenant();
         $tenant->id          = self::DEMO_TENANT_ID;
         $tenant->name        = 'Demo Clinic';
-        $tenant->address     = 'Demo Address';
+        $tenant->address     = 'Demo Clinic Address';
         $tenant->db_name     = $dbName;
         $tenant->db_username = $dbUser;
         $tenant->db_password = $dbPass;
         $tenant->saveQuietly();
 
-        Log::info('Created tenant_test tenant record', ['db_name' => $dbName]);
+        Log::info('Created tenant_test tenant record', [
+            'db_name'     => $dbName,
+            'db_username' => $dbUser,
+        ]);
 
         return $tenant->fresh();
     }
 
     /**
      * Configure the 'tenant' DB connection to point at tenant_test.
+     * Uses credentials stored in the tenant record (data JSON column).
      */
     private function configureTenantConnection(Tenant $tenant): void
     {
         $centralConfig = config('database.connections.' . config('tenancy.database.central_connection'));
 
-        $dbName   = $tenant->db_name   ?? self::DEMO_TENANT_ID;
-        $dbUser   = $tenant->db_username ?? $centralConfig['username'];
-        $dbPass   = $tenant->db_password ?? $centralConfig['password'];
+        // Read credentials from the tenant record's data JSON column
+        $dbName = $tenant->db_name     ?? self::DEMO_TENANT_ID;
+        $dbUser = $tenant->db_username ?? $centralConfig['username'];
+        $dbPass = $tenant->db_password ?? $centralConfig['password'];
 
         config([
             'database.connections.tenant.host'     => $centralConfig['host'],
             'database.connections.tenant.port'     => $centralConfig['port'],
             'database.connections.tenant.database' => $dbName,
-            'database.connections.tenant.username' => 'u876784197_tenant_test',
-            'database.connections.tenant.password' => 'Bs@f6kz:6Q4',
+            'database.connections.tenant.username' => $dbUser,
+            'database.connections.tenant.password' => $dbPass,
         ]);
 
         DB::purge('tenant');
