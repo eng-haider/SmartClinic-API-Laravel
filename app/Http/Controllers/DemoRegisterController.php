@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Tenant;
 use App\Models\User;
+use App\Http\Resources\UserResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -123,15 +124,12 @@ class DemoRegisterController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Demo account created successfully.',
+                'message_ar' => 'تم إنشاء الحساب التجريبي بنجاح',
                 'data'    => [
-                    'user'      => [
-                        'id'    => $user->id,
-                        'name'  => $user->name,
-                        'phone' => $user->phone,
-                        'roles' => $user->getRoleNames(),
-                    ],
-                    'tenant_id' => self::DEMO_TENANT_ID,
-                    'token'     => $token,
+                    'user'        => new UserResource($user),
+                    'token'       => $token,
+                    'tenant_id'   => self::DEMO_TENANT_ID,
+                    'clinic_name' => 'Demo Clinic',
                 ],
             ], 201);
 
