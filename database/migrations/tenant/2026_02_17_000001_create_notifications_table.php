@@ -56,16 +56,15 @@ return new class extends Migration
         } else {
             // Table already exists — safely add any missing indexes
             Schema::table('notifications', function (Blueprint $table) {
-                $sm = Schema::getConnection()->getDoctrineSchemaManager();
-                $indexes = array_keys($sm->listTableIndexes('notifications'));
+                $existingIndexes = array_column(Schema::getIndexes('notifications'), 'name');
 
-                if (!in_array('notifications_notifiable_type_notifiable_id_index', $indexes)) {
+                if (!in_array('notifications_notifiable_type_notifiable_id_index', $existingIndexes)) {
                     $table->index(['notifiable_type', 'notifiable_id']);
                 }
-                if (!in_array('notifications_is_read_created_at_index', $indexes)) {
+                if (!in_array('notifications_is_read_created_at_index', $existingIndexes)) {
                     $table->index(['is_read', 'created_at']);
                 }
-                if (!in_array('notifications_type_created_at_index', $indexes)) {
+                if (!in_array('notifications_type_created_at_index', $existingIndexes)) {
                     $table->index(['type', 'created_at']);
                 }
             });
