@@ -22,6 +22,7 @@ class TenantDatabaseSeeder extends Seeder
             TenantStatusesSeeder::class,
             TenantCaseCategoriesSeeder::class,
             TenantClinicSettingsSeeder::class, // Initialize clinic settings
+            ReservationTypeSeeder::class,       // Initialize reservation types
         ]);
     }
 }

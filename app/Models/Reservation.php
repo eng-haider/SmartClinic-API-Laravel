@@ -20,6 +20,8 @@ class Reservation extends Model
         'patient_id',
         'doctor_id',
         'status_id',
+        'reservation_type_id',
+        'reservation_type_note',
         'notes',
         'reservation_start_date',
         'reservation_end_date',
@@ -41,6 +43,7 @@ class Reservation extends Model
             'patient_id' => 'integer',
             'doctor_id' => 'integer',
             'status_id' => 'integer',
+            'reservation_type_id' => 'integer',
             'creator_id' => 'integer',
             'updator_id' => 'integer',
             'reservation_start_date' => 'date',
@@ -96,6 +99,14 @@ class Reservation extends Model
     public function status()
     {
         return $this->belongsTo(Status::class);
+    }
+
+    /**
+     * Get the type of the reservation.
+     */
+    public function reservationType()
+    {
+        return $this->belongsTo(ReservationType::class);
     }
 
     /**
