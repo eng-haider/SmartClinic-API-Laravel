@@ -63,6 +63,7 @@ class ReservationRepository
                 'patient',
                 'doctor',
                 'status',
+                'reservationType',
             ])
             ->defaultSort('-reservation_start_date');
     }
