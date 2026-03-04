@@ -49,25 +49,28 @@ return new class extends Migration
                 $table->softDeletes();
 
                 // Indexes for performance
-                $table->index(['notifiable_type', 'notifiable_id']);
+                // Note: morphs() already adds an index on (notifiable_type, notifiable_id)
                 $table->index(['is_read', 'created_at']);
                 $table->index(['type', 'created_at']);
             });
         } else {
-            // Table already exists — safely add any missing indexes
-            Schema::table('notifications', function (Blueprint $table) {
-                $existingIndexes = array_column(Schema::getIndexes('notifications'), 'name');
+            // Table already exists — safely add any missing indexes using try/catch
+            // to handle cases where Schema::getIndexes() may not reflect actual DB state
+            $indexesToAdd = [
+                ['columns' => ['notifiable_type', 'notifiable_id'], 'name' => 'notifications_notifiable_type_notifiable_id_index'],
+                ['columns' => ['is_read', 'created_at'],            'name' => 'notifications_is_read_created_at_index'],
+                ['columns' => ['type', 'created_at'],               'name' => 'notifications_type_created_at_index'],
+            ];
 
-                if (!in_array('notifications_notifiable_type_notifiable_id_index', $existingIndexes)) {
-                    $table->index(['notifiable_type', 'notifiable_id']);
+            foreach ($indexesToAdd as $idx) {
+                try {
+                    Schema::table('notifications', function (Blueprint $table) use ($idx) {
+                        $table->index($idx['columns'], $idx['name']);
+                    });
+                } catch (\Exception $e) {
+                    // Index already exists — skip silently
                 }
-                if (!in_array('notifications_is_read_created_at_index', $existingIndexes)) {
-                    $table->index(['is_read', 'created_at']);
-                }
-                if (!in_array('notifications_type_created_at_index', $existingIndexes)) {
-                    $table->index(['type', 'created_at']);
-                }
-            });
+            }
         }
     }
 
