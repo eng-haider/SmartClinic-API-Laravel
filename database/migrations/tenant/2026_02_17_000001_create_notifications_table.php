@@ -11,47 +11,65 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('notifications', function (Blueprint $table) {
-            $table->id();
-            
-            // Polymorphic relationship - can notify any model (User, Patient, etc.)
-            $table->morphs('notifiable');
-            
-            // Notification content
-            $table->string('title');
-            $table->text('body');
-            $table->string('type')->default('general'); // general, appointment, payment, case, etc.
-            
-            // Additional data (JSON format for flexibility)
-            $table->json('data')->nullable();
-            
-            // OneSignal integration
-            $table->string('onesignal_notification_id')->nullable();
-            $table->enum('onesignal_status', ['pending', 'sent', 'failed'])->default('pending');
-            $table->text('onesignal_error')->nullable();
-            
-            // Read status
-            $table->boolean('is_read')->default(false);
-            $table->timestamp('read_at')->nullable();
-            
-            // Sender information (optional - who triggered this notification)
-            $table->unsignedBigInteger('sender_id')->nullable();
-            $table->foreign('sender_id')->references('id')->on('users')->onDelete('set null');
-            
-            // Priority level
-            $table->enum('priority', ['low', 'medium', 'high', 'urgent'])->default('medium');
-            
-            // Action URL or deep link
-            $table->string('action_url')->nullable();
-            
-            $table->timestamps();
-            $table->softDeletes();
-            
-            // Indexes for performance
-            $table->index(['notifiable_type', 'notifiable_id']);
-            $table->index(['is_read', 'created_at']);
-            $table->index(['type', 'created_at']);
-        });
+        if (!Schema::hasTable('notifications')) {
+            Schema::create('notifications', function (Blueprint $table) {
+                $table->id();
+
+                // Polymorphic relationship - can notify any model (User, Patient, etc.)
+                $table->morphs('notifiable');
+
+                // Notification content
+                $table->string('title');
+                $table->text('body');
+                $table->string('type')->default('general'); // general, appointment, payment, case, etc.
+
+                // Additional data (JSON format for flexibility)
+                $table->json('data')->nullable();
+
+                // OneSignal integration
+                $table->string('onesignal_notification_id')->nullable();
+                $table->enum('onesignal_status', ['pending', 'sent', 'failed'])->default('pending');
+                $table->text('onesignal_error')->nullable();
+
+                // Read status
+                $table->boolean('is_read')->default(false);
+                $table->timestamp('read_at')->nullable();
+
+                // Sender information (optional - who triggered this notification)
+                $table->unsignedBigInteger('sender_id')->nullable();
+                $table->foreign('sender_id')->references('id')->on('users')->onDelete('set null');
+
+                // Priority level
+                $table->enum('priority', ['low', 'medium', 'high', 'urgent'])->default('medium');
+
+                // Action URL or deep link
+                $table->string('action_url')->nullable();
+
+                $table->timestamps();
+                $table->softDeletes();
+
+                // Indexes for performance
+                $table->index(['notifiable_type', 'notifiable_id']);
+                $table->index(['is_read', 'created_at']);
+                $table->index(['type', 'created_at']);
+            });
+        } else {
+            // Table already exists — safely add any missing indexes
+            Schema::table('notifications', function (Blueprint $table) {
+                $sm = Schema::getConnection()->getDoctrineSchemaManager();
+                $indexes = array_keys($sm->listTableIndexes('notifications'));
+
+                if (!in_array('notifications_notifiable_type_notifiable_id_index', $indexes)) {
+                    $table->index(['notifiable_type', 'notifiable_id']);
+                }
+                if (!in_array('notifications_is_read_created_at_index', $indexes)) {
+                    $table->index(['is_read', 'created_at']);
+                }
+                if (!in_array('notifications_type_created_at_index', $indexes)) {
+                    $table->index(['type', 'created_at']);
+                }
+            });
+        }
     }
 
     /**
