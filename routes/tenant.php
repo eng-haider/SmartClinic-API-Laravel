@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 use App\Http\Middleware\InitializeTenancyByHeader;
+use App\Http\Middleware\InitializeTenancyByPatientToken;
 
 // Controllers
 use App\Http\Controllers\AuthController;
@@ -44,6 +45,20 @@ use App\Http\Controllers\Report\FinancialReportController;
 */
 
 // ============================================
+// PUBLIC PATIENT ROUTES (No auth required)
+// Tenant resolved automatically from patient token
+// Also supports: ?clinic=ID or X-Tenant-ID header
+// ============================================
+Route::middleware(['api', InitializeTenancyByPatientToken::class])
+    ->prefix('api/tenant/public/patients')
+    ->group(function () {
+        Route::get('/{token}', [PublicPatientController::class, 'show']);
+        Route::get('/{token}/cases', [PublicPatientController::class, 'cases']);
+        Route::get('/{token}/images', [PublicPatientController::class, 'images']);
+        Route::get('/{token}/reservations', [PublicPatientController::class, 'reservations']);
+    });
+
+// ============================================
 // TENANT API ROUTES (Initialized by Header)
 // Use X-Tenant-ID or X-Clinic-ID header
 // ============================================
@@ -55,10 +70,6 @@ Route::middleware([
     // Auth routes
     Route::post('auth/register', [AuthController::class, 'register']);
     Route::post('auth/login', [AuthController::class, 'login']);
-    
-    // Public patient routes (no authentication required)
-    // Tenant ID passed as query parameter for QR code links: ?clinic={tenant_id}
-
     
     Route::middleware('jwt')->group(function () {
         Route::get('auth/me', [AuthController::class, 'me']);

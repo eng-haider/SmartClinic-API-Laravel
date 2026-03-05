@@ -220,11 +220,16 @@ class Patient extends Model
     /**
      * Get the public profile URL.
      *
+     * Includes ?clinic={tenant_id} so the API can resolve the tenant
+     * without requiring the caller to pass a header.
+     *
      * @return string
      */
     public function getPublicProfileUrlAttribute(): string
     {
-        return config('app.url') . '/api/public/patients/' . $this->public_token;
+        $tenantId = tenant('id');
+        $base = config('app.url') . '/api/tenant/public/patients/' . $this->public_token;
+        return $tenantId ? $base . '?clinic=' . $tenantId : $base;
     }
 
     /**
