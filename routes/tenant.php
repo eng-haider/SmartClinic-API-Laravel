@@ -58,12 +58,7 @@ Route::middleware([
     
     // Public patient routes (no authentication required)
     // Tenant ID passed as query parameter for QR code links: ?clinic={tenant_id}
-    Route::prefix('public/patients')->group(function () {
-        Route::get('/{token}', [PublicPatientController::class, 'show']);
-        Route::get('/{token}/cases', [PublicPatientController::class, 'cases']);
-        Route::get('/{token}/images', [PublicPatientController::class, 'images']);
-        Route::get('/{token}/reservations', [PublicPatientController::class, 'reservations']);
-    });
+
     
     Route::middleware('jwt')->group(function () {
         Route::get('auth/me', [AuthController::class, 'me']);
