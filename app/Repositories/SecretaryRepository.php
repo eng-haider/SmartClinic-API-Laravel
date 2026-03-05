@@ -52,11 +52,12 @@ class SecretaryRepository
      */
     public function findInClinic(int $id): ?User
     {
-        $query = User::on('mysql')->where('id', $id)
-            
-            ->with(['permissions', 'roles']);
-
-        return $query->first();
+        return User::where('id', $id)
+            ->whereHas('roles', function ($query) {
+                $query->where('name', 'secretary');
+            })
+            ->with(['permissions', 'roles'])
+            ->first();
     }
 
     /**
