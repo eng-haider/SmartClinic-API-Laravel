@@ -27,23 +27,23 @@ class ReservationResource extends JsonResource
             'reservation_to_time' => $this->reservation_to_time,
             'is_waiting' => $this->is_waiting,
             'patient' => $this->when($this->relationLoaded('patient'), function () {
-                return [
+                return $this->patient ? [
                     'id' => $this->patient->id,
                     'name' => $this->patient->name,
                     'phone' => $this->patient->phone,
-                ];
+                ] : null;
             }),
             'doctor' => $this->when($this->relationLoaded('doctor'), function () {
-                return [
+                return $this->doctor ? [
                     'id' => $this->doctor->id,
                     'name' => $this->doctor->name,
-                ];
+                ] : null;
             }),
             'status' => $this->when($this->relationLoaded('status'), function () {
-                return [
+                return $this->status ? [
                     'id' => $this->status->id,
                     'name' => $this->status->name,
-                ];
+                ] : null;
             }),
             'creator_id' => $this->creator_id,
             'updator_id' => $this->updator_id,
