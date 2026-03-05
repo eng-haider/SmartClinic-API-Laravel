@@ -47,12 +47,14 @@ Route::prefix('tenants')->group(function () {
 // PUBLIC PATIENT PROFILE ROUTES (No authentication required)
 // These routes are accessed via QR code scanning
 // ============================================
-Route::prefix('public/patients')->group(function () {
-    Route::get('/{token}', [PublicPatientController::class, 'show'])->name('public.patients.show');
-    Route::get('/{token}/cases', [PublicPatientController::class, 'cases'])->name('public.patients.cases');
-    Route::get('/{token}/images', [PublicPatientController::class, 'images'])->name('public.patients.images');
-    Route::get('/{token}/reservations', [PublicPatientController::class, 'reservations'])->name('public.patients.reservations');
-});
+Route::prefix('public/patients')
+    ->withoutMiddleware(\App\Http\Middleware\InitializeTenancyByHeader::class)
+    ->group(function () {
+        Route::get('/{token}', [PublicPatientController::class, 'show'])->name('public.patients.show');
+        Route::get('/{token}/cases', [PublicPatientController::class, 'cases'])->name('public.patients.cases');
+        Route::get('/{token}/images', [PublicPatientController::class, 'images'])->name('public.patients.images');
+        Route::get('/{token}/reservations', [PublicPatientController::class, 'reservations'])->name('public.patients.reservations');
+    });
 
 // ============================================
 // PUBLIC AUTH ROUTES (No authentication required)
