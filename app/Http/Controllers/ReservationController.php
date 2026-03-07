@@ -96,6 +96,13 @@ class ReservationController extends Controller
             ], 404);
         }
 
+        // Auto-mark as Completed (status_id=3) when opened, unless already Completed or Cancelled
+        // Pending=1, In Progress=2 → auto-advance to Completed=3; Completed=3, Cancelled=4 → untouched
+        if (in_array($reservation->status_id, [1, 2])) {
+            $reservation->update(['status_id' => 3]);
+            $reservation = $reservation->fresh(['patient', 'doctor', 'status']);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Reservation retrieved successfully',
