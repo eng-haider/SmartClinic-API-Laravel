@@ -20,7 +20,7 @@ class CaseController extends Controller
         $this->middleware('permission:create-case')->only(['store']);
         $this->middleware('permission:view-clinic-cases')->only(['show']);
         $this->middleware('permission:edit-case')->only(['update']);
-        $this->middleware('permission:delete-case')->only(['destroy']);
+        // $this->middleware('permission:delete-case')->only(['destroy']);
     }
 
     /**
