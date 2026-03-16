@@ -17,6 +17,8 @@ use Spatie\Permission\Models\Role;
 
 class MinaNewMigrationSeeder extends Seeder
 {
+
+
     /**
      * ============================================================
      * CONFIGURATION
@@ -411,7 +413,7 @@ class MinaNewMigrationSeeder extends Seeder
                         'identifier' => $oldPatient->identifier ?? null,
                         'credit_balance' => $oldPatient->credit_balance ?? null,
                         'credit_balance_add_at' => $oldPatient->credit_balance_add_at ?? null,
-                        'tooth_details' => $oldPatient->tooth_parts ? json_decode($oldPatient->tooth_parts, true) : null,
+                        'tooth_details' => $oldPatient->tooth_parts ? $this->convertToothParts($oldPatient->tooth_parts) : null,
                         'public_token' => Str::uuid()->toString(),
                     ]);
                 });
@@ -650,4 +652,254 @@ class MinaNewMigrationSeeder extends Seeder
         $this->billCount = $count;
         $this->command->info("   ✓ Migrated {$count} bills ({$skipped} skipped, {$errors} errors)");
     }
+
+    /**
+     * Convert old tooth_parts format to new tooth_details format.
+     * Old: [{"tooth_number":18,"tooth_id":"tooth-35","part_id":1,"color":"#FF5252"}]
+     * New: [{"tooth_number":18,"tooth_id":"tooth-18","part_id":6,"color":"#FF5252"}]
+     */
+    private function convertToothParts(string $json): ?array
+    {
+        $parts = json_decode($json, true);
+        if (!is_array($parts)) {
+            return null;
+        }
+
+        $validFdi = [11,12,13,14,15,16,17,18,21,22,23,24,25,26,27,28,
+                     31,32,33,34,35,36,37,38,41,42,43,44,45,46,47,48];
+
+        $mapped = [];
+        foreach ($parts as $p) {
+            $oldToothId = $p['tooth_id'] ?? null;
+            $toothNumber = (int)($p['tooth_number'] ?? 0);
+
+            // Check if already in new format
+            if ($oldToothId === "tooth-{$toothNumber}" && in_array($toothNumber, $validFdi)) {
+                $mapped[] = $p;
+                continue;
+            }
+
+            // Look up in mapping
+            if ($oldToothId && isset(self::OLD_TO_NEW[$oldToothId])) {
+                $m = self::OLD_TO_NEW[$oldToothId];
+                $mapped[] = [
+                    'tooth_number' => (int)str_replace('tooth-', '', $m['toothId']),
+                    'tooth_id'     => $m['toothId'],
+                    'part_id'      => $m['partId'],
+                    'color'        => $p['color'] ?? '#FF5252',
+                ];
+            }
+            // Entries not in mapping are skipped (outline/background paths)
+        }
+
+        return empty($mapped) ? null : $mapped;
+    }
+
+    private const OLD_TO_NEW = [
+        'tooth-100' => ['toothId' => 'tooth-25', 'partId' => 2],
+        'tooth-101' => ['toothId' => 'tooth-25', 'partId' => 3],
+        'tooth-102' => ['toothId' => 'tooth-25', 'partId' => 4],
+        'tooth-103' => ['toothId' => 'tooth-25', 'partId' => 1],
+        'tooth-105' => ['toothId' => 'tooth-25', 'partId' => 6],
+        'tooth-107' => ['toothId' => 'tooth-13', 'partId' => 2],
+        'tooth-109' => ['toothId' => 'tooth-12', 'partId' => 2],
+        'tooth-10'  => ['toothId' => 'tooth-14', 'partId' => 2],
+        'tooth-111' => ['toothId' => 'tooth-22', 'partId' => 2],
+        'tooth-110' => ['toothId' => 'tooth-22', 'partId' => 2],
+        'tooth-112' => ['toothId' => 'tooth-13', 'partId' => 5],
+        'tooth-113' => ['toothId' => 'tooth-12', 'partId' => 5],
+        'tooth-114' => ['toothId' => 'tooth-11', 'partId' => 5],
+        'tooth-115' => ['toothId' => 'tooth-22', 'partId' => 5],
+        'tooth-116' => ['toothId' => 'tooth-23', 'partId' => 5],
+        'tooth-117' => ['toothId' => 'tooth-14', 'partId' => 5],
+        'tooth-118' => ['toothId' => 'tooth-24', 'partId' => 5],
+        'tooth-119' => ['toothId' => 'tooth-25', 'partId' => 5],
+        'tooth-120' => ['toothId' => 'tooth-18', 'partId' => 5],
+        'tooth-122' => ['toothId' => 'tooth-16', 'partId' => 5],
+        'tooth-123' => ['toothId' => 'tooth-27', 'partId' => 5],
+        'tooth-124' => ['toothId' => 'tooth-28', 'partId' => 5],
+        'tooth-126' => ['toothId' => 'tooth-15', 'partId' => 5],
+        'tooth-127' => ['toothId' => 'tooth-15', 'partId' => 2],
+        'tooth-128' => ['toothId' => 'tooth-15', 'partId' => 3],
+        'tooth-129' => ['toothId' => 'tooth-15', 'partId' => 4],
+        'tooth-131' => ['toothId' => 'tooth-15', 'partId' => 1],
+        'tooth-132' => ['toothId' => 'tooth-15', 'partId' => 6],
+        'tooth-134' => ['toothId' => 'tooth-26', 'partId' => 5],
+        'tooth-136' => ['toothId' => 'tooth-21', 'partId' => 5],
+        'tooth-137' => ['toothId' => 'tooth-21', 'partId' => 2],
+        'tooth-138' => ['toothId' => 'tooth-21', 'partId' => 2],
+        'tooth-139' => ['toothId' => 'tooth-21', 'partId' => 3],
+        'tooth-13'  => ['toothId' => 'tooth-12', 'partId' => 6],
+        'tooth-140' => ['toothId' => 'tooth-21', 'partId' => 4],
+        'tooth-142' => ['toothId' => 'tooth-21', 'partId' => 1],
+        'tooth-143' => ['toothId' => 'tooth-21', 'partId' => 6],
+        'tooth-145' => ['toothId' => 'tooth-48', 'partId' => 5],
+        'tooth-146' => ['toothId' => 'tooth-48', 'partId' => 2],
+        'tooth-147' => ['toothId' => 'tooth-48', 'partId' => 3],
+        'tooth-148' => ['toothId' => 'tooth-48', 'partId' => 4],
+        'tooth-149' => ['toothId' => 'tooth-48', 'partId' => 1],
+        'tooth-151' => ['toothId' => 'tooth-47', 'partId' => 5],
+        'tooth-152' => ['toothId' => 'tooth-47', 'partId' => 2],
+        'tooth-153' => ['toothId' => 'tooth-47', 'partId' => 3],
+        'tooth-154' => ['toothId' => 'tooth-47', 'partId' => 4],
+        'tooth-155' => ['toothId' => 'tooth-47', 'partId' => 1],
+        'tooth-156' => ['toothId' => 'tooth-46', 'partId' => 5],
+        'tooth-157' => ['toothId' => 'tooth-46', 'partId' => 5],
+        'tooth-158' => ['toothId' => 'tooth-46', 'partId' => 2],
+        'tooth-159' => ['toothId' => 'tooth-46', 'partId' => 3],
+        'tooth-15'  => ['toothId' => 'tooth-11', 'partId' => 6],
+        'tooth-160' => ['toothId' => 'tooth-46', 'partId' => 4],
+        'tooth-161' => ['toothId' => 'tooth-36', 'partId' => 1],
+        'tooth-162' => ['toothId' => 'tooth-36', 'partId' => 5],
+        'tooth-163' => ['toothId' => 'tooth-36', 'partId' => 2],
+        'tooth-164' => ['toothId' => 'tooth-36', 'partId' => 3],
+        'tooth-165' => ['toothId' => 'tooth-36', 'partId' => 4],
+        'tooth-166' => ['toothId' => 'tooth-36', 'partId' => 1],
+        'tooth-168' => ['toothId' => 'tooth-37', 'partId' => 5],
+        'tooth-169' => ['toothId' => 'tooth-37', 'partId' => 2],
+        'tooth-170' => ['toothId' => 'tooth-37', 'partId' => 3],
+        'tooth-171' => ['toothId' => 'tooth-37', 'partId' => 4],
+        'tooth-172' => ['toothId' => 'tooth-37', 'partId' => 1],
+        'tooth-174' => ['toothId' => 'tooth-38', 'partId' => 5],
+        'tooth-175' => ['toothId' => 'tooth-38', 'partId' => 2],
+        'tooth-176' => ['toothId' => 'tooth-38', 'partId' => 3],
+        'tooth-177' => ['toothId' => 'tooth-38', 'partId' => 4],
+        'tooth-178' => ['toothId' => 'tooth-38', 'partId' => 1],
+        'tooth-179' => ['toothId' => 'tooth-47', 'partId' => 6],
+        'tooth-17'  => ['toothId' => 'tooth-22', 'partId' => 6],
+        'tooth-180' => ['toothId' => 'tooth-46', 'partId' => 6],
+        'tooth-181' => ['toothId' => 'tooth-36', 'partId' => 6],
+        'tooth-182' => ['toothId' => 'tooth-37', 'partId' => 1],
+        'tooth-184' => ['toothId' => 'tooth-48', 'partId' => 6],
+        'tooth-185' => ['toothId' => 'tooth-38', 'partId' => 6],
+        'tooth-189' => ['toothId' => 'tooth-43', 'partId' => 2],
+        'tooth-190' => ['toothId' => 'tooth-43', 'partId' => 3],
+        'tooth-191' => ['toothId' => 'tooth-43', 'partId' => 4],
+        'tooth-192' => ['toothId' => 'tooth-43', 'partId' => 1],
+        'tooth-194' => ['toothId' => 'tooth-33', 'partId' => 5],
+        'tooth-196' => ['toothId' => 'tooth-33', 'partId' => 2],
+        'tooth-197' => ['toothId' => 'tooth-33', 'partId' => 3],
+        'tooth-198' => ['toothId' => 'tooth-33', 'partId' => 4],
+        'tooth-199' => ['toothId' => 'tooth-33', 'partId' => 1],
+        'tooth-202' => ['toothId' => 'tooth-34', 'partId' => 5],
+        'tooth-203' => ['toothId' => 'tooth-34', 'partId' => 2],
+        'tooth-204' => ['toothId' => 'tooth-34', 'partId' => 3],
+        'tooth-205' => ['toothId' => 'tooth-34', 'partId' => 4],
+        'tooth-206' => ['toothId' => 'tooth-34', 'partId' => 1],
+        'tooth-208' => ['toothId' => 'tooth-35', 'partId' => 5],
+        'tooth-209' => ['toothId' => 'tooth-35', 'partId' => 2],
+        'tooth-210' => ['toothId' => 'tooth-35', 'partId' => 3],
+        'tooth-211' => ['toothId' => 'tooth-35', 'partId' => 4],
+        'tooth-212' => ['toothId' => 'tooth-35', 'partId' => 1],
+        'tooth-216' => ['toothId' => 'tooth-42', 'partId' => 5],
+        'tooth-218' => ['toothId' => 'tooth-42', 'partId' => 2],
+        'tooth-219' => ['toothId' => 'tooth-42', 'partId' => 3],
+        'tooth-21'  => ['toothId' => 'tooth-17', 'partId' => 7],
+        'tooth-220' => ['toothId' => 'tooth-42', 'partId' => 4],
+        'tooth-221' => ['toothId' => 'tooth-42', 'partId' => 1],
+        'tooth-223' => ['toothId' => 'tooth-41', 'partId' => 5],
+        'tooth-225' => ['toothId' => 'tooth-41', 'partId' => 2],
+        'tooth-226' => ['toothId' => 'tooth-41', 'partId' => 3],
+        'tooth-227' => ['toothId' => 'tooth-41', 'partId' => 4],
+        'tooth-228' => ['toothId' => 'tooth-41', 'partId' => 1],
+        'tooth-229' => ['toothId' => 'tooth-31', 'partId' => 1],
+        'tooth-22'  => ['toothId' => 'tooth-27', 'partId' => 7],
+        'tooth-230' => ['toothId' => 'tooth-31', 'partId' => 5],
+        'tooth-232' => ['toothId' => 'tooth-31', 'partId' => 2],
+        'tooth-233' => ['toothId' => 'tooth-31', 'partId' => 3],
+        'tooth-234' => ['toothId' => 'tooth-31', 'partId' => 4],
+        'tooth-235' => ['toothId' => 'tooth-31', 'partId' => 1],
+        'tooth-237' => ['toothId' => 'tooth-32', 'partId' => 5],
+        'tooth-239' => ['toothId' => 'tooth-32', 'partId' => 2],
+        'tooth-240' => ['toothId' => 'tooth-32', 'partId' => 3],
+        'tooth-241' => ['toothId' => 'tooth-32', 'partId' => 4],
+        'tooth-242' => ['toothId' => 'tooth-32', 'partId' => 1],
+        'tooth-243' => ['toothId' => 'tooth-43', 'partId' => 6],
+        'tooth-244' => ['toothId' => 'tooth-33', 'partId' => 6],
+        'tooth-247' => ['toothId' => 'tooth-45', 'partId' => 5],
+        'tooth-248' => ['toothId' => 'tooth-45', 'partId' => 2],
+        'tooth-249' => ['toothId' => 'tooth-45', 'partId' => 3],
+        'tooth-250' => ['toothId' => 'tooth-45', 'partId' => 4],
+        'tooth-251' => ['toothId' => 'tooth-45', 'partId' => 1],
+        'tooth-253' => ['toothId' => 'tooth-44', 'partId' => 5],
+        'tooth-254' => ['toothId' => 'tooth-44', 'partId' => 2],
+        'tooth-255' => ['toothId' => 'tooth-44', 'partId' => 3],
+        'tooth-256' => ['toothId' => 'tooth-44', 'partId' => 4],
+        'tooth-257' => ['toothId' => 'tooth-44', 'partId' => 1],
+        'tooth-259' => ['toothId' => 'tooth-46', 'partId' => 1],
+        'tooth-25'  => ['toothId' => 'tooth-16', 'partId' => 1],
+        'tooth-260' => ['toothId' => 'tooth-42', 'partId' => 6],
+        'tooth-261' => ['toothId' => 'tooth-32', 'partId' => 6],
+        'tooth-262' => ['toothId' => 'tooth-45', 'partId' => 6],
+        'tooth-264' => ['toothId' => 'tooth-35', 'partId' => 6],
+        'tooth-266' => ['toothId' => 'tooth-41', 'partId' => 6],
+        'tooth-267' => ['toothId' => 'tooth-31', 'partId' => 6],
+        'tooth-269' => ['toothId' => 'tooth-44', 'partId' => 6],
+        'tooth-26'  => ['toothId' => 'tooth-26', 'partId' => 1],
+        'tooth-270' => ['toothId' => 'tooth-34', 'partId' => 6],
+        'tooth-27'  => ['toothId' => 'tooth-17', 'partId' => 7],
+        'tooth-28'  => ['toothId' => 'tooth-17', 'partId' => 6],
+        'tooth-29'  => ['toothId' => 'tooth-27', 'partId' => 6],
+        'tooth-2'   => ['toothId' => 'tooth-14', 'partId' => 6],
+        'tooth-31'  => ['toothId' => 'tooth-18', 'partId' => 7],
+        'tooth-32'  => ['toothId' => 'tooth-28', 'partId' => 7],
+        'tooth-33'  => ['toothId' => 'tooth-16', 'partId' => 1],
+        'tooth-34'  => ['toothId' => 'tooth-26', 'partId' => 7],
+        'tooth-35'  => ['toothId' => 'tooth-18', 'partId' => 6],
+        'tooth-36'  => ['toothId' => 'tooth-28', 'partId' => 6],
+        'tooth-37'  => ['toothId' => 'tooth-18', 'partId' => 7],
+        'tooth-38'  => ['toothId' => 'tooth-28', 'partId' => 7],
+        'tooth-47'  => ['toothId' => 'tooth-16', 'partId' => 7],
+        'tooth-48'  => ['toothId' => 'tooth-18', 'partId' => 4],
+        'tooth-49'  => ['toothId' => 'tooth-17', 'partId' => 4],
+        'tooth-50'  => ['toothId' => 'tooth-16', 'partId' => 1],
+        'tooth-51'  => ['toothId' => 'tooth-14', 'partId' => 1],
+        'tooth-52'  => ['toothId' => 'tooth-24', 'partId' => 1],
+        'tooth-53'  => ['toothId' => 'tooth-26', 'partId' => 4],
+        'tooth-54'  => ['toothId' => 'tooth-27', 'partId' => 4],
+        'tooth-55'  => ['toothId' => 'tooth-28', 'partId' => 4],
+        'tooth-56'  => ['toothId' => 'tooth-13', 'partId' => 1],
+        'tooth-57'  => ['toothId' => 'tooth-12', 'partId' => 1],
+        'tooth-58'  => ['toothId' => 'tooth-11', 'partId' => 1],
+        'tooth-59'  => ['toothId' => 'tooth-22', 'partId' => 1],
+        'tooth-60'  => ['toothId' => 'tooth-23', 'partId' => 1],
+        'tooth-61'  => ['toothId' => 'tooth-14', 'partId' => 4],
+        'tooth-62'  => ['toothId' => 'tooth-14', 'partId' => 3],
+        'tooth-63'  => ['toothId' => 'tooth-24', 'partId' => 4],
+        'tooth-64'  => ['toothId' => 'tooth-24', 'partId' => 3],
+        'tooth-65'  => ['toothId' => 'tooth-18', 'partId' => 1],
+        'tooth-66'  => ['toothId' => 'tooth-18', 'partId' => 3],
+        'tooth-67'  => ['toothId' => 'tooth-17', 'partId' => 1],
+        'tooth-68'  => ['toothId' => 'tooth-17', 'partId' => 3],
+        'tooth-69'  => ['toothId' => 'tooth-16', 'partId' => 4],
+        'tooth-6'   => ['toothId' => 'tooth-24', 'partId' => 6],
+        'tooth-70'  => ['toothId' => 'tooth-16', 'partId' => 3],
+        'tooth-71'  => ['toothId' => 'tooth-26', 'partId' => 4],
+        'tooth-72'  => ['toothId' => 'tooth-26', 'partId' => 3],
+        'tooth-73'  => ['toothId' => 'tooth-27', 'partId' => 1],
+        'tooth-74'  => ['toothId' => 'tooth-27', 'partId' => 3],
+        'tooth-75'  => ['toothId' => 'tooth-28', 'partId' => 1],
+        'tooth-76'  => ['toothId' => 'tooth-28', 'partId' => 3],
+        'tooth-78'  => ['toothId' => 'tooth-18', 'partId' => 2],
+        'tooth-79'  => ['toothId' => 'tooth-17', 'partId' => 2],
+        'tooth-80'  => ['toothId' => 'tooth-16', 'partId' => 2],
+        'tooth-81'  => ['toothId' => 'tooth-26', 'partId' => 2],
+        'tooth-82'  => ['toothId' => 'tooth-27', 'partId' => 2],
+        'tooth-83'  => ['toothId' => 'tooth-28', 'partId' => 2],
+        'tooth-84'  => ['toothId' => 'tooth-24', 'partId' => 2],
+        'tooth-86'  => ['toothId' => 'tooth-13', 'partId' => 4],
+        'tooth-87'  => ['toothId' => 'tooth-13', 'partId' => 3],
+        'tooth-88'  => ['toothId' => 'tooth-12', 'partId' => 4],
+        'tooth-89'  => ['toothId' => 'tooth-12', 'partId' => 3],
+        'tooth-8'   => ['toothId' => 'tooth-13', 'partId' => 6],
+        'tooth-90'  => ['toothId' => 'tooth-11', 'partId' => 4],
+        'tooth-91'  => ['toothId' => 'tooth-11', 'partId' => 3],
+        'tooth-92'  => ['toothId' => 'tooth-22', 'partId' => 4],
+        'tooth-93'  => ['toothId' => 'tooth-22', 'partId' => 3],
+        'tooth-94'  => ['toothId' => 'tooth-23', 'partId' => 4],
+        'tooth-95'  => ['toothId' => 'tooth-23', 'partId' => 3],
+        'tooth-96'  => ['toothId' => 'tooth-11', 'partId' => 2],
+        'tooth-97'  => ['toothId' => 'tooth-23', 'partId' => 2],
+        'tooth-9'   => ['toothId' => 'tooth-23', 'partId' => 6],
+    ];
 }
