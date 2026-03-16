@@ -27,11 +27,11 @@ class HostingerDatabaseManager extends MySQLDatabaseManager
      */
     public function createDatabase(TenantWithDatabase $tenant): bool
     {
-        if (app()->environment('local', 'development', 'testing')) {
-            $databaseName = $this->getTenantDatabaseName($tenant);
-            DB::statement("CREATE DATABASE IF NOT EXISTS `{$databaseName}`");
-            return true;
-        }
+        // if (app()->environment('local', 'development', 'testing')) {
+        //     $databaseName = $this->getTenantDatabaseName($tenant);
+        //     DB::statement("CREATE DATABASE IF NOT EXISTS `{$databaseName}`");
+        //     return true;
+        // }
 
         // Skip database creation on production - must be done manually in hPanel
         return true;
@@ -57,11 +57,11 @@ class HostingerDatabaseManager extends MySQLDatabaseManager
     /**
      * Get the database name for a tenant.
      */
-    protected function getTenantDatabaseName(TenantWithDatabase $tenant): string
-    {
-        $prefix = config('tenancy.database.prefix', 'tenant');
-        return $prefix . $tenant->getTenantKey();
-    }
+    // protected function getTenantDatabaseName(TenantWithDatabase $tenant): string
+    // {
+    //     $prefix = config('tenancy.database.prefix', 'tenant');
+    //     return $prefix . $tenant->getTenantKey();
+    // }
 
     /**
      * Get the tenant database connection configuration.
@@ -75,16 +75,23 @@ class HostingerDatabaseManager extends MySQLDatabaseManager
         
         // Set database name
         $config['database'] = $databaseName;
+
+        // On Hostinger: username = database name
+        $config['username'] = $databaseName;
+
+        // Use tenant database password from .env (same for all tenants)
+        $config['password'] = env('TENANT_DB_PASSWORD', $baseConfig['password'] ?? '');
+
         
-        if (app()->environment('local', 'development', 'testing')) {
-            // Local: use same credentials as central DB (root)
-            $config['username'] = $baseConfig['username'] ?? 'root';
-            $config['password'] = $baseConfig['password'] ?? '';
-        } else {
-            // Hostinger production: username = database name
-            $config['username'] = $databaseName;
-            $config['password'] = env('TENANT_DB_PASSWORD', $baseConfig['password'] ?? '');
-        }
+        // if (app()->environment('local', 'development', 'testing')) {
+        //     // Local: use same credentials as central DB (root)
+        //     $config['username'] = $baseConfig['username'] ?? 'root';
+        //     $config['password'] = $baseConfig['password'] ?? '';
+        // } else {
+        //     // Hostinger production: username = database name
+        //     $config['username'] = $databaseName;
+        //     $config['password'] = env('TENANT_DB_PASSWORD', $baseConfig['password'] ?? '');
+        // }
         
         return $config;
     }
