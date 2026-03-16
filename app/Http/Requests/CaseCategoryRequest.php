@@ -28,6 +28,7 @@ class CaseCategoryRequest extends FormRequest
             'name' => 'required|string|max:255',
             'order' => 'nullable|integer|min:0',
             'item_cost' => 'nullable|integer|min:0',
+            'without_detect_tooth' => 'nullable|boolean',
         ];
     }
 

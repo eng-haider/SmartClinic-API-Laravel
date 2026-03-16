@@ -411,7 +411,7 @@ class MinaNewMigrationSeeder extends Seeder
                         'identifier' => $oldPatient->identifier ?? null,
                         'credit_balance' => $oldPatient->credit_balance ?? null,
                         'credit_balance_add_at' => $oldPatient->credit_balance_add_at ?? null,
-                        'tooth_details' => $oldPatient->tooth_parts ?? null,
+                        'tooth_details' => $oldPatient->tooth_parts ? json_decode($oldPatient->tooth_parts, true) : null,
                         'public_token' => Str::uuid()->toString(),
                     ]);
                 });

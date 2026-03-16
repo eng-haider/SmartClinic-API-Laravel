@@ -18,7 +18,7 @@ class ReservationController extends Controller
     {
         $this->middleware('permission:view-clinic-reservations,view-all-reservations')->only(['index', 'show']);
         $this->middleware('permission:create-reservation')->only(['store']);
-        $this->middleware('permission:edit-reservation')->only(['update']);
+        $this->middleware('permission:edit-reservation')->only(['update', 'changeStatus']);
         $this->middleware('permission:delete-reservation')->only(['destroy']);
     }
 
@@ -115,6 +115,31 @@ class ReservationController extends Controller
                 'success' => true,
                 'message' => 'Reservation updated successfully',
                 'data' => new ReservationResource($reservation),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Change the status of the specified reservation.
+     */
+    public function changeStatus(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'status_id' => 'required|integer|exists:statuses,id',
+        ]);
+
+        try {
+            $reservation = $this->reservationRepository->changeStatus($id, $request->input('status_id'));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Reservation status updated successfully',
+                'data' => new ReservationResource($reservation->load(['patient', 'doctor', 'status'])),
             ]);
         } catch (\Exception $e) {
             return response()->json([

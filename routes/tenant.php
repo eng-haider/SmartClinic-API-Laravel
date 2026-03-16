@@ -89,6 +89,7 @@ Route::middleware([
     // Reservation routes
     Route::middleware('jwt')->group(function () {
         Route::apiResource('reservations', ReservationController::class);
+        Route::patch('reservations/{reservation}/status', [ReservationController::class, 'changeStatus']);
     });
 
     // Recipe routes

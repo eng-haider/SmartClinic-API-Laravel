@@ -132,6 +132,22 @@ class ReservationRepository
     }
 
     /**
+     * Change reservation status
+     */
+    public function changeStatus(int $id, int $statusId): Reservation
+    {
+        $reservation = $this->getById($id);
+
+        if (!$reservation) {
+            throw new \Exception("Reservation with ID {$id} not found");
+        }
+
+        $reservation->update(['status_id' => $statusId]);
+
+        return $reservation->fresh(['patient', 'doctor', 'status']);
+    }
+
+    /**
      * Delete reservation
      */
     public function delete(int $id): bool

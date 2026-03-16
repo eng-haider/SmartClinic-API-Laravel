@@ -19,6 +19,7 @@ class CaseCategory extends Model
         'name',
         'order',
         'item_cost',
+        'without_detect_tooth',
     ];
 
     /**
@@ -31,6 +32,7 @@ class CaseCategory extends Model
         return [
             'order' => 'integer',
             'item_cost' => 'integer',
+            'without_detect_tooth' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
