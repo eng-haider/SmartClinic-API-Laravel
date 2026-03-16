@@ -182,16 +182,25 @@ class ReservationController extends Controller
 
 
 
-    public function changeStatus(int $id, int $statusId): Reservation
+    public function changeStatus(Request $request, int $id): JsonResponse
     {
-        $reservation = $this->getById($id);
+        $request->validate([
+            'status_id' => 'required|integer|exists:statuses,id',
+        ]);
 
-        if (!$reservation) {
-            throw new \Exception("Reservation with ID {$id} not found");
+        try {
+            $reservation = $this->reservationRepository->changeStatus($id, $request->input('status_id'));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Reservation status updated successfully',
+                'data' => new ReservationResource($reservation->load(['patient', 'doctor', 'status'])),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
         }
-
-        $reservation->update(['status_id' => $statusId]);
-
-        return $reservation->fresh(['patient', 'doctor', 'status']);
     }
 }
