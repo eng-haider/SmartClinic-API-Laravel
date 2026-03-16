@@ -16,10 +16,10 @@ class ReservationController extends Controller
      */
     public function __construct(private ReservationRepository $reservationRepository)
     {
-        // $this->middleware('permission:view-clinic-reservations,view-all-reservations,view-own-reservations')->only(['index', 'show']);
-        // $this->middleware('permission:create-reservation')->only(['store']);
-        // $this->middleware('permission:edit-reservation')->only(['update', 'changeStatus']);
-        // $this->middleware('permission:delete-reservation,edit-reservation')->only(['destroy']);
+        $this->middleware('permission:view-clinic-reservations')->only(['index', 'show']);
+        $this->middleware('permission:create-reservation')->only(['store']);
+        $this->middleware('permission:edit-reservation')->only(['update']);
+        $this->middleware('permission:delete-reservation')->only(['destroy']);
     }
 
     /**
@@ -96,6 +96,13 @@ class ReservationController extends Controller
             ], 404);
         }
 
+        // Auto-mark as Completed (status_id=3) when opened, unless already Completed or Cancelled
+        // Pending=1, In Progress=2 → auto-advance to Completed=3; Completed=3, Cancelled=4 → untouched
+        if (in_array($reservation->status_id, [1, 2])) {
+            $reservation->update(['status_id' => 3]);
+            $reservation = $reservation->fresh(['patient', 'doctor', 'status']);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Reservation retrieved successfully',
@@ -115,31 +122,6 @@ class ReservationController extends Controller
                 'success' => true,
                 'message' => 'Reservation updated successfully',
                 'data' => new ReservationResource($reservation),
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
-        }
-    }
-
-    /**
-     * Change the status of the specified reservation.
-     */
-    public function changeStatus(Request $request, int $id): JsonResponse
-    {
-        $request->validate([
-            'status_id' => 'required|integer|exists:statuses,id',
-        ]);
-
-        try {
-            $reservation = $this->reservationRepository->changeStatus($id, $request->input('status_id'));
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Reservation status updated successfully',
-                'data' => new ReservationResource($reservation->load(['patient', 'doctor', 'status'])),
             ]);
         } catch (\Exception $e) {
             return response()->json([
