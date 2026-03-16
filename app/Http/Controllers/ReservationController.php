@@ -37,11 +37,11 @@ class ReservationController extends Controller
         ]);
 
         $perPage = $request->input('per_page', 15);
-        
+
         // Multi-tenancy: Get doctor_id filter based on user role
         // Database is already isolated by tenant, no need for clinic_id
         $doctorId = $this->getDoctorIdFilter();
-        
+
         $reservations = $this->reservationRepository->getAllWithFilters($filters, $perPage, null, $doctorId);
 
         return response()->json([
@@ -164,18 +164,34 @@ class ReservationController extends Controller
     private function getDoctorIdFilter(): ?int
     {
         $user = Auth::user();
-        
+
         // Super doctor and secretary see all reservations in this tenant
         if ($user->hasRole('clinic_super_doctor') || $user->hasRole('secretary') || $user->hasRole('super_admin')) {
             return null;
         }
-        
+
         // Doctor sees only their own reservations
         if ($user->hasRole('doctor')) {
             return $user->id;
         }
-        
+
         // Default: show all reservations in this tenant
         return null;
+    }
+
+
+
+
+    public function changeStatus(int $id, int $statusId): Reservation
+    {
+        $reservation = $this->getById($id);
+
+        if (!$reservation) {
+            throw new \Exception("Reservation with ID {$id} not found");
+        }
+
+        $reservation->update(['status_id' => $statusId]);
+
+        return $reservation->fresh(['patient', 'doctor', 'status']);
     }
 }
