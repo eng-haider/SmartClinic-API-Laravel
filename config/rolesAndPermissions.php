@@ -220,6 +220,7 @@ return [
                 'view-own-reservations',
                 'create-reservation',
                 'edit-reservation',
+                'delete-reservation',
 
                 // Notes
                 'view-notes',
