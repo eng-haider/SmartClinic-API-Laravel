@@ -70,7 +70,7 @@ class ReservationController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Reservation created successfully',
-                'data' => new ReservationResource($reservation->load(['patient', 'doctor', 'status'])),
+                'data' => new ReservationResource($reservation->load(['patient', 'doctor', 'status', 'reservationType'])),
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
@@ -194,7 +194,7 @@ class ReservationController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Reservation status updated successfully',
-                'data' => new ReservationResource($reservation->load(['patient', 'doctor', 'status'])),
+                'data' => new ReservationResource($reservation->load(['patient', 'doctor', 'status', 'reservationType'])),
             ]);
         } catch (\Exception $e) {
             return response()->json([

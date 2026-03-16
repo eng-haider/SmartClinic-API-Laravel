@@ -26,6 +26,7 @@ class ReservationResource extends JsonResource
                 return $this->reservationType ? [
                     'id' => $this->reservationType->id,
                     'name' => $this->reservationType->name,
+                    'name_ar' => $this->reservationType->name_ar,
                 ] : null;
             }),
             'notes' => $this->notes,

@@ -98,7 +98,7 @@ class ReservationRepository
     public function getById(int $id, ?int $doctorId = null): ?Reservation
     {
         $query = $this->query()
-            ->with(['patient', 'doctor', 'status']);
+            ->with(['patient', 'doctor', 'status', 'reservationType']);
         
         // Filter by doctor if provided (for doctors to see only their own reservations)
         if ($doctorId !== null) {
@@ -145,7 +145,7 @@ class ReservationRepository
 
         $reservation->update(['status_id' => $statusId]);
 
-        return $reservation->fresh(['patient', 'doctor', 'status']);
+        return $reservation->fresh(['patient', 'doctor', 'status', 'reservationType']);
     }
 
     /**
