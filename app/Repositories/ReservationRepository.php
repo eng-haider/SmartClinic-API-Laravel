@@ -133,9 +133,9 @@ class ReservationRepository
     }
 
     /**
-     * Mark reservation as done (Completed status)
+     * Change reservation status
      */
-    public function markAsDone(int $id): Reservation
+    public function changeStatus(int $id, int $statusId): Reservation
     {
         $reservation = $this->getById($id);
 
@@ -143,8 +143,7 @@ class ReservationRepository
             throw new \Exception("Reservation with ID {$id} not found");
         }
 
-        // Status ID 3 = Completed (مكتمل) as seeded in TenantStatusesSeeder
-        $reservation->update(['status_id' => 3]);
+        $reservation->update(['status_id' => $statusId]);
 
         return $reservation->fresh(['patient', 'doctor', 'status']);
     }

@@ -61,9 +61,12 @@ class SeedAllTenants extends Command
                 // Get database credentials
                 $dbName = $tenant->db_name ?? (config('tenancy.database.prefix') . $tenant->id);
                 $dbUsername = $tenant->db_username ?? $dbName;
-                $dbPassword = $tenant->db_password ?? env('TENANT_DB_PASSWORD');
+                $dbPassword = $tenant->db_password ?? env('TENANT_DB_PASSWORD', '');
 
-                if (empty($dbPassword)) {
+                // Check if we're in local environment
+                $isLocal = app()->environment('local');
+                
+                if (empty($dbPassword) && !$isLocal) {
                     $this->warn("  ⚠ No database password found for tenant {$tenant->id}. Skipping.");
                     $failed++;
                     continue;
