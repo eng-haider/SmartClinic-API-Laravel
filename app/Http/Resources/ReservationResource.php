@@ -20,6 +20,14 @@ class ReservationResource extends JsonResource
             'doctor_id' => $this->doctor_id,
             'clinics_id' => $this->clinics_id,
             'status_id' => $this->status_id,
+            'reservation_type_id' => $this->reservation_type_id,
+            'reservation_type_note' => $this->reservation_type_note,
+            'reservation_type' => $this->when($this->relationLoaded('reservationType'), function () {
+                return $this->reservationType ? [
+                    'id' => $this->reservationType->id,
+                    'name' => $this->reservationType->name,
+                ] : null;
+            }),
             'notes' => $this->notes,
             'reservation_start_date' => $this->reservation_start_date?->format('Y-m-d'),
             'reservation_end_date' => $this->reservation_end_date?->format('Y-m-d'),
