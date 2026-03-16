@@ -43,6 +43,7 @@ class ReservationResource extends JsonResource
                 return $this->status ? [
                     'id' => $this->status->id,
                     'name' => $this->status->name,
+                    'color' => $this->status->color,
                 ] : null;
             }),
             'creator_id' => $this->creator_id,
