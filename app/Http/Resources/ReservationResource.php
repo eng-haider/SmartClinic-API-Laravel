@@ -26,7 +26,6 @@ class ReservationResource extends JsonResource
                 return $this->reservationType ? [
                     'id' => $this->reservationType->id,
                     'name' => $this->reservationType->name,
-                    'name_ar' => $this->reservationType->name_ar,
                 ] : null;
             }),
             'notes' => $this->notes,
@@ -40,6 +39,7 @@ class ReservationResource extends JsonResource
                     'id' => $this->patient->id,
                     'name' => $this->patient->name,
                     'phone' => $this->patient->phone,
+                    'age' => $this->patient->age,
                 ] : null;
             }),
             'doctor' => $this->when($this->relationLoaded('doctor'), function () {

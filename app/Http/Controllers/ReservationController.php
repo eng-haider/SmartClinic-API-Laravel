@@ -42,7 +42,7 @@ class ReservationController extends Controller
         // Database is already isolated by tenant, no need for clinic_id
         $doctorId = $this->getDoctorIdFilter();
 
-        $reservations = $this->reservationRepository->getAllWithFilters($filters, $perPage, null, $doctorId);
+        $reservations = $this->reservationRepository->getAllWithFilters($filters, $perPage, $doctorId);
 
         return response()->json([
             'success' => true,
