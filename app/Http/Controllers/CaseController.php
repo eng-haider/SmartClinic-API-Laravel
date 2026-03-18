@@ -175,7 +175,8 @@ class CaseController extends Controller
      * We only need to filter by doctor for regular doctors who should only see their own cases.
      * 
      * - Super Doctor/Secretary: sees all cases in their tenant database [null]
-     * - Doctor: sees ONLY their own cases [user_id]
+     * - Doctor with view-clinic-cases permission: sees all cases [null]
+     * - Doctor without view-clinic-cases permission: sees ONLY their own cases [user_id]
      */
     private function getDoctorIdFilter(): ?int
     {
@@ -186,7 +187,12 @@ class CaseController extends Controller
             return null;
         }
         
-        // Doctor sees only their own cases
+        // Doctor with view-clinic-cases permission sees all cases
+        if ($user->hasPermissionTo('view-clinic-cases')) {
+            return null;
+        }
+        
+        // Doctor without view-clinic-cases permission sees only their own cases
         if ($user->hasRole('doctor')) {
             return $user->id;
         }
