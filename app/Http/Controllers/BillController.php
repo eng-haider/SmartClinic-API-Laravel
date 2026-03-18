@@ -238,6 +238,11 @@ class BillController extends Controller
             'message' => 'Bill statistics retrieved successfully',
             'data' => $statistics,
             'filters' => $filters,
+            'debug' => [
+                'doctor_id_filter' => $doctorId,
+                'user_id' => auth()->id(),
+                'has_view_all_bills' => auth()->user()->hasPermissionTo('view-all-bills'),
+            ],
         ]);
     }
 

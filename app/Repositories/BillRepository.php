@@ -282,7 +282,7 @@ class BillRepository
         $totalBills = $query->count();
         $paidBills = (clone $query)->paid()->count();
         $unpaidBills = (clone $query)->unpaid()->count();
-        $totalPaidPrice = (clone $query)->paid()->sum('price') ?? 0;
+        $totalPaidPrice = (clone $query)->sum('price') ?? 0;
         $totalUnpaidPrice = (clone $query)->unpaid()->sum('price') ?? 0;
 
         // Get cases with same date filter to calculate total case prices
