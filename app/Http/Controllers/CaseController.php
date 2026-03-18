@@ -18,7 +18,7 @@ class CaseController extends Controller
     {
         // index method will check permissions inside the method
         $this->middleware('permission:create-case')->only(['store']);
-        $this->middleware('permission:view-clinic-cases')->only(['show']);
+        // $this->middleware('permission:view-clinic-cases')->only(['show']);
         $this->middleware('permission:edit-case')->only(['update']);
         // $this->middleware('permission:delete-case')->only(['destroy']);
     }
