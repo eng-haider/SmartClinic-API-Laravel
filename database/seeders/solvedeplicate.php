@@ -53,7 +53,14 @@ class FixDuplicatePatientsSeeder extends Seeder
      *
      * Example: 'mina_last' — connects directly to mina_last database (bypasses tenancy)
      */
-    private string $directDatabaseName = 'mina_last';
+        private string $directDatabaseName = 'u876784197_tenant_test';
+
+    /**
+     * Custom database credentials (optional)
+     * Leave empty to use default config credentials
+     */
+    private string $directDatabaseUsername = 'u876784197_tenant_test';
+    private string $directDatabasePassword = '9!iSeEys:6sO';
 
     /**
      * Which tenant IDs to process. Leave empty [] to process ALL tenants.
@@ -150,6 +157,15 @@ class FixDuplicatePatientsSeeder extends Seeder
             // Register direct connection to the specified database
             $baseConfig = config('database.connections.mysql');
             $baseConfig['database'] = $this->directDatabaseName;
+            
+            // Use custom credentials if provided
+            if (!empty($this->directDatabaseUsername)) {
+                $baseConfig['username'] = $this->directDatabaseUsername;
+            }
+            if (!empty($this->directDatabasePassword)) {
+                $baseConfig['password'] = $this->directDatabasePassword;
+            }
+            
             config(["database.connections.{$connName}" => $baseConfig]);
 
             // Test connection
