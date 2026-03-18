@@ -48,7 +48,22 @@ class FixDuplicatePatientsSeeder extends Seeder
     private string $cutoffDate = '2025-12-25';
 
     /**
+     * FOR DIRECT DATABASE: Set a database name to connect directly to that DB.
+     * Leave empty '' to use the tenant system.
+     */
+    private string $directDatabaseName = 'u876784197_tenant_mina';
+
+    /**
+     * Custom database credentials (optional)
+     * Leave empty to use default config credentials
+     */
+    private string $directDatabaseHost = '127.0.0.1';  // Use 127.0.0.1 for TCP/IP or Hostinger remote host
+    private string $directDatabaseUsername = 'u876784197_tenant_mina';
+    private string $directDatabasePassword = '9!iSeEys:6sO';
+
+    /**
      * Which tenant IDs to process. Leave empty [] to process ALL tenants.
+     * (Only used if $directDatabaseName is empty)
      *
      * Example: ['saffat', 'mina_last']
      */
@@ -64,6 +79,28 @@ class FixDuplicatePatientsSeeder extends Seeder
         $this->command->info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         $this->command->info("   Cutoff date : {$this->cutoffDate}");
         $this->command->info("   Mode        : " . ($this->dryRun ? '🟡 DRY RUN (no changes)' : '🟢 LIVE'));
+        $this->command->info('');
+
+        // If direct database is specified, use that instead of tenant system
+        if (!empty($this->directDatabaseName)) {
+            $this->command->info("📦 Mode: Direct database connection");
+            $this->command->info("   Database: {$this->directDatabaseName}");
+            $this->command->info('');
+
+            $this->processDirectDatabase();
+
+            $this->command->info('');
+            $this->command->info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            $this->command->info('✅ Database processed.');
+            if ($this->dryRun) {
+                $this->command->warn('   ⚠  DRY RUN — no data was changed.');
+            }
+            $this->command->info('');
+            return;
+        }
+
+        // Otherwise, use tenant system
+        $this->command->info("📦 Mode: Tenant system");
         $this->command->info('');
 
         $tenants = empty($this->onlyTenants)
@@ -88,6 +125,47 @@ class FixDuplicatePatientsSeeder extends Seeder
         if ($this->dryRun) {
             $this->command->warn('   ⚠  DRY RUN — no data was changed.');
         }
+        $this->command->info('');
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+
+    private function processDirectDatabase(): void
+    {
+        $connName = 'direct_fix_connection';
+
+        try {
+            // Register direct connection to the specified database
+            $baseConfig = config('database.connections.mysql');
+            $baseConfig['database'] = $this->directDatabaseName;
+            
+            // Use custom credentials if provided
+            if (!empty($this->directDatabaseHost)) {
+                $baseConfig['host'] = $this->directDatabaseHost;
+            }
+            if (!empty($this->directDatabaseUsername)) {
+                $baseConfig['username'] = $this->directDatabaseUsername;
+            }
+            if (!empty($this->directDatabasePassword)) {
+                $baseConfig['password'] = $this->directDatabasePassword;
+            }
+            
+            config(["database.connections.{$connName}" => $baseConfig]);
+
+            // Test connection
+            DB::connection($connName)->statement('SELECT 1');
+
+            $this->command->info("┌─ Database: {$this->directDatabaseName}");
+
+            // Use the direct connection for the fix
+            DB::setDefaultConnection($connName);
+            $this->fixDuplicates();
+
+            $this->command->info("└─ Done: {$this->directDatabaseName}");
+        } catch (\Exception $e) {
+            $this->command->error("└─ ❌ Error processing {$this->directDatabaseName}: " . $e->getMessage());
+        }
+
         $this->command->info('');
     }
 

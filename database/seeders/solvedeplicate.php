@@ -59,7 +59,7 @@ class FixDuplicatePatientsSeeder extends Seeder
      * Custom database credentials (optional)
      * Leave empty to use default config credentials
      */
-    private string $directDatabaseUsername = 'u876784197_tenant_test';
+    private string $directDatabaseUsername = 'u876784197_tenant_mina';
     private string $directDatabasePassword = '9!iSeEys:6sO';
 
     /**
