@@ -83,7 +83,7 @@ class CaseRepository
     public function getById(int $id, ?int $doctorId = null): ?CaseModel
     {
         $query = $this->query()
-            ->with(['patient', 'doctor', 'category', 'status']);
+            ->with(['patient', 'doctor', 'category', 'status','bills']);
         
         // Filter by doctor if provided (for doctors to see only their own cases)
         if ($doctorId !== null) {
