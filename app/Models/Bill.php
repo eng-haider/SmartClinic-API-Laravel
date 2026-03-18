@@ -124,7 +124,7 @@ class Bill extends Model
      */
     public function scopePaid($query)
     {
-        return $query->where('is_paid', true);
+        return $query->where('is_paid', true)->orwhere('is_paid', 1);
     }
 
     /**
