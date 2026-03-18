@@ -20,7 +20,8 @@ trait DoctorFilterTrait
      * We only need to filter by doctor for regular doctors who should only see their own data.
      * 
      * - Super Doctor/Secretary/Admin: sees all data in their tenant database [null]
-     * - Doctor: sees ONLY their own data [user_id]
+     * - Doctor with view-all-bills permission: sees all bills [null]
+     * - Doctor without view-all-bills permission: sees ONLY their own data [user_id]
      */
     private function getDoctorIdFilter(): ?int
     {
@@ -31,7 +32,12 @@ trait DoctorFilterTrait
             return null;
         }
         
-        // Doctor sees only their own data
+        // Doctor with view-all-bills permission sees all bills
+        if ($user->hasPermissionTo('view-all-bills')) {
+            return null;
+        }
+        
+        // Doctor without view-all-bills permission sees only their own data
         if ($user->hasRole('doctor')) {
             return $user->id;
         }
