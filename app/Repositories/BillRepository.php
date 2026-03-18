@@ -330,7 +330,7 @@ class BillRepository
             'paid_bills' => $paidBills,
             'unpaid_bills' => $unpaidBills,
             'total_price' => $totalPrice, // Total of ALL cases price (not bills)
-            'total_paid_price' => $totalPaidCases, // Total paid cases price
+            'total_paid_price' =>  $totalPaidPrice , // Total paid cases price
             'total_unpaid_price' => $totalUnpaidPrice,
             'unpaid_case_price' => $unpaidCasePrice, // total_price - total_paid_price
             'remaining_amount' => $totalUnpaidPrice, // Remaining to be paid
