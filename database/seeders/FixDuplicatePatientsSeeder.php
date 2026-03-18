@@ -191,10 +191,10 @@ class FixDuplicatePatientsSeeder extends Seeder
 
     private function fixDuplicates(): void
     {
-        // Find phone numbers that appear in BOTH old and new records.
+        // Find patient names that appear in BOTH old and new records.
         // "old" = created before cutoff, "new" = created on/after cutoff.
-        $duplicatePhones = DB::table('patients as p_new')
-            ->join('patients as p_old', 'p_old.phone', '=', 'p_new.phone')
+        $duplicateNames = DB::table('patients as p_new')
+            ->join('patients as p_old', 'p_old.name', '=', 'p_new.name')
             ->whereNull('p_new.deleted_at')
             ->whereNull('p_old.deleted_at')
             ->where('p_new.created_at', '>=', $this->cutoffDate)
@@ -203,32 +203,33 @@ class FixDuplicatePatientsSeeder extends Seeder
             ->select(
                 'p_new.id   as new_id',
                 'p_new.name as new_name',
+                'p_new.phone as new_phone',
                 'p_new.created_at as new_created',
                 'p_old.id   as old_id',
                 'p_old.name as old_name',
-                'p_old.created_at as old_created',
-                'p_new.phone as phone'
+                'p_old.phone as old_phone',
+                'p_old.created_at as old_created'
             )
             ->get();
 
-        if ($duplicatePhones->isEmpty()) {
+        if ($duplicateNames->isEmpty()) {
             $this->command->info("│  ✓ No duplicate patients found.");
             return;
         }
 
-        $this->command->info("│  Found {$duplicatePhones->count()} duplicate pair(s).");
+        $this->command->info("│  Found {$duplicateNames->count()} duplicate pair(s).");
         $this->command->info('│');
 
         $merged   = 0;
         $skipped  = 0;
 
-        foreach ($duplicatePhones as $pair) {
+        foreach ($duplicateNames as $pair) {
             $oldId = $pair->old_id;
             $newId = $pair->new_id;
 
-            $this->command->info("│  ┌ Pair: phone={$pair->phone}");
-            $this->command->info("│  │  OLD patient  id={$oldId}  name=\"{$pair->old_name}\"  created={$pair->old_created}");
-            $this->command->info("│  │  NEW patient  id={$newId}  name=\"{$pair->new_name}\"  created={$pair->new_created}");
+            $this->command->info("│  ┌ Pair: name=\"{$pair->old_name}\"");
+            $this->command->info("│  │  OLD patient  id={$oldId}  name=\"{$pair->old_name}\"  phone={$pair->old_phone}  created={$pair->old_created}");
+            $this->command->info("│  │  NEW patient  id={$newId}  name=\"{$pair->new_name}\"  phone={$pair->new_phone}  created={$pair->new_created}");
 
             // Count related records to transfer
             $casesCount        = DB::table('cases')       ->whereNull('deleted_at')->where('patient_id', $oldId)->count();
