@@ -288,7 +288,7 @@ Route::middleware('jwt')->prefix('reports')->group(function () {
 // ============================================
 // DEMO AI ROUTES (JWT required) - Tenant-specific
 // ============================================
-Route::middleware('jwt')->group(function () {
+Route::middleware('jwt')->prefix('tenant')->group(function () {
     // Demo AI routes (FREE - no API key needed)
     Route::get('demo-ai/capabilities', [DemoAIController::class, 'getCapabilities']);
     Route::get('demo-ai/report-types', [DemoAIController::class, 'getReportTypes']);
