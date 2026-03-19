@@ -71,6 +71,34 @@ class DemoAIService
      */
     private function getDatabaseStats(): array
     {
+        // Get tenant from request header or middleware
+        $tenantId = request()->header('X-Tenant-ID');
+        
+        if ($tenantId) {
+            $tenant = \App\Models\Tenant::find($tenantId);
+            if ($tenant) {
+                return $tenant->run(function () {
+                    return $this->getTenantDatabaseStats();
+                });
+            }
+        }
+        
+        // Try to get current tenant from middleware
+        if (function_exists('tenant') && tenant()) {
+            return tenant()->run(function () {
+                return $this->getTenantDatabaseStats();
+            });
+        }
+        
+        // Fallback - return demo data
+        return $this->getDemoStats();
+    }
+    
+    /**
+     * Get tenant database statistics
+     */
+    private function getTenantDatabaseStats(): array
+    {
         return [
             'patients' => [
                 'total' => DB::table('patients')->count(),
@@ -110,6 +138,42 @@ class DemoAIService
                     ->whereDate('created_at', today())
                     ->where('is_paid', true)
                     ->sum('price'),
+            ]
+        ];
+    }
+    
+    /**
+     * Get demo statistics for testing
+     */
+    private function getDemoStats(): array
+    {
+        return [
+            'patients' => [
+                'total' => 150,
+                'active' => 142,
+                'new_this_month' => 8,
+            ],
+            'cases' => [
+                'total' => 250,
+                'active' => 240,
+                'paid' => 200,
+                'unpaid' => 50,
+                'total_revenue' => 12500,
+            ],
+            'bills' => [
+                'total' => 180,
+                'paid' => 150,
+                'unpaid' => 30,
+                'total_revenue' => 15000,
+                'total_outstanding' => 3000,
+            ],
+            'doctors' => [
+                'total' => 5,
+            ],
+            'recent_activity' => [
+                'today_cases' => 12,
+                'today_bills' => 8,
+                'today_revenue' => 1200,
             ]
         ];
     }
