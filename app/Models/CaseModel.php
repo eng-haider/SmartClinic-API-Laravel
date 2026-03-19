@@ -30,6 +30,7 @@ class CaseModel extends Model
         'tooth_num',
         'root_stuffing',
         'is_paid',
+        'case_date',
     ];
 
     /**
@@ -46,6 +47,7 @@ class CaseModel extends Model
             'status_id' => 'integer',
             'price' => 'integer',
             'is_paid' => 'boolean',
+            'case_date' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',

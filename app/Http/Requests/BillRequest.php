@@ -27,6 +27,7 @@ class BillRequest extends FormRequest
             // 'is_paid' => 'nullable|boolean',
             // 'use_credit' => 'nullable|boolean',
             'doctor_id' => 'nullable|exists:users,id',
+            'bill_date' => 'nullable|date',
         ];
 
         // Make patient_id optional on update
@@ -51,6 +52,9 @@ class BillRequest extends FormRequest
             // Set doctor_id if not provided
              $data['doctor_id'] = auth()->id();
         }
+
+        // Set default bill_date to current datetime if not provided
+        $data['bill_date'] = $this->bill_date ?? now()->toDateTimeString();
 
         if (!empty($data)) {
             $this->merge($data);

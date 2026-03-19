@@ -42,6 +42,7 @@ class CaseResource extends JsonResource
             'root_stuffing' => $this->root_stuffing,
             'is_paid' => $this->is_paid,
             'payment_status' => $this->is_paid ? 'Paid' : 'Unpaid',
+            'case_date' => $this->case_date?->format('Y-m-d H:i:s'),
             'bills' => $this->when($this->relationLoaded('bills'), function () {
                 return $this->bills->map(function ($bill) {
                     return [

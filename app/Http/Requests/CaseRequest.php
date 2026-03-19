@@ -30,6 +30,7 @@ class CaseRequest extends FormRequest
             'tooth_num' => 'nullable|string|max:500',
             'root_stuffing' => 'nullable|string|max:500',
             'is_paid' => 'nullable|boolean',
+            'case_date' => 'nullable|date',
         ];
     }
 
@@ -46,9 +47,11 @@ class CaseRequest extends FormRequest
 
         // Always set doctor_id from authenticated user
         // Set default status_id to 2 if not provided
+        // Set default case_date to current datetime if not provided
         $this->merge([
             'doctor_id' => $user->id,
             'status_id' => $this->status_id ?? 2,
+            'case_date' => $this->case_date ?? now()->toDateTimeString(),
         ]);
     }
 
@@ -67,6 +70,7 @@ class CaseRequest extends FormRequest
             'status_id.exists' => 'Selected status does not exist',
             'price.integer' => 'Price must be a number',
             'price.min' => 'Price must be at least 0',
+            'case_date.date' => 'Case date must be a valid date',
         ];
     }
 
@@ -80,6 +84,7 @@ class CaseRequest extends FormRequest
             'doctor_id' => 'doctor',
             'case_categores_id' => 'case category',
             'status_id' => 'status',
+            'case_date' => 'case date',
         ];
     }
 }

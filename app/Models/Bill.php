@@ -47,6 +47,7 @@ class Bill extends Model
         'creator_id',
         'updator_id',
         'use_credit',
+        'bill_date',
     ];
 
     /**
@@ -65,6 +66,7 @@ class Bill extends Model
             'price' => 'integer',
             'is_paid' => 'boolean',
             'use_credit' => 'boolean',
+            'bill_date' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
