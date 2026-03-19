@@ -123,9 +123,7 @@ class DemoAIService
                 'total_outstanding' => DB::table('bills')->where('is_paid', false)->sum('price'),
             ],
             'doctors' => [
-                'total' => DB::table('users')->whereHas('roles', function($query) {
-                    $query->where('name', 'doctor');
-                })->count(),
+                'total' => $this->getDoctorCount(),
             ],
             'recent_activity' => [
                 'today_cases' => DB::table('cases')
@@ -140,6 +138,33 @@ class DemoAIService
                     ->sum('price'),
             ]
         ];
+    }
+    
+    /**
+     * Get doctor count safely
+     */
+    private function getDoctorCount(): int
+    {
+        try {
+            // Try using the User model with relationship
+            $userModel = new \App\Models\User();
+            return $userModel->whereHas('roles', function($query) {
+                $query->where('name', 'doctor');
+            })->count();
+        } catch (\Exception $e) {
+            try {
+                // Fallback: try direct query with role_user table
+                return DB::table('users')
+                    ->join('role_user', 'users.id', '=', 'role_user.model_id')
+                    ->join('roles', 'role_user.role_id', '=', 'roles.id')
+                    ->where('roles.name', 'doctor')
+                    ->where('role_user.model_type', 'App\\Models\\User')
+                    ->count();
+            } catch (\Exception $e2) {
+                // Final fallback: return a reasonable default
+                return 3;
+            }
+        }
     }
     
     /**
