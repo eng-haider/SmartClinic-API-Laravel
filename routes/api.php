@@ -286,9 +286,16 @@ Route::middleware('jwt')->prefix('reports')->group(function () {
 });
 
 // ============================================
-// DEMO AI ROUTES (JWT required) - Tenant-specific
+// AI ROUTES (JWT required) - Tenant-specific
 // ============================================
 Route::middleware('jwt')->group(function () {
+    // Regular AI routes (requires OpenAI API key)
+    Route::get('ai/capabilities', [AIController::class, 'getCapabilities']);
+    Route::get('ai/report-types', [AIController::class, 'getReportTypes']);
+    Route::post('ai/generate-report', [AIController::class, 'generateReport']);
+    Route::post('ai/ask-question', [AIController::class, 'askQuestion']);
+    
+    // Demo AI routes (FREE - no API key needed)
     Route::get('demo-ai/capabilities', [DemoAIController::class, 'getCapabilities']);
     Route::get('demo-ai/report-types', [DemoAIController::class, 'getReportTypes']);
     Route::post('demo-ai/generate-report', [DemoAIController::class, 'generateReport']);
