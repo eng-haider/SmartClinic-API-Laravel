@@ -79,13 +79,13 @@ Route::middleware('jwt')->group(function () {
     Route::post('auth/change-password', [AuthController::class, 'changePassword']);
 });
 
-// Protected AI routes (JWT required)
-Route::middleware('jwt')->group(function () {
-    Route::get('ai/capabilities', [AIController::class, 'getCapabilities']);
-    Route::get('ai/report-types', [AIController::class, 'getReportTypes']);
-    Route::post('ai/generate-report', [AIController::class, 'generateReport']);
-    Route::post('ai/ask-question', [AIController::class, 'askQuestion']);
-});
+// Protected AI routes (JWT required) - DISABLED until OpenAI package is installed
+// Route::middleware('jwt')->group(function () {
+//     Route::get('ai/capabilities', [AIController::class, 'getCapabilities']);
+//     Route::get('ai/report-types', [AIController::class, 'getReportTypes']);
+//     Route::post('ai/generate-report', [AIController::class, 'generateReport']);
+//     Route::post('ai/ask-question', [AIController::class, 'askQuestion']);
+// });
 
 // Protected Demo AI routes (JWT required) - FREE VERSION
 Route::middleware('jwt')->group(function () {
@@ -286,15 +286,9 @@ Route::middleware('jwt')->prefix('reports')->group(function () {
 });
 
 // ============================================
-// AI ROUTES (JWT required) - Tenant-specific
+// DEMO AI ROUTES (JWT required) - Tenant-specific
 // ============================================
 Route::middleware('jwt')->group(function () {
-    // Regular AI routes (requires OpenAI API key)
-    Route::get('ai/capabilities', [AIController::class, 'getCapabilities']);
-    Route::get('ai/report-types', [AIController::class, 'getReportTypes']);
-    Route::post('ai/generate-report', [AIController::class, 'generateReport']);
-    Route::post('ai/ask-question', [AIController::class, 'askQuestion']);
-    
     // Demo AI routes (FREE - no API key needed)
     Route::get('demo-ai/capabilities', [DemoAIController::class, 'getCapabilities']);
     Route::get('demo-ai/report-types', [DemoAIController::class, 'getReportTypes']);

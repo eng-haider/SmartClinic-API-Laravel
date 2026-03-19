@@ -12,6 +12,9 @@ class AIService
 
     public function __construct()
     {
+        if (!class_exists('OpenAI')) {
+            throw new \Exception('OpenAI package not installed. Please run: composer require openai-php/client');
+        }
         $this->client = OpenAI::client(config('services.openai.api_key'));
     }
 
