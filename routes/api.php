@@ -284,3 +284,13 @@ Route::middleware('jwt')->prefix('reports')->group(function () {
     // Legacy bill report (kept for backward compatibility)
     Route::get('bills', [BillReportController::class, 'index'])->name('reports.bills.legacy');
 });
+
+// ============================================
+// DEMO AI ROUTES (JWT required) - Tenant-specific
+// ============================================
+Route::middleware('jwt')->group(function () {
+    Route::get('demo-ai/capabilities', [DemoAIController::class, 'getCapabilities']);
+    Route::get('demo-ai/report-types', [DemoAIController::class, 'getReportTypes']);
+    Route::post('demo-ai/generate-report', [DemoAIController::class, 'generateReport']);
+    Route::post('demo-ai/ask-question', [DemoAIController::class, 'askQuestion']);
+});
