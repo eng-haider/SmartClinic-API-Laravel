@@ -75,6 +75,7 @@ class BillResource extends JsonResource
             'use_credit' => $this->use_credit,
             'credit_usage' => $this->credit_usage,
             'bill_date' => $this->bill_date?->format('Y-m-d H:i:s'),
+            'bill_at' => $this->bill_date?->format('Y-m-d H:i:s'),
             'creator' => $this->creator ? [
                 'id' => $this->creator_id,
                 'name' => $this->creator?->name ?? 'N/A',
