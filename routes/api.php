@@ -24,6 +24,9 @@ use App\Http\Controllers\Report\PatientReportController;
 use App\Http\Controllers\Report\CaseReportController;
 use App\Http\Controllers\Report\ReservationReportController;
 use App\Http\Controllers\Report\FinancialReportController;
+use App\Http\Controllers\DemoRegisterController;
+use App\Http\Controllers\AIController;
+use App\Http\Controllers\DemoAIController;
 use Illuminate\Support\Facades\Route;
 
 // ============================================
@@ -70,9 +73,26 @@ Route::post('auth/smart-login', [AuthController::class, 'smartLogin']); // â† Ø
 // Protected auth routes (JWT required)
 Route::middleware('jwt')->group(function () {
     Route::get('auth/me', [AuthController::class, 'me']);
+    Route::get('auth/permissions', [AuthController::class, 'permissions']);
     Route::post('auth/logout', [AuthController::class, 'logout']);
     Route::post('auth/refresh', [AuthController::class, 'refresh']);
     Route::post('auth/change-password', [AuthController::class, 'changePassword']);
+});
+
+// Protected AI routes (JWT required)
+Route::middleware('jwt')->group(function () {
+    Route::get('ai/capabilities', [AIController::class, 'getCapabilities']);
+    Route::get('ai/report-types', [AIController::class, 'getReportTypes']);
+    Route::post('ai/generate-report', [AIController::class, 'generateReport']);
+    Route::post('ai/ask-question', [AIController::class, 'askQuestion']);
+});
+
+// Protected Demo AI routes (JWT required) - FREE VERSION
+Route::middleware('jwt')->group(function () {
+    Route::get('demo-ai/capabilities', [DemoAIController::class, 'getCapabilities']);
+    Route::get('demo-ai/report-types', [DemoAIController::class, 'getReportTypes']);
+    Route::post('demo-ai/generate-report', [DemoAIController::class, 'generateReport']);
+    Route::post('demo-ai/ask-question', [DemoAIController::class, 'askQuestion']);
 });
 
 // Protected patient routes (JWT required)

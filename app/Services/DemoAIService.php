@@ -1,0 +1,346 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class DemoAIService
+{
+    /**
+     * Generate demo database report (no AI needed)
+     */
+    public function generateDatabaseReport(string $reportType = 'general'): array
+    {
+        try {
+            // Get database statistics
+            $stats = $this->getDatabaseStats();
+            
+            // Generate demo report based on type
+            $report = $this->generateDemoReport($stats, $reportType);
+            
+            return [
+                'success' => true,
+                'report' => $report,
+                'stats' => $stats,
+                'report_type' => $reportType,
+                'generated_at' => now()->toDateTimeString(),
+                'demo_mode' => true
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Demo Report Generation Error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => 'Failed to generate demo report: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Answer questions with demo responses (no AI needed)
+     */
+    public function askQuestion(string $question): array
+    {
+        try {
+            // Get relevant database data
+            $stats = $this->getDatabaseStats();
+            
+            // Generate demo answer
+            $answer = $this->generateDemoAnswer($question, $stats);
+            
+            return [
+                'success' => true,
+                'question' => $question,
+                'answer' => $answer,
+                'answered_at' => now()->toDateTimeString(),
+                'demo_mode' => true
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Demo Question Answering Error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => 'Failed to answer question: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Get database statistics
+     */
+    private function getDatabaseStats(): array
+    {
+        return [
+            'patients' => [
+                'total' => DB::table('patients')->count(),
+                'active' => DB::table('patients')->whereNull('deleted_at')->count(),
+                'new_this_month' => DB::table('patients')
+                    ->whereMonth('created_at', now()->month)
+                    ->whereYear('created_at', now()->year)
+                    ->count(),
+            ],
+            'cases' => [
+                'total' => DB::table('cases')->count(),
+                'active' => DB::table('cases')->whereNull('deleted_at')->count(),
+                'paid' => DB::table('cases')->where('is_paid', true)->count(),
+                'unpaid' => DB::table('cases')->where('is_paid', false)->count(),
+                'total_revenue' => DB::table('cases')->where('is_paid', true)->sum('price'),
+            ],
+            'bills' => [
+                'total' => DB::table('bills')->count(),
+                'paid' => DB::table('bills')->where('is_paid', true)->count(),
+                'unpaid' => DB::table('bills')->where('is_paid', false)->count(),
+                'total_revenue' => DB::table('bills')->where('is_paid', true)->sum('price'),
+                'total_outstanding' => DB::table('bills')->where('is_paid', false)->sum('price'),
+            ],
+            'doctors' => [
+                'total' => DB::table('users')->whereHas('roles', function($query) {
+                    $query->where('name', 'doctor');
+                })->count(),
+            ],
+            'recent_activity' => [
+                'today_cases' => DB::table('cases')
+                    ->whereDate('created_at', today())
+                    ->count(),
+                'today_bills' => DB::table('bills')
+                    ->whereDate('created_at', today())
+                    ->count(),
+                'today_revenue' => DB::table('bills')
+                    ->whereDate('created_at', today())
+                    ->where('is_paid', true)
+                    ->sum('price'),
+            ]
+        ];
+    }
+
+    /**
+     * Generate demo report based on type
+     */
+    private function generateDemoReport(array $stats, string $reportType): string
+    {
+        $currentDate = now()->format('F j, Y');
+        
+        switch ($reportType) {
+            case 'financial':
+                return $this->generateFinancialReport($stats, $currentDate);
+            case 'operational':
+                return $this->generateOperationalReport($stats, $currentDate);
+            case 'summary':
+                return $this->generateSummaryReport($stats, $currentDate);
+            default:
+                return $this->generateGeneralReport($stats, $currentDate);
+        }
+    }
+
+    /**
+     * Generate demo answer for questions
+     */
+    private function generateDemoAnswer(string $question, array $stats): string
+    {
+        $question = strtolower($question);
+        
+        // Patient questions
+        if (str_contains($question, 'patient') || str_contains($question, 'patients')) {
+            if (str_contains($question, 'how many') || str_contains($question, 'total')) {
+                return "You currently have {$stats['patients']['total']} total patients, with {$stats['patients']['active']} active patients. This month, you've added {$stats['patients']['new_this_month']} new patients.";
+            }
+            if (str_contains($question, 'new') || str_contains($question, 'this month')) {
+                return "This month, you've added {$stats['patients']['new_this_month']} new patients to your clinic.";
+            }
+            return "Your clinic has {$stats['patients']['total']} total patients with {$stats['patients']['active']} currently active.";
+        }
+        
+        // Revenue questions
+        if (str_contains($question, 'revenue') || str_contains($question, 'income') || str_contains($question, 'money')) {
+            if (str_contains($question, 'today')) {
+                return "Today's revenue is ${$stats['recent_activity']['today_revenue']} from paid bills.";
+            }
+            if (str_contains($question, 'outstanding') || str_contains($question, 'unpaid')) {
+                return "You have ${$stats['bills']['total_outstanding']} in outstanding payments from {$stats['bills']['unpaid']} unpaid bills.";
+            }
+            return "Your total revenue from paid bills is ${$stats['bills']['total_revenue']}. You have ${$stats['bills']['total_outstanding']} outstanding from unpaid bills.";
+        }
+        
+        // Bill questions
+        if (str_contains($question, 'bill') || str_contains($question, 'bills')) {
+            if (str_contains($question, 'unpaid')) {
+                return "You have {$stats['bills']['unpaid']} unpaid bills totaling ${$stats['bills']['total_outstanding']}.";
+            }
+            if (str_contains($question, 'paid')) {
+                return "You have {$stats['bills']['paid']} paid bills totaling ${$stats['bills']['total_revenue']}.";
+            }
+            if (str_contains($question, 'today')) {
+                return "Today you've created {$stats['recent_activity']['today_bills']} bills.";
+            }
+            return "You have {$stats['bills']['total']} total bills: {$stats['bills']['paid']} paid and {$stats['bills']['unpaid']} unpaid.";
+        }
+        
+        // Case questions
+        if (str_contains($question, 'case') || str_contains($question, 'cases')) {
+            if (str_contains($question, 'today')) {
+                return "Today you've created {$stats['recent_activity']['today_cases']} new cases.";
+            }
+            return "You have {$stats['cases']['total']} total cases: {$stats['cases']['paid']} paid and {$stats['cases']['unpaid']} unpaid.";
+        }
+        
+        // Doctor questions
+        if (str_contains($question, 'doctor') || str_contains($question, 'doctors')) {
+            return "Your clinic has {$stats['doctors']['total']} doctors currently registered.";
+        }
+        
+        // Today's activity
+        if (str_contains($question, 'today') || str_contains($question, 'activity')) {
+            return "Today's activity: {$stats['recent_activity']['today_cases']} new cases, {$stats['recent_activity']['today_bills']} bills, and ${$stats['recent_activity']['today_revenue']} in revenue.";
+        }
+        
+        // Default response
+        return "Based on your clinic data, I can see you have {$stats['patients']['total']} patients, {$stats['bills']['total']} bills, and {$stats['cases']['total']} cases. Could you please be more specific about what you'd like to know?";
+    }
+
+    /**
+     * Generate general report
+     */
+    private function generateGeneralReport(array $stats, string $currentDate): string
+    {
+        return "
+MEDICAL CLINIC GENERAL REPORT
+Date: {$currentDate}
+
+🏥 OVERVIEW:
+Your clinic is performing well with {$stats['patients']['total']} total patients and {$stats['patients']['active']} active patients. This month, you've welcomed {$stats['patients']['new_this_month']} new patients.
+
+💰 FINANCIAL SUMMARY:
+- Total Revenue: ${$stats['bills']['total_revenue']}
+- Outstanding Payments: ${$stats['bills']['total_outstanding']}
+- Paid Bills: {$stats['bills']['paid']} out of {$stats['bills']['total']}
+- Today's Revenue: ${$stats['recent_activity']['today_revenue']}
+
+📊 OPERATIONAL INSIGHTS:
+- Total Cases: {$stats['cases']['total']}
+- Active Doctors: {$stats['doctors']['total']}
+- Today's Activity: {$stats['recent_activity']['today_cases']} cases, {$stats['recent_activity']['today_bills']} bills
+
+📈 RECOMMENDATIONS:
+1. Focus on collecting outstanding payments of ${$stats['bills']['total_outstanding']}
+2. Maintain the good patient acquisition rate ({$stats['patients']['new_this_month']} this month)
+3. Consider expanding services if patient growth continues
+
+This report shows a healthy, growing clinic with good patient engagement and steady revenue flow.
+        ";
+    }
+
+    /**
+     * Generate financial report
+     */
+    private function generateFinancialReport(array $stats, string $currentDate): string
+    {
+        $collectionRate = $stats['bills']['total'] > 0 ? 
+            round(($stats['bills']['paid'] / $stats['bills']['total']) * 100, 1) : 0;
+        
+        $performance = $collectionRate > 80 ? 'excellent' : ($collectionRate > 60 ? 'good' : 'needs improvement');
+        $dailyAvg = round($stats['bills']['total_revenue'] / max(1, now()->daysInMonth), 2);
+        
+        return "FINANCIAL PERFORMANCE REPORT
+Date: {$currentDate}
+
+REVENUE ANALYSIS:
+- Total Collected: ${$stats['bills']['total_revenue']}
+- Outstanding Amount: ${$stats['bills']['total_outstanding']}
+- Collection Rate: {$collectionRate}%
+
+BILL BREAKDOWN:
+- Total Bills: {$stats['bills']['total']}
+- Paid Bills: {$stats['bills']['paid']} (${$stats['bills']['total_revenue']})
+- Unpaid Bills: {$stats['bills']['unpaid']} (${$stats['bills']['total_outstanding']})
+
+TODAY'S PERFORMANCE:
+- Daily Revenue: ${$stats['recent_activity']['today_revenue']}
+- Daily Bills: {$stats['recent_activity']['today_bills']}
+
+FINANCIAL INSIGHTS:
+1. Collection rate of {$collectionRate}% is {$performance}
+2. Outstanding amount of ${$stats['bills']['total_outstanding']} requires attention
+3. Daily average revenue: ${$dailyAvg}
+
+RECOMMENDATIONS:
+- Implement payment reminders for unpaid bills
+- Consider early payment discounts
+- Review pricing strategy if collection rate is below 70%";
+    }
+
+    /**
+     * Generate operational report
+     */
+    private function generateOperationalReport(array $stats, string $currentDate): string
+    {
+        $casesPerDoctor = $stats['doctors']['total'] > 0 ? 
+            round($stats['cases']['total'] / $stats['doctors']['total'], 1) : 0;
+        
+        return "
+OPERATIONAL PERFORMANCE REPORT
+Date: {$currentDate}
+
+👥 PATIENT MANAGEMENT:
+- Total Patients: {$stats['patients']['total']}
+- Active Patients: {$stats['patients']['active']}
+- New Patients This Month: {$stats['patients']['new_this_month']}
+
+🩺 CASE MANAGEMENT:
+- Total Cases: {$stats['cases']['total']}
+- Paid Cases: {$stats['cases']['paid']}
+- Unpaid Cases: {$stats['cases']['unpaid']}
+- Cases Per Doctor: {$casesPerDoctor}
+
+👨‍⚕️ DOCTOR WORKLOAD:
+- Active Doctors: {$stats['doctors']['total']}
+- Average Cases Per Doctor: {$casesPerDoctor}
+
+📊 TODAY'S OPERATIONS:
+- New Cases Today: {$stats['recent_activity']['today_cases']}
+- New Bills Today: {$stats['recent_activity']['today_bills']}
+
+🎯 OPERATIONAL EFFICIENCY:
+- Patient Growth Rate: " . ($stats['patients']['new_this_month'] > 0 ? 'Positive' : 'Neutral') . "
+- Case Completion Rate: " . ($stats['cases']['total'] > 0 ? round(($stats['cases']['paid'] / $stats['cases']['total']) * 100, 1) . '%' : 'N/A') . "
+
+💡 OPERATIONAL RECOMMENDATIONS:
+1. Monitor doctor workload distribution
+2. Focus on increasing case completion rate
+3. Maintain patient acquisition momentum
+4. Consider expanding team if workload increases
+        ";
+    }
+
+    /**
+     * Generate summary report
+     */
+    private function generateSummaryReport(array $stats, string $currentDate): string
+    {
+        return "
+EXECUTIVE SUMMARY REPORT
+Date: {$currentDate}
+
+🏥 KEY METRICS:
+• Total Patients: {$stats['patients']['total']}
+• Active Patients: {$stats['patients']['active']}
+• New This Month: {$stats['patients']['new_this_month']}
+
+💰 FINANCIAL SNAPSHOT:
+• Total Revenue: ${$stats['bills']['total_revenue']}
+• Outstanding: ${$stats['bills']['total_outstanding']}
+• Today's Revenue: ${$stats['recent_activity']['today_revenue']}
+
+📊 OPERATIONAL HIGHLIGHTS:
+• Total Cases: {$stats['cases']['total']}
+• Active Doctors: {$stats['doctors']['total']}
+• Today's Activity: {$stats['recent_activity']['today_cases']} cases
+
+🎯 PERFORMANCE INDICATORS:
+• Collection Rate: " . ($stats['bills']['total'] > 0 ? round(($stats['bills']['paid'] / $stats['bills']['total']) * 100, 1) . '%' : 'N/A') . "
+• Patient Growth: " . ($stats['patients']['new_this_month'] > 0 ? 'Positive' : 'Stable') . "
+
+📈 STATUS: " . ($stats['bills']['total_revenue'] > 0 ? 'Revenue Generating' : 'Building') . "
+        ";
+    }
+}
