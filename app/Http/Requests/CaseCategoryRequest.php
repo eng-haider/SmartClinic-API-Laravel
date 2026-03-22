@@ -26,6 +26,7 @@ class CaseCategoryRequest extends FormRequest
 
         return [
             'name' => 'required|string|max:255',
+            'category_type' => 'required|in:dental,beauty',
             'order' => 'nullable|integer|min:0',
             'item_cost' => 'nullable|integer|min:0',
             'without_detect_tooth' => 'nullable|boolean',
@@ -43,10 +44,13 @@ class CaseCategoryRequest extends FormRequest
             'name.required' => 'Category name is required',
             'name.string' => 'Category name must be a string',
             'name.max' => 'Category name must not exceed 255 characters',
+            'category_type.required' => 'Category type is required',
+            'category_type.in' => 'Category type must be either dental or beauty',
             'order.integer' => 'Order must be an integer',
             'order.min' => 'Order must be at least 0',
             'item_cost.integer' => 'Item cost must be an integer',
             'item_cost.min' => 'Item cost must be at least 0',
+            'without_detect_tooth.boolean' => 'Tooth detection flag must be true or false',
         ];
     }
 }
