@@ -9,6 +9,7 @@ use App\Models\CaseModel;
 use App\Models\Bill;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use OpenAI;
 
@@ -43,14 +44,14 @@ class VectorSearchService
         // Perform cosine similarity search using pgvector
         $results = DB::connection('pgsql_embeddings')
             ->select(
-                "SELECT id, clinic_id, table_name, record_id, content,
+            "SELECT id, clinic_id, table_name, record_id, content,
                         1 - (embedding <=> ?::vector) as similarity
                  FROM embeddings
                  WHERE clinic_id = ?
                  ORDER BY embedding <=> ?::vector
                  LIMIT ?",
-                [$vectorString, $clinicId, $vectorString, $limit]
-            );
+        [$vectorString, $clinicId, $vectorString, $limit]
+        );
 
         return collect($results);
     }
@@ -67,10 +68,10 @@ class VectorSearchService
 
         // Model mapping: table_name => Model class
         $modelMap = [
-            'patients' => Patient::class,
-            'reservations' => Reservation::class,
-            'cases' => CaseModel::class,
-            'bills' => Bill::class,
+            'patients' => Patient::class ,
+            'reservations' => Reservation::class ,
+            'cases' => CaseModel::class ,
+            'bills' => Bill::class ,
         ];
 
         foreach ($embeddingResults as $embedding) {
@@ -117,7 +118,8 @@ class VectorSearchService
                         'content' => $embedding->content,
                         'similarity' => round($embedding->similarity, 4),
                     ];
-                } else {
+                }
+                else {
                     // Record was deleted but embedding still exists
                     $records[] = [
                         'source' => $embedding->table_name,
@@ -127,7 +129,8 @@ class VectorSearchService
                         'note' => 'Original record no longer exists',
                     ];
                 }
-            } catch (\Exception $e) {
+            }
+            catch (\Exception $e) {
                 Log::warning('Failed to fetch original record', [
                     'table' => $embedding->table_name,
                     'record_id' => $embedding->record_id,
@@ -158,9 +161,49 @@ class VectorSearchService
      * @param string $question  The user's question
      * @return array            Response with answer, sources, etc.
      */
+    /**
+     * Check if the question is a simple greeting that doesn't need database search.
+     */
+    private function isSimpleGreeting(string $question): bool
+    {
+        $greetings = [
+            'hello', 'hi', 'hey', 'how are you', 'good morning', 'good evening',
+            'good afternoon', 'what can you do', 'who are you', 'help',
+            'مرحبا', 'اهلا', 'السلام عليكم', 'كيف حالك', 'شلونك', 'هلو',
+        ];
+        $lower = mb_strtolower(trim($question));
+        foreach ($greetings as $greeting) {
+            if (str_contains($lower, $greeting)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public function chat(string $clinicId, string $question): array
     {
         try {
+            $apiKey = config('services.openai.api_key');
+            $model = config('services.openai.chat_model', 'gpt-4o-mini');
+            $systemMessage = 'You are a helpful AI assistant for a dental/medical clinic management system called SmartClinic. '
+                . 'You can greet users, answer general questions, and help with clinic-related queries. '
+                . 'When clinic data context is provided, use it to answer questions accurately. '
+                . 'If no relevant clinic data is provided, still respond helpfully. '
+                . 'Be professional, friendly, and concise. Support both Arabic and English.';
+
+            // For simple greetings, skip the expensive embedding search
+            if ($this->isSimpleGreeting($question)) {
+                $answer = $this->callOpenAI($apiKey, $model, $systemMessage, $question, 300);
+
+                return [
+                    'success' => true,
+                    'question' => $question,
+                    'answer' => $answer,
+                    'sources' => [],
+                    'answered_at' => now()->toDateTimeString(),
+                ];
+            }
+
             // Step 1 & 2: Search similar embeddings
             $similarEmbeddings = $this->searchSimilar($clinicId, $question, 5);
 
@@ -177,13 +220,6 @@ class VectorSearchService
                 $context = $this->buildContext($originalRecords);
             }
 
-            // Build the system message
-            $systemMessage = 'You are a helpful AI assistant for a dental/medical clinic management system called SmartClinic. '
-                . 'You can greet users, answer general questions, and help with clinic-related queries. '
-                . 'When clinic data context is provided, use it to answer questions accurately. '
-                . 'If no relevant clinic data is provided, still respond helpfully but mention that you don\'t have specific data for that query. '
-                . 'Be professional, friendly, and concise. Support both Arabic and English.';
-
             // Build the user message
             $userMessage = $question;
             if (!empty($context)) {
@@ -192,35 +228,15 @@ class VectorSearchService
                     . "Clinic Data Context:\n{$context}";
             }
 
-            // Step 5: Send to GPT for final answer
-            $response = $this->client->chat()->create([
-                'model' => config('services.openai.chat_model', 'gpt-5-nano'),
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemMessage],
-                    ['role' => 'user', 'content' => $userMessage]
-                ],
-                'max_completion_tokens' => 1000,
-            ]);
-
-            // Handle the response - check multiple possible locations
-            $answer = $response->choices[0]->message->content ?? '';
-            
-            // If still empty, check for refusal
-            if (empty($answer) && isset($response->choices[0]->message->refusal)) {
-                $answer = 'I\'m sorry, I cannot answer that question.';
-            }
-
-            // Final fallback
-            if (empty($answer)) {
-                $answer = 'I received your question but was unable to generate a response. Please try rephrasing your question.';
-            }
+            // Send to GPT for final answer
+            $answer = $this->callOpenAI($apiKey, $model, $systemMessage, $userMessage, 1000);
 
             // Build source references
             $sources = array_map(function ($record) {
                 return [
-                    'type' => $record['source'],
-                    'record_id' => $record['record_id'],
-                    'similarity' => $record['similarity'],
+                'type' => $record['source'],
+                'record_id' => $record['record_id'],
+                'similarity' => $record['similarity'],
                 ];
             }, $originalRecords);
 
@@ -232,7 +248,8 @@ class VectorSearchService
                 'answered_at' => now()->toDateTimeString(),
             ];
 
-        } catch (\Exception $e) {
+        }
+        catch (\Exception $e) {
             Log::error('AI Chat Error: ' . $e->getMessage(), [
                 'clinic_id' => $clinicId,
                 'question' => $question,
@@ -244,6 +261,42 @@ class VectorSearchService
                 'error' => 'Failed to process your question: ' . $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Call OpenAI Chat API directly using Laravel Http client.
+     */
+    private function callOpenAI(string $apiKey, string $model, string $systemMessage, string $userMessage, int $maxTokens = 1000): string
+    {
+        $body = [
+            'model' => $model,
+            'messages' => [
+                ['role' => 'system', 'content' => $systemMessage],
+                ['role' => 'user', 'content' => $userMessage],
+            ],
+        ];
+
+        // gpt-5-nano uses different parameter names
+        if (str_contains($model, 'gpt-5')) {
+            $body['max_completion_tokens'] = $maxTokens;
+            // gpt-5-nano does not support custom temperature
+        } else {
+            $body['max_tokens'] = $maxTokens;
+            $body['temperature'] = 0.3;
+        }
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $apiKey,
+            'Content-Type' => 'application/json',
+        ])->timeout(30)->post('https://api.openai.com/v1/chat/completions', $body);
+
+        $data = $response->json();
+
+        if (isset($data['error'])) {
+            throw new \Exception($data['error']['message'] ?? 'OpenAI API error');
+        }
+
+        return $data['choices'][0]['message']['content'] ?? 'I could not generate a response. Please try again.';
     }
 
     /**
