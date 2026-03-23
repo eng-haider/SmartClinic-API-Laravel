@@ -26,10 +26,14 @@ trait HasEmbeddings
             try {
                 $clinicId = tenant('id');
                 if ($clinicId) {
-                    app(EmbeddingService::class)->syncModelEmbedding($model, $clinicId);
+                    // Pre-compute content so the background Job doesn't need to query the tenant DB
+                    $content = trim($model->toEmbeddingContent());
+                    if (!empty($content)) {
+                        \App\Jobs\SyncEmbeddingJob::dispatch($clinicId, $model->getEmbeddingTableName(), $model->getKey(), $content);
+                    }
                 }
             } catch (\Exception $e) {
-                Log::warning('Embedding sync failed on create: ' . $e->getMessage(), [
+                Log::warning('Embedding job dispatch failed on create: ' . $e->getMessage(), [
                     'model' => get_class($model),
                     'id' => $model->getKey(),
                 ]);
@@ -41,19 +45,24 @@ trait HasEmbeddings
             try {
                 $clinicId = tenant('id');
                 if ($clinicId) {
-                    // Build current content and check if it differs
-                    $newContent = $model->toEmbeddingContent();
+                    $content = trim($model->toEmbeddingContent());
+                    
+                    if (empty($content)) {
+                        return; // Nothing to sync
+                    }
+
+                    // Check if embedding exists with same content in the central pgsql_embeddings DB
                     $existingEmbedding = \App\Models\Embedding::forClinic($clinicId)
                         ->forRecord($model->getEmbeddingTableName(), $model->getKey())
                         ->first();
 
-                    // Only regenerate if content actually changed
-                    if (!$existingEmbedding || $existingEmbedding->content !== $newContent) {
-                        app(EmbeddingService::class)->syncModelEmbedding($model, $clinicId);
+                    // Only dispatch job if content actually changed
+                    if (!$existingEmbedding || $existingEmbedding->content !== $content) {
+                        \App\Jobs\SyncEmbeddingJob::dispatch($clinicId, $model->getEmbeddingTableName(), $model->getKey(), $content);
                     }
                 }
             } catch (\Exception $e) {
-                Log::warning('Embedding sync failed on update: ' . $e->getMessage(), [
+                Log::warning('Embedding job dispatch failed on update: ' . $e->getMessage(), [
                     'model' => get_class($model),
                     'id' => $model->getKey(),
                 ]);
