@@ -279,8 +279,9 @@ class VectorSearchService
         // gpt-5-nano uses different parameter names
         if (str_contains($model, 'gpt-5')) {
             $body['max_completion_tokens'] = $maxTokens;
-            // gpt-5-nano does not support custom temperature
-        } else {
+        // gpt-5-nano does not support custom temperature
+        }
+        else {
             $body['max_tokens'] = $maxTokens;
             $body['temperature'] = 0.3;
         }
