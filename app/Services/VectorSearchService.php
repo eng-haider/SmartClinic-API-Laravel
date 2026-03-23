@@ -297,7 +297,19 @@ class VectorSearchService
             throw new \Exception($data['error']['message'] ?? 'OpenAI API error');
         }
 
-        return $data['choices'][0]['message']['content'] ?? 'I could not generate a response. Please try again.';
+        $content = $data['choices'][0]['message']['content'] ?? null;
+
+        // Handle both null AND empty string
+        if (empty($content)) {
+            // If gpt-5-nano returns empty, fallback to gpt-4o-mini
+            if (str_contains($model, 'gpt-5')) {
+                Log::warning('gpt-5-nano returned empty content, retrying with gpt-4o-mini');
+                return $this->callOpenAI($apiKey, 'gpt-4o-mini', $systemMessage, $userMessage, $maxTokens);
+            }
+            return 'I could not generate a response. Please try again.';
+        }
+
+        return $content;
     }
 
     /**
