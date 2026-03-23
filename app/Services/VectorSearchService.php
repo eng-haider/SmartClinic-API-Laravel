@@ -200,7 +200,6 @@ class VectorSearchService
                     ]
                 ],
                 'max_completion_tokens' => 1000,
-                'temperature' => 0.3,
             ]);
 
             $answer = $response->choices[0]->message->content;
