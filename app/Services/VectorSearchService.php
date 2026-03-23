@@ -184,7 +184,8 @@ class VectorSearchService
     {
         try {
             $apiKey = config('services.openai.api_key');
-            $model = config('services.openai.chat_model', 'gpt-4o-mini');
+            // Hardcode gpt-4o-mini because gpt-5-nano takes ~10 seconds to fail before retrying, which makes it feel slow
+            $model = 'gpt-4o-mini';
             $systemMessage = 'You are a helpful AI assistant for a dental/medical clinic management system called SmartClinic. '
                 . 'You can greet users, answer general questions, and help with clinic-related queries. '
                 . 'When clinic data context is provided, use it to answer questions accurately. '
