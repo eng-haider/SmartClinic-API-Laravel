@@ -164,45 +164,56 @@ class VectorSearchService
             // Step 1 & 2: Search similar embeddings
             $similarEmbeddings = $this->searchSimilar($clinicId, $question, 5);
 
-            if ($similarEmbeddings->isEmpty()) {
-                return [
-                    'success' => true,
-                    'answer' => 'I don\'t have enough data to answer your question yet. Please make sure your clinic data has been synced for AI assistance.',
-                    'sources' => [],
-                    'question' => $question,
-                    'answered_at' => now()->toDateTimeString(),
-                ];
+            // Filter out low-similarity results (below 0.3 threshold)
+            $relevantEmbeddings = $similarEmbeddings->filter(function ($item) {
+                return $item->similarity >= 0.3;
+            });
+
+            // Build context only from relevant results
+            $originalRecords = [];
+            $context = '';
+            if ($relevantEmbeddings->isNotEmpty()) {
+                $originalRecords = $this->fetchOriginalRecords($relevantEmbeddings);
+                $context = $this->buildContext($originalRecords);
             }
 
-            // Step 3: Fetch original records
-            $originalRecords = $this->fetchOriginalRecords($similarEmbeddings);
+            // Build the system message
+            $systemMessage = 'You are a helpful AI assistant for a dental/medical clinic management system called SmartClinic. '
+                . 'You can greet users, answer general questions, and help with clinic-related queries. '
+                . 'When clinic data context is provided, use it to answer questions accurately. '
+                . 'If no relevant clinic data is provided, still respond helpfully but mention that you don\'t have specific data for that query. '
+                . 'Be professional, friendly, and concise. Support both Arabic and English.';
 
-            // Step 4: Build context from retrieved records
-            $context = $this->buildContext($originalRecords);
+            // Build the user message
+            $userMessage = $question;
+            if (!empty($context)) {
+                $userMessage = "Based on the following clinic records, answer this question:\n\n"
+                    . "Question: {$question}\n\n"
+                    . "Clinic Data Context:\n{$context}";
+            }
 
             // Step 5: Send to GPT for final answer
             $response = $this->client->chat()->create([
                 'model' => config('services.openai.chat_model', 'gpt-5-nano'),
                 'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => 'You are a helpful AI assistant for a dental/medical clinic management system. '
-                            . 'Answer questions based ONLY on the provided clinic data context. '
-                            . 'Be accurate, professional, and concise. '
-                            . 'If the data doesn\'t contain enough information to fully answer the question, say so. '
-                            . 'Format monetary values properly. Use clear language.'
-                    ],
-                    [
-                        'role' => 'user',
-                        'content' => "Based on the following clinic records, answer this question:\n\n"
-                            . "Question: {$question}\n\n"
-                            . "Clinic Data Context:\n{$context}"
-                    ]
+                    ['role' => 'system', 'content' => $systemMessage],
+                    ['role' => 'user', 'content' => $userMessage]
                 ],
                 'max_completion_tokens' => 1000,
             ]);
 
-            $answer = $response->choices[0]->message->content;
+            // Handle the response - check multiple possible locations
+            $answer = $response->choices[0]->message->content ?? '';
+            
+            // If still empty, check for refusal
+            if (empty($answer) && isset($response->choices[0]->message->refusal)) {
+                $answer = 'I\'m sorry, I cannot answer that question.';
+            }
+
+            // Final fallback
+            if (empty($answer)) {
+                $answer = 'I received your question but was unable to generate a response. Please try rephrasing your question.';
+            }
 
             // Build source references
             $sources = array_map(function ($record) {
