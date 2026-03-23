@@ -1,12 +1,13 @@
 <?php
 namespace App\Models;
+use App\Traits\HasEmbeddings;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CaseModel extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasEmbeddings;
 
     /**
      * The table associated with the model.
@@ -157,5 +158,27 @@ class CaseModel extends Model
     public function images()
     {
         return $this->morphMany(Image::class, 'imageable');
+    }
+
+    /**
+     * Convert case data to embedding content string.
+     */
+    public function toEmbeddingContent(): string
+    {
+        $parts = [
+            "Dental/Medical Case",
+            $this->patient ? "Patient: {$this->patient->name}" : null,
+            $this->doctor ? "Doctor: {$this->doctor->name}" : null,
+            $this->category ? "Category: {$this->category->name}" : null,
+            $this->tooth_num ? "Tooth Number: {$this->tooth_num}" : null,
+            $this->price ? "Price: {$this->price}" : null,
+            $this->status ? "Status: {$this->status->name}" : null,
+            "Paid: " . ($this->is_paid ? 'Yes' : 'No'),
+            $this->case_date ? "Case Date: {$this->case_date->format('Y-m-d')}" : null,
+            $this->getAttribute('notes') ? "Notes: {$this->getAttribute('notes')}" : null,
+            $this->root_stuffing ? "Root Stuffing: {$this->root_stuffing}" : null,
+        ];
+
+        return implode('. ', array_filter($parts));
     }
 }

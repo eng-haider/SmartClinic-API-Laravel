@@ -169,6 +169,30 @@ return [
             'sslmode' => 'prefer',
         ],
 
+        /*
+        |--------------------------------------------------------------------------
+        | pgvector Embeddings Database Connection
+        |--------------------------------------------------------------------------
+        |
+        | Dedicated PostgreSQL connection for AI embeddings with pgvector.
+        | This is separate from the MySQL tenant databases.
+        | Requires: PostgreSQL with pgvector extension enabled.
+        |
+        */
+        'pgsql_embeddings' => [
+            'driver' => 'pgsql',
+            'host' => env('PGVECTOR_HOST', '127.0.0.1'),
+            'port' => env('PGVECTOR_PORT', '5432'),
+            'database' => env('PGVECTOR_DATABASE', 'smartclinic_embeddings'),
+            'username' => env('PGVECTOR_USERNAME', 'postgres'),
+            'password' => env('PGVECTOR_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => 'prefer',
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

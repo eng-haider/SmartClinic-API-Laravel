@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasEmbeddings;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,7 +11,7 @@ use Illuminate\Support\Str;
 
 class Patient extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasEmbeddings;
 
     /**
      * The attributes that are mass assignable.
@@ -258,5 +259,24 @@ class Patient extends Model
         return $query->whereDoesntHave('cases', function ($q) {
             $q->where('is_paid', false);
         })->whereHas('cases'); // Must have at least one case
+    }
+
+    /**
+     * Convert patient data to embedding content string.
+     */
+    public function toEmbeddingContent(): string
+    {
+        $parts = [
+            "Patient: {$this->name}",
+            $this->phone ? "Phone: {$this->phone}" : null,
+            $this->age ? "Age: {$this->age}" : null,
+            "Sex: {$this->sex_label}",
+            $this->address ? "Address: {$this->address}" : null,
+            $this->systemic_conditions ? "Systemic Conditions: {$this->systemic_conditions}" : null,
+            $this->note ? "Notes: {$this->note}" : null,
+            $this->doctor ? "Doctor: {$this->doctor->name}" : null,
+        ];
+
+        return implode('. ', array_filter($parts));
     }
 }

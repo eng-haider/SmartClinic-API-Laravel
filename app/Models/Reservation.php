@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasEmbeddings;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -9,7 +10,7 @@ use Illuminate\Support\Facades\Auth;
 
 class Reservation extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasEmbeddings;
 
     /**
      * The attributes that are mass assignable.
@@ -208,5 +209,27 @@ class Reservation extends Model
         return $query->whereDate('reservation_start_date', '<=', now()->toDateString())
                      ->whereDate('reservation_end_date', '>=', now()->toDateString())
                      ->orderBy('reservation_from_time');
+    }
+
+    /**
+     * Convert reservation data to embedding content string.
+     */
+    public function toEmbeddingContent(): string
+    {
+        $parts = [
+            "Appointment/Reservation",
+            $this->patient ? "Patient: {$this->patient->name}" : null,
+            $this->doctor ? "Doctor: {$this->doctor->name}" : null,
+            $this->reservation_start_date ? "Date: {$this->reservation_start_date->format('Y-m-d')}" : null,
+            $this->reservation_from_time ? "From: {$this->reservation_from_time}" : null,
+            $this->reservation_to_time ? "To: {$this->reservation_to_time}" : null,
+            $this->status ? "Status: {$this->status->name}" : null,
+            $this->reservationType ? "Type: {$this->reservationType->name}" : null,
+            $this->reservation_type_note ? "Type Note: {$this->reservation_type_note}" : null,
+            $this->is_waiting ? "Waiting: Yes" : "Waiting: No",
+            $this->getAttribute('notes') ? "Notes: {$this->getAttribute('notes')}" : null,
+        ];
+
+        return implode('. ', array_filter($parts));
     }
 }

@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\HasEmbeddings;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Bill extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasEmbeddings;
 
     /**
      * The "booted" method of the model.
@@ -247,5 +248,31 @@ class Bill extends Model
     public function getCreditUsageAttribute(): string
     {
         return $this->use_credit ? 'Credit Used' : 'No Credit';
+    }
+
+    /**
+     * Convert bill data to embedding content string.
+     */
+    public function toEmbeddingContent(): string
+    {
+        // Map billable type to human-readable name
+        $billableType = match ($this->billable_type) {
+            'App\Models\Case', 'App\Models\CaseModel' => 'Case',
+            'App\Models\Reservation' => 'Reservation',
+            default => $this->billable_type ?? 'Unknown',
+        };
+
+        $parts = [
+            "Bill/Invoice",
+            $this->patient ? "Patient: {$this->patient->name}" : null,
+            $this->doctor ? "Doctor: {$this->doctor->name}" : null,
+            "Price: {$this->price}",
+            "Payment Status: {$this->payment_status}",
+            "Billable Type: {$billableType}",
+            $this->bill_date ? "Bill Date: {$this->bill_date->format('Y-m-d')}" : null,
+            $this->use_credit ? "Credit Used: Yes" : null,
+        ];
+
+        return implode('. ', array_filter($parts));
     }
 }

@@ -31,6 +31,7 @@ use App\Http\Controllers\Report\PatientReportController;
 use App\Http\Controllers\Report\CaseReportController;
 use App\Http\Controllers\Report\ReservationReportController;
 use App\Http\Controllers\Report\FinancialReportController;
+use App\Http\Controllers\AIController;
 
 /*
 |--------------------------------------------------------------------------
@@ -168,6 +169,16 @@ Route::middleware([
         Route::get('/{key}', [ClinicSettingController::class, 'show']);
         Route::put('/{key}', [ClinicSettingController::class, 'update']);
         Route::post('/bulk-update', [ClinicSettingController::class, 'updateBulk']);
+    });
+
+    // ============================================
+    // AI CHATBOT ROUTES (JWT required)
+    // Uses pgvector RAG for context-aware answers
+    // ============================================
+    Route::middleware('jwt')->prefix('ai')->group(function () {
+        Route::post('chat', [AIController::class, 'chat']);
+        Route::post('sync-embeddings', [AIController::class, 'syncEmbeddings']);
+        Route::get('capabilities', [AIController::class, 'getCapabilities']);
     });
 
     // ============================================
