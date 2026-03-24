@@ -62,7 +62,6 @@ class GetAnalyticsTool implements AIToolInterface
 
         // Top by revenue
         $topByRevenue = Bill::whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->where('is_paid', true)
             ->select('doctor_id', DB::raw('SUM(price) as total_revenue'), DB::raw('COUNT(*) as bill_count'))
             ->groupBy('doctor_id')
             ->orderByDesc('total_revenue')
@@ -126,7 +125,6 @@ class GetAnalyticsTool implements AIToolInterface
             $monthLabel = $date->format('M Y');
 
             $revenue = Bill::whereBetween('created_at', [$start, $end])
-                ->where('is_paid', true)
                 ->sum('price');
 
             $billCount = Bill::whereBetween('created_at', [$start, $end])->count();
@@ -147,8 +145,8 @@ class GetAnalyticsTool implements AIToolInterface
         $lastMonthEnd = now()->subMonth()->endOfMonth();
 
         // Revenue
-        $thisRevenue = Bill::whereBetween('created_at', [$thisMonthStart, $thisMonthEnd])->where('is_paid', true)->sum('price');
-        $lastRevenue = Bill::whereBetween('created_at', [$lastMonthStart, $lastMonthEnd])->where('is_paid', true)->sum('price');
+        $thisRevenue = Bill::whereBetween('created_at', [$thisMonthStart, $thisMonthEnd])->sum('price');
+        $lastRevenue = Bill::whereBetween('created_at', [$lastMonthStart, $lastMonthEnd])->sum('price');
         $revenueChange = $lastRevenue > 0 ? round((($thisRevenue - $lastRevenue) / $lastRevenue) * 100, 1) : 0;
         $revenueDir = $revenueChange >= 0 ? '↑' : '↓';
         $lines[] = "Revenue: {$thisRevenue} vs {$lastRevenue} ({$revenueDir} {$revenueChange}%)";

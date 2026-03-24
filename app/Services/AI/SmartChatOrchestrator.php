@@ -71,7 +71,7 @@ class SmartChatOrchestrator
             $analysis = $this->analyzer->analyze($question);
             Log::info('AI Pipeline: Analysis result', ['analysis' => $analysis]);
 
-            // Simple greeting — skip pipeline
+            // Simple greeting — skip entire pipeline, respond directly
             if ($analysis['intent'] === 'general' && !$analysis['needs_database'] && !$analysis['needs_vector_search']) {
                 $answer = $this->callGPT($question, '', 300);
                 return $this->buildResponse($question, $answer, [], $analysis, $startTime);
@@ -96,15 +96,19 @@ class SmartChatOrchestrator
                 }
             }
 
-            // Step 4: Vector search
+            // Step 4: Vector search — only when tools can't fully answer
+            // Skip for intents where DB tools already provide comprehensive data
             $originalRecords = [];
-            if ($analysis['needs_vector_search']) {
+            $skipVectorIntents = ['revenue', 'expenses', 'patients', 'reservations', 'cases', 'analytics'];
+            $shouldRunVector = $analysis['needs_vector_search'] && !in_array($analysis['intent'], $skipVectorIntents);
+
+            if ($shouldRunVector) {
                 $originalRecords = $this->runVectorSearch($clinicId, $question);
                 $contextBuilder->addVectorSearchResults($originalRecords);
             }
 
-            // Step 4b: Medical knowledge search
-            if ($analysis['needs_knowledge_base']) {
+            // Step 4b: Medical knowledge search — only for medical questions
+            if ($analysis['needs_knowledge_base'] && $analysis['intent'] === 'medical_question') {
                 $kbTool = $this->tools['search_medical_knowledge'] ?? null;
                 if ($kbTool) {
                     $kbResult = $kbTool->execute($toolParams);

@@ -100,6 +100,7 @@ class TenantController extends Controller
             'user_phone' => 'required|string|max:20',
             'user_email' => 'nullable|email|max:255',
             'user_password' => 'required|string|min:6',
+            'has_ai_bot' => 'nullable|boolean',
         ]);
 
         // Generate unique tenant ID from name
@@ -164,6 +165,7 @@ class TenantController extends Controller
                 'whatsapp_template_sid' => $validated['whatsapp_template_sid'] ?? null,
                 'whatsapp_phone' => $validated['whatsapp_phone'] ?? null,
                 'logo' => $validated['logo'] ?? null,
+                'has_ai_bot' => $validated['has_ai_bot'] ?? false,
                 'db_name' => $databaseName,
                 'db_username' => $databaseUsername,
                 'db_password' => $databasePassword,
@@ -180,6 +182,7 @@ class TenantController extends Controller
                 'whatsapp_template_sid' => $validated['whatsapp_template_sid'] ?? null,
                 'whatsapp_phone' => $validated['whatsapp_phone'] ?? null,
                 'logo' => $validated['logo'] ?? null,
+                'has_ai_bot' => $validated['has_ai_bot'] ?? false,
             ]);
             
             Log::info('✓ Clinic created in central DB', ['id' => $clinic->id]);
@@ -405,6 +408,7 @@ class TenantController extends Controller
             'show_rx_id' => 'nullable|boolean',
             'logo' => 'nullable|string',
             'api_whatsapp' => 'nullable|boolean',
+            'has_ai_bot' => 'nullable|boolean',
         ]);
 
         $tenant->update($validated);

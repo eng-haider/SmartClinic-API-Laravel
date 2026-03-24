@@ -46,6 +46,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'show_rx_id',
         'logo',
         'api_whatsapp',
+        'has_ai_bot',
         'data',
         // Hostinger database credentials (one user per database)
         'db_name',
@@ -106,6 +107,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             'send_msg' => 'boolean',
             'show_rx_id' => 'boolean',
             'api_whatsapp' => 'boolean',
+            'has_ai_bot' => 'boolean',
             'data' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
@@ -133,6 +135,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             'show_rx_id',
             'logo',
             'api_whatsapp',
+            'has_ai_bot',
         ];
     }
 }

@@ -41,11 +41,19 @@ class AIController extends Controller
 
         $clinicId = tenant('id');
 
-        if (!$clinicId) {
+        if (!$clinicId || !tenant()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Clinic context not found. Please ensure tenant is initialized.',
             ], 400);
+        }
+
+        if (!tenant('has_ai_bot')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'AI Chatbot is not enabled for this clinic. Please contact support.',
+                'message_ar' => 'خدمة الذكاء الاصطناعي غير مفعلة لهذه العيادة. يرجى التواصل مع الدعم الفني.',
+            ], 403);
         }
 
         $result = $this->vectorSearchService->chat($clinicId, $request->input('question'));
@@ -185,6 +193,14 @@ class AIController extends Controller
         $request->validate([
             'question' => 'required|string|max:1000'
         ]);
+
+        if (!tenant() || !tenant('has_ai_bot')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'AI Chatbot is not enabled for this clinic. Please contact support.',
+                'message_ar' => 'خدمة الذكاء الاصطناعي غير مفعلة لهذه العيادة. يرجى التواصل مع الدعم الفني.',
+            ], 403);
+        }
 
         $question = $request->input('question');
         

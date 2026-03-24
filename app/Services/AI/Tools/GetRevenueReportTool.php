@@ -31,13 +31,10 @@ class GetRevenueReportTool implements AIToolInterface
 
             $lines[] = "--- Revenue Report for {$label} ---";
             $lines[] = "Total Bills: " . $bills->count();
-            $lines[] = "Total Paid Revenue: " . $bills->where('is_paid', true)->sum('price');
-            $lines[] = "Total Unpaid Amount: " . $bills->where('is_paid', false)->sum('price');
-            $lines[] = "Paid Bills: " . $bills->where('is_paid', true)->count();
-            $lines[] = "Unpaid Bills: " . $bills->where('is_paid', false)->count();
+            $lines[] = "Total Revenue: " . $bills->sum('price');
 
             // Top doctors by revenue
-            $doctorRevenue = $bills->where('is_paid', true)->groupBy('doctor_id')->map(fn($b) => $b->sum('price'))->sortDesc()->take(5);
+            $doctorRevenue = $bills->groupBy('doctor_id')->map(fn($b) => $b->sum('price'))->sortDesc()->take(5);
             if ($doctorRevenue->isNotEmpty()) {
                 $lines[] = "Top Doctors by Revenue:";
                 foreach ($doctorRevenue as $doctorId => $revenue) {
@@ -53,8 +50,7 @@ class GetRevenueReportTool implements AIToolInterface
                 foreach ($bills->take(15) as $bill) {
                     $patientName = $bill->patient->name ?? 'Unknown';
                     $doctorName = $bill->doctor->name ?? 'Unknown';
-                    $status = $bill->is_paid ? 'Paid' : 'Unpaid';
-                    $lines[] = "  - {$patientName} | Dr. {$doctorName} | {$bill->price} | {$status}";
+                    $lines[] = "  - {$patientName} | Dr. {$doctorName} | {$bill->price}";
                 }
             }
         } else {
@@ -64,24 +60,21 @@ class GetRevenueReportTool implements AIToolInterface
 
             $lines[] = "--- Revenue for Today ({$today}) ---";
             $lines[] = "Today's Bills: " . $todayBills->count();
-            $lines[] = "Today's Paid Revenue: " . $todayBills->where('is_paid', true)->sum('price');
-            $lines[] = "Today's Unpaid: " . $todayBills->where('is_paid', false)->sum('price');
+            $lines[] = "Today's Revenue: " . $todayBills->sum('price');
 
             // All-time summary (cached for 5 minutes)
             $allTimeStats = Cache::remember('revenue_all_time', 300, function () {
                 $all = Bill::all();
                 return [
                     'total' => $all->count(),
-                    'paid' => $all->where('is_paid', true)->sum('price'),
-                    'unpaid' => $all->where('is_paid', false)->sum('price'),
+                    'revenue' => $all->sum('price'),
                 ];
             });
 
             $lines[] = "";
             $lines[] = "--- All-Time Revenue ---";
             $lines[] = "Total Bills: {$allTimeStats['total']}";
-            $lines[] = "Total Paid Revenue: {$allTimeStats['paid']}";
-            $lines[] = "Total Unpaid: {$allTimeStats['unpaid']}";
+            $lines[] = "Total Revenue: {$allTimeStats['revenue']}";
         }
 
         // Expenses summary

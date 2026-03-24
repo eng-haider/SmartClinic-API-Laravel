@@ -42,7 +42,6 @@ class Bill extends Model
         'patient_id',
         'billable_id',
         'billable_type',
-        'is_paid',
         'price',
         'doctor_id',
         'creator_id',
@@ -65,7 +64,6 @@ class Bill extends Model
             'creator_id' => 'integer',
             'updator_id' => 'integer',
             'price' => 'integer',
-            'is_paid' => 'boolean',
             'use_credit' => 'boolean',
             'bill_date' => 'datetime',
             'created_at' => 'datetime',
@@ -124,18 +122,20 @@ class Bill extends Model
 
     /**
      * Scope a query to only include paid bills.
+     * Bills are always considered paid, so this returns all bills.
      */
     public function scopePaid($query)
     {
-        return $query->where('is_paid', true)->orwhere('is_paid', 1);
+        return $query;
     }
 
     /**
      * Scope a query to only include unpaid bills.
+     * Bills are always paid, so this returns nothing.
      */
     public function scopeUnpaid($query)
     {
-        return $query->where('is_paid', false);
+        return $query->whereRaw('1 = 0');
     }
 
     /**
@@ -219,27 +219,28 @@ class Bill extends Model
     }
 
     /**
-     * Mark bill as paid.
+     * Mark bill as paid (no-op: bills are always paid).
      */
     public function markAsPaid(): bool
     {
-        return $this->update(['is_paid' => true]);
+        return true;
     }
 
     /**
-     * Mark bill as unpaid.
+     * Mark bill as unpaid (no-op: bills are always paid).
      */
     public function markAsUnpaid(): bool
     {
-        return $this->update(['is_paid' => false]);
+        return true;
     }
 
     /**
      * Get payment status label.
+     * Bills are always considered paid.
      */
     public function getPaymentStatusAttribute(): string
     {
-        return $this->is_paid ? 'Paid' : 'Unpaid';
+        return 'Paid';
     }
 
     /**
@@ -267,7 +268,6 @@ class Bill extends Model
             $this->patient ? "Patient: {$this->patient->name}" : null,
             $this->doctor ? "Doctor: {$this->doctor->name}" : null,
             "Price: {$this->price}",
-            "Payment Status: {$this->payment_status}",
             "Billable Type: {$billableType}",
             $this->bill_date ? "Bill Date: {$this->bill_date->format('Y-m-d')}" : null,
             $this->use_credit ? "Credit Used: Yes" : null,

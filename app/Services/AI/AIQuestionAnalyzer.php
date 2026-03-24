@@ -2,6 +2,7 @@
 
 namespace App\Services\AI;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -30,6 +31,19 @@ class AIQuestionAnalyzer
      */
     public function analyze(string $question): array
     {
+        // FAST PATH: Skip the OpenAI call entirely for simple greetings
+        $greetingResult = $this->detectGreeting($question);
+        if ($greetingResult !== null) {
+            return $greetingResult;
+        }
+
+        // Check cache (60 second TTL for identical questions)
+        $cacheKey = 'ai_analysis:' . md5(mb_strtolower(trim($question)));
+        $cached = Cache::get($cacheKey);
+        if ($cached) {
+            return $cached;
+        }
+
         try {
             $systemPrompt = $this->buildSystemPrompt();
             $userPrompt = "Analyze this question: \"{$question}\"";
@@ -37,14 +51,14 @@ class AIQuestionAnalyzer
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $this->apiKey,
                 'Content-Type' => 'application/json',
-            ])->timeout(15)->post('https://api.openai.com/v1/chat/completions', [
+            ])->timeout(10)->post('https://api.openai.com/v1/chat/completions', [
                 'model' => $this->model,
                 'messages' => [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
-                'max_tokens' => 500,
-                'temperature' => 0.1,
+                'max_tokens' => 300,
+                'temperature' => 0.0,
                 'response_format' => ['type' => 'json_object'],
             ]);
 
@@ -69,12 +83,48 @@ class AIQuestionAnalyzer
                 return $this->fallbackAnalysis($question);
             }
 
-            return $this->normalizeResult($parsed);
+            $result = $this->normalizeResult($parsed);
+
+            // Cache the result for 60 seconds
+            Cache::put($cacheKey, $result, 60);
+
+            return $result;
 
         } catch (\Exception $e) {
             Log::error('AIQuestionAnalyzer error: ' . $e->getMessage());
             return $this->fallbackAnalysis($question);
         }
+    }
+
+    /**
+     * Fast greeting detection — avoids the OpenAI API call entirely.
+     * Returns null if the question is NOT a greeting.
+     */
+    private function detectGreeting(string $question): ?array
+    {
+        $q = mb_strtolower(trim($question));
+
+        $greetings = [
+            'hello', 'hi', 'hey', 'how are you', 'good morning', 'good evening',
+            'good afternoon', 'what can you do', 'who are you', 'help',
+            'مرحبا', 'اهلا', 'السلام عليكم', 'كيف حالك', 'شلونك', 'هلو',
+            'صباح الخير', 'مساء الخير', 'شنو تگدر تسوي', 'ساعدني',
+        ];
+
+        foreach ($greetings as $greeting) {
+            if (str_contains($q, $greeting)) {
+                return [
+                    'intent' => 'general',
+                    'entities' => ['patient_name' => '', 'doctor_name' => ''],
+                    'date_range' => ['type' => 'none', 'start' => null, 'end' => null],
+                    'needs_database' => false,
+                    'needs_vector_search' => false,
+                    'needs_knowledge_base' => false,
+                ];
+            }
+        }
+
+        return null;
     }
 
     /**

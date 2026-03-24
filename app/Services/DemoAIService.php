@@ -117,10 +117,7 @@ class DemoAIService
             ],
             'bills' => [
                 'total' => DB::table('bills')->count(),
-                'paid' => DB::table('bills')->where('is_paid', true)->count(),
-                'unpaid' => DB::table('bills')->where('is_paid', false)->count(),
-                'total_revenue' => DB::table('bills')->where('is_paid', true)->sum('price'),
-                'total_outstanding' => DB::table('bills')->where('is_paid', false)->sum('price'),
+                'total_revenue' => DB::table('bills')->sum('price'),
             ],
             'doctors' => [
                 'total' => $this->getDoctorCount(),
@@ -134,7 +131,6 @@ class DemoAIService
                     ->count(),
                 'today_revenue' => DB::table('bills')
                     ->whereDate('created_at', today())
-                    ->where('is_paid', true)
                     ->sum('price'),
             ]
         ];
@@ -187,10 +183,7 @@ class DemoAIService
             ],
             'bills' => [
                 'total' => 180,
-                'paid' => 150,
-                'unpaid' => 30,
                 'total_revenue' => 15000,
-                'total_outstanding' => 3000,
             ],
             'doctors' => [
                 'total' => 5,
@@ -243,26 +236,17 @@ class DemoAIService
         // Revenue questions
         if (str_contains($question, 'revenue') || str_contains($question, 'income') || str_contains($question, 'money')) {
             if (str_contains($question, 'today')) {
-                return "Today's revenue is ${$stats['recent_activity']['today_revenue']} from paid bills.";
+                return "Today's revenue is \${$stats['recent_activity']['today_revenue']} from bills.";
             }
-            if (str_contains($question, 'outstanding') || str_contains($question, 'unpaid')) {
-                return "You have ${$stats['bills']['total_outstanding']} in outstanding payments from {$stats['bills']['unpaid']} unpaid bills.";
-            }
-            return "Your total revenue from paid bills is ${$stats['bills']['total_revenue']}. You have ${$stats['bills']['total_outstanding']} outstanding from unpaid bills.";
+            return "Your total revenue from bills is \${$stats['bills']['total_revenue']}.";
         }
         
         // Bill questions
         if (str_contains($question, 'bill') || str_contains($question, 'bills')) {
-            if (str_contains($question, 'unpaid')) {
-                return "You have {$stats['bills']['unpaid']} unpaid bills totaling ${$stats['bills']['total_outstanding']}.";
-            }
-            if (str_contains($question, 'paid')) {
-                return "You have {$stats['bills']['paid']} paid bills totaling ${$stats['bills']['total_revenue']}.";
-            }
             if (str_contains($question, 'today')) {
                 return "Today you've created {$stats['recent_activity']['today_bills']} bills.";
             }
-            return "You have {$stats['bills']['total']} total bills: {$stats['bills']['paid']} paid and {$stats['bills']['unpaid']} unpaid.";
+            return "You have {$stats['bills']['total']} total bills with total revenue of \${$stats['bills']['total_revenue']}.";
         }
         
         // Case questions
@@ -300,10 +284,9 @@ Date: {$currentDate}
 Your clinic is performing well with {$stats['patients']['total']} total patients and {$stats['patients']['active']} active patients. This month, you've welcomed {$stats['patients']['new_this_month']} new patients.
 
 💰 FINANCIAL SUMMARY:
-- Total Revenue: ${$stats['bills']['total_revenue']}
-- Outstanding Payments: ${$stats['bills']['total_outstanding']}
-- Paid Bills: {$stats['bills']['paid']} out of {$stats['bills']['total']}
-- Today's Revenue: ${$stats['recent_activity']['today_revenue']}
+- Total Revenue: \${$stats['bills']['total_revenue']}
+- Total Bills: {$stats['bills']['total']}
+- Today's Revenue: \${$stats['recent_activity']['today_revenue']}
 
 📊 OPERATIONAL INSIGHTS:
 - Total Cases: {$stats['cases']['total']}
@@ -311,9 +294,8 @@ Your clinic is performing well with {$stats['patients']['total']} total patients
 - Today's Activity: {$stats['recent_activity']['today_cases']} cases, {$stats['recent_activity']['today_bills']} bills
 
 📈 RECOMMENDATIONS:
-1. Focus on collecting outstanding payments of ${$stats['bills']['total_outstanding']}
-2. Maintain the good patient acquisition rate ({$stats['patients']['new_this_month']} this month)
-3. Consider expanding services if patient growth continues
+1. Maintain the good patient acquisition rate ({$stats['patients']['new_this_month']} this month)
+2. Consider expanding services if patient growth continues
 
 This report shows a healthy, growing clinic with good patient engagement and steady revenue flow.
         ";
@@ -324,38 +306,25 @@ This report shows a healthy, growing clinic with good patient engagement and ste
      */
     private function generateFinancialReport(array $stats, string $currentDate): string
     {
-        $collectionRate = $stats['bills']['total'] > 0 ? 
-            round(($stats['bills']['paid'] / $stats['bills']['total']) * 100, 1) : 0;
-        
-        $performance = $collectionRate > 80 ? 'excellent' : ($collectionRate > 60 ? 'good' : 'needs improvement');
         $dailyAvg = round($stats['bills']['total_revenue'] / max(1, now()->daysInMonth), 2);
         
         return "FINANCIAL PERFORMANCE REPORT
 Date: {$currentDate}
 
 REVENUE ANALYSIS:
-- Total Collected: ${$stats['bills']['total_revenue']}
-- Outstanding Amount: ${$stats['bills']['total_outstanding']}
-- Collection Rate: {$collectionRate}%
-
-BILL BREAKDOWN:
+- Total Revenue: \${$stats['bills']['total_revenue']}
 - Total Bills: {$stats['bills']['total']}
-- Paid Bills: {$stats['bills']['paid']} (${$stats['bills']['total_revenue']})
-- Unpaid Bills: {$stats['bills']['unpaid']} (${$stats['bills']['total_outstanding']})
 
 TODAY'S PERFORMANCE:
-- Daily Revenue: ${$stats['recent_activity']['today_revenue']}
+- Daily Revenue: \${$stats['recent_activity']['today_revenue']}
 - Daily Bills: {$stats['recent_activity']['today_bills']}
 
 FINANCIAL INSIGHTS:
-1. Collection rate of {$collectionRate}% is {$performance}
-2. Outstanding amount of ${$stats['bills']['total_outstanding']} requires attention
-3. Daily average revenue: ${$dailyAvg}
+1. Daily average revenue: \${$dailyAvg}
 
 RECOMMENDATIONS:
-- Implement payment reminders for unpaid bills
-- Consider early payment discounts
-- Review pricing strategy if collection rate is below 70%";
+- Monitor daily revenue trends
+- Review pricing strategy periodically";
     }
 
     /**
@@ -416,9 +385,8 @@ Date: {$currentDate}
 • New This Month: {$stats['patients']['new_this_month']}
 
 💰 FINANCIAL SNAPSHOT:
-• Total Revenue: ${$stats['bills']['total_revenue']}
-• Outstanding: ${$stats['bills']['total_outstanding']}
-• Today's Revenue: ${$stats['recent_activity']['today_revenue']}
+• Total Revenue: \${$stats['bills']['total_revenue']}
+• Today's Revenue: \${$stats['recent_activity']['today_revenue']}
 
 📊 OPERATIONAL HIGHLIGHTS:
 • Total Cases: {$stats['cases']['total']}
@@ -426,7 +394,6 @@ Date: {$currentDate}
 • Today's Activity: {$stats['recent_activity']['today_cases']} cases
 
 🎯 PERFORMANCE INDICATORS:
-• Collection Rate: " . ($stats['bills']['total'] > 0 ? round(($stats['bills']['paid'] / $stats['bills']['total']) * 100, 1) . '%' : 'N/A') . "
 • Patient Growth: " . ($stats['patients']['new_this_month'] > 0 ? 'Positive' : 'Stable') . "
 
 📈 STATUS: " . ($stats['bills']['total_revenue'] > 0 ? 'Revenue Generating' : 'Building') . "

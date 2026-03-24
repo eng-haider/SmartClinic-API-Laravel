@@ -134,10 +134,7 @@ class AIService
             ],
             'bills' => [
                 'total' => DB::table('bills')->count(),
-                'paid' => DB::table('bills')->where('is_paid', true)->count(),
-                'unpaid' => DB::table('bills')->where('is_paid', false)->count(),
-                'total_revenue' => DB::table('bills')->where('is_paid', true)->sum('price'),
-                'total_outstanding' => DB::table('bills')->where('is_paid', false)->sum('price'),
+                'total_revenue' => DB::table('bills')->sum('price'),
             ],
             'doctors' => [
                 'total' => DB::table('users')->whereHas('roles', function($query) {
@@ -153,7 +150,6 @@ class AIService
                     ->count(),
                 'today_revenue' => DB::table('bills')
                     ->whereDate('created_at', today())
-                    ->where('is_paid', true)
                     ->sum('price'),
             ]
         ];
@@ -256,7 +252,6 @@ Current Date: " . now()->toDateString() . "
             $context .= "\n\nREVENUE BREAKDOWN:\n";
             $revenueByMonth = DB::table('bills')
                 ->select(DB::raw('MONTH(created_at) as month'), DB::raw('SUM(price) as revenue'))
-                ->where('is_paid', true)
                 ->where('created_at', '>=', now()->subMonths(6))
                 ->groupBy(DB::raw('MONTH(created_at)'))
                 ->orderBy('month')

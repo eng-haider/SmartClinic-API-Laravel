@@ -55,11 +55,7 @@ class SearchPatientTool implements AIToolInterface
 
             // Get financial summary for this patient
             $totalBilled = $patient->bills()->sum('price');
-            $totalPaid = $patient->bills()->where('is_paid', true)->sum('price');
-            $totalUnpaid = $patient->bills()->where('is_paid', false)->sum('price');
             $lines[] = "  Total Billed: {$totalBilled}";
-            $lines[] = "  Total Paid: {$totalPaid}";
-            $lines[] = "  Total Unpaid: {$totalUnpaid}";
 
             // Recent cases
             $recentCases = $patient->cases()->with(['category:id,name', 'status:id,name'])->latest()->take(5)->get();
