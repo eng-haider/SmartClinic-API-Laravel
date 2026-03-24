@@ -180,6 +180,35 @@ class VectorSearchService
         return false;
     }
 
+    /**
+     * Check if the user is asking about today's reservations or appointments.
+     */
+    private function isAskingAboutTodayReservations(string $question): bool
+    {
+        $question = mb_strtolower(trim($question));
+        
+        $timeWords = ['today', 'اليوم', 'النهارده', 'النهاردة'];
+        $appointmentWords = ['appointment', 'appointments', 'reservation', 'reservations', 'schedule', 'مواعيد', 'موعد', 'حجوزات', 'حجز', 'جدول'];
+        
+        $hasTime = false;
+        foreach ($timeWords as $word) {
+            if (str_contains($question, $word)) {
+                $hasTime = true;
+                break;
+            }
+        }
+
+        $hasAppointment = false;
+        foreach ($appointmentWords as $word) {
+            if (str_contains($question, $word)) {
+                $hasAppointment = true;
+                break;
+            }
+        }
+
+        return $hasTime && $hasAppointment;
+    }
+
     public function chat(string $clinicId, string $question): array
     {
         try {
@@ -190,7 +219,8 @@ class VectorSearchService
                 . 'You can greet users, answer general questions, and help with clinic-related queries. '
                 . 'When clinic data context is provided, use it to answer questions accurately. '
                 . 'If no relevant clinic data is provided, still respond helpfully. '
-                . 'Be professional, friendly, and concise. Support both Arabic and English.';
+                . 'Be professional, friendly, and concise. Support both Arabic and English. '
+                . 'The current date and time is: ' . now()->toDateTimeString() . '.';
 
             // For simple greetings, skip the expensive embedding search
             if ($this->isSimpleGreeting($question)) {
@@ -219,6 +249,27 @@ class VectorSearchService
             if ($relevantEmbeddings->isNotEmpty()) {
                 $originalRecords = $this->fetchOriginalRecords($relevantEmbeddings);
                 $context = $this->buildContext($originalRecords);
+            }
+
+            // Special handling for "today's reservations"
+            if ($this->isAskingAboutTodayReservations($question)) {
+                $todayReservations = Reservation::today()
+                    ->with(['patient:id,name', 'doctor:id,name', 'status:id,name', 'reservationType:id,name'])
+                    ->get();
+
+                if ($todayReservations->isNotEmpty()) {
+                    $todayContext = "--- Today's Reservations (" . now()->toDateString() . ") ---\n";
+                    foreach ($todayReservations as $res) {
+                        $patientName = $res->patient->name ?? 'Unknown';
+                        $doctorName = $res->doctor->name ?? 'Unknown';
+                        $statusName = $res->status->name ?? 'Unknown';
+                        $time = $res->reservation_from_time . ' - ' . $res->reservation_to_time;
+                        $todayContext .= "- {$time}: Patient {$patientName} with Dr. {$doctorName} ({$statusName})\n";
+                    }
+                    $context = $todayContext . "\n" . $context;
+                } else {
+                    $context = "--- Today's Reservations (" . now()->toDateString() . ") ---\nNo reservations found for today.\n\n" . $context;
+                }
             }
 
             // Build the user message
