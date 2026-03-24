@@ -7,6 +7,7 @@ use App\Models\Patient;
 use App\Models\Reservation;
 use App\Models\CaseModel;
 use App\Models\Bill;
+use App\Models\ClinicExpense;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -26,22 +27,12 @@ class VectorSearchService
 
     /**
      * Search for the most similar embeddings to a query string.
-     *
-     * Uses pgvector cosine distance (<=>) for fast similarity search,
-     * filtered by clinic_id for multi-tenant isolation.
-     *
-     * @param string $clinicId  The clinic/tenant ID
-     * @param string $query     The search query text
-     * @param int    $limit     Number of results to return
-     * @return Collection       Collection of matching embedding records
      */
     public function searchSimilar(string $clinicId, string $query, int $limit = 5): Collection
     {
-        // Convert query to embedding vector
         $queryVector = $this->embeddingService->generateEmbedding($query);
         $vectorString = '[' . implode(',', $queryVector) . ']';
 
-        // Perform cosine similarity search using pgvector
         $results = DB::connection('pgsql_embeddings')
             ->select(
             "SELECT id, clinic_id, table_name, record_id, content,
@@ -58,27 +49,22 @@ class VectorSearchService
 
     /**
      * Fetch the original records from the tenant database using table_name + record_id.
-     *
-     * @param Collection $embeddingResults  Results from searchSimilar()
-     * @return array                        Array of original records with metadata
      */
     public function fetchOriginalRecords(Collection $embeddingResults): array
     {
         $records = [];
 
-        // Model mapping: table_name => Model class
         $modelMap = [
-            'patients' => Patient::class ,
-            'reservations' => Reservation::class ,
-            'cases' => CaseModel::class ,
-            'bills' => Bill::class ,
+            'patients' => Patient::class,
+            'reservations' => Reservation::class,
+            'cases' => CaseModel::class,
+            'bills' => Bill::class,
         ];
 
         foreach ($embeddingResults as $embedding) {
             $modelClass = $modelMap[$embedding->table_name] ?? null;
 
             if (!$modelClass) {
-                // Unknown table, use the content from embedding directly
                 $records[] = [
                     'source' => $embedding->table_name,
                     'record_id' => $embedding->record_id,
@@ -89,10 +75,8 @@ class VectorSearchService
             }
 
             try {
-                // Fetch original record with relationships
                 $query = $modelClass::query()->where('id', $embedding->record_id);
 
-                // Eager load relationships based on model type
                 switch ($embedding->table_name) {
                     case 'patients':
                         $query->with(['doctor:id,name']);
@@ -118,9 +102,7 @@ class VectorSearchService
                         'content' => $embedding->content,
                         'similarity' => round($embedding->similarity, 4),
                     ];
-                }
-                else {
-                    // Record was deleted but embedding still exists
+                } else {
                     $records[] = [
                         'source' => $embedding->table_name,
                         'record_id' => $embedding->record_id,
@@ -129,8 +111,7 @@ class VectorSearchService
                         'note' => 'Original record no longer exists',
                     ];
                 }
-            }
-            catch (\Exception $e) {
+            } catch (\Exception $e) {
                 Log::warning('Failed to fetch original record', [
                     'table' => $embedding->table_name,
                     'record_id' => $embedding->record_id,
@@ -149,18 +130,10 @@ class VectorSearchService
         return $records;
     }
 
-    /**
-     * Full RAG chat flow:
-     * 1. Convert question to embedding
-     * 2. Search top 5 most similar vectors for the clinic
-     * 3. Fetch original records from tenant DB
-     * 4. Build context and send to GPT
-     * 5. Return AI response
-     *
-     * @param string $clinicId  The clinic/tenant ID
-     * @param string $question  The user's question
-     * @return array            Response with answer, sources, etc.
-     */
+    // =========================================================================
+    // SMART INTENT DETECTION
+    // =========================================================================
+
     /**
      * Check if the question is a simple greeting that doesn't need database search.
      */
@@ -181,120 +154,555 @@ class VectorSearchService
     }
 
     /**
-     * Check if the user is asking about reservations or appointments.
+     * Detect the intent(s) of the user's question.
+     * Returns an array of matched intents: revenue, expenses, patients, cases, reservations, dashboard.
+     *
+     * @return string[]
      */
-    private function isAskingAboutReservations(string $question): bool
+    private function detectIntent(string $question): array
     {
-        $question = mb_strtolower(trim($question));
-        
-        $appointmentWords = [
-            'appointment', 'appointments', 'reservation', 'reservations', 'schedule',
-            'مواعيد', 'موعد', 'حجوزات', 'حجز', 'جدول', 'مرضى',
+        $q = mb_strtolower(trim($question));
+        $intents = [];
+
+        // Revenue / Bills intent
+        $revenueWords = [
+            'revenue', 'income', 'bill', 'bills', 'invoice', 'invoices', 'payment', 'payments', 'paid', 'unpaid',
+            'إيرادات', 'إيراد', 'دخل', 'فواتير', 'فاتورة', 'مدفوعات', 'مدفوع', 'غير مدفوع',
+            'أرباح', 'ربح', 'مبيعات', 'تحصيل', 'ايرادات', 'ايراد', 'فلوس', 'مبلغ', 'مبالغ',
         ];
-        
-        foreach ($appointmentWords as $word) {
-            if (str_contains($question, $word)) {
-                return true;
+        foreach ($revenueWords as $word) {
+            if (str_contains($q, $word)) {
+                $intents[] = 'revenue';
+                break;
             }
         }
 
-        return false;
+        // Expenses intent
+        $expenseWords = [
+            'expense', 'expenses', 'cost', 'costs', 'spending',
+            'مصاريف', 'مصروف', 'نفقات', 'تكاليف', 'تكلفة', 'مصروفات', 'صرف',
+        ];
+        foreach ($expenseWords as $word) {
+            if (str_contains($q, $word)) {
+                $intents[] = 'expenses';
+                break;
+            }
+        }
+
+        // Patients intent
+        $patientWords = [
+            'patient', 'patients', 'new patient', 'registered',
+            'مرضى', 'مريض', 'مراجعين', 'مراجع', 'مسجلين', 'مسجل',
+        ];
+        foreach ($patientWords as $word) {
+            if (str_contains($q, $word)) {
+                $intents[] = 'patients';
+                break;
+            }
+        }
+
+        // Cases / Treatments intent
+        $caseWords = [
+            'case', 'cases', 'treatment', 'treatments', 'procedure', 'procedures',
+            'حالات', 'حالة', 'علاج', 'علاجات', 'إجراء', 'إجراءات', 'معالجة',
+        ];
+        foreach ($caseWords as $word) {
+            if (str_contains($q, $word)) {
+                $intents[] = 'cases';
+                break;
+            }
+        }
+
+        // Reservations / Appointments intent
+        $reservationWords = [
+            'appointment', 'appointments', 'reservation', 'reservations', 'schedule', 'booking', 'bookings',
+            'مواعيد', 'موعد', 'حجوزات', 'حجز', 'جدول',
+        ];
+        foreach ($reservationWords as $word) {
+            if (str_contains($q, $word)) {
+                $intents[] = 'reservations';
+                break;
+            }
+        }
+
+        // Dashboard / Summary intent
+        $dashboardWords = [
+            'summary', 'overview', 'dashboard', 'report', 'statistics', 'stats', 'total',
+            'ملخص', 'تقرير', 'إحصائيات', 'نظرة عامة', 'إجمالي', 'احصائيات', 'ملخص عام',
+        ];
+        foreach ($dashboardWords as $word) {
+            if (str_contains($q, $word)) {
+                $intents[] = 'dashboard';
+                break;
+            }
+        }
+
+        return array_unique($intents);
     }
 
     /**
      * Extract a target date from the user's question.
-     * Supports: today, tomorrow, yesterday, specific day numbers, and full dates.
+     * Supports: today, tomorrow, yesterday, specific day numbers, full dates, and month references.
      *
-     * @return \Carbon\Carbon|null  The parsed date or null if no date detected
+     * @return \Carbon\Carbon|null
      */
     private function extractDateFromQuestion(string $question): ?\Carbon\Carbon
     {
-        $question = mb_strtolower(trim($question));
+        $q = mb_strtolower(trim($question));
 
-        // Today keywords
-        $todayWords = ['today', 'اليوم', 'النهارده', 'النهاردة'];
-        foreach ($todayWords as $word) {
-            if (str_contains($question, $word)) {
-                return now()->startOfDay();
-            }
+        // Today
+        foreach (['today', 'اليوم', 'النهارده', 'النهاردة'] as $word) {
+            if (str_contains($q, $word)) return now()->startOfDay();
         }
 
-        // Tomorrow keywords
-        $tomorrowWords = ['tomorrow', 'غدا', 'غداً', 'باچر', 'باجر', 'بكرة', 'بكره'];
-        foreach ($tomorrowWords as $word) {
-            if (str_contains($question, $word)) {
-                return now()->addDay()->startOfDay();
-            }
+        // Tomorrow
+        foreach (['tomorrow', 'غدا', 'غداً', 'باچر', 'باجر', 'بكرة', 'بكره'] as $word) {
+            if (str_contains($q, $word)) return now()->addDay()->startOfDay();
         }
 
-        // Yesterday keywords
-        $yesterdayWords = ['yesterday', 'أمس', 'امس', 'البارحة', 'البارحه'];
-        foreach ($yesterdayWords as $word) {
-            if (str_contains($question, $word)) {
-                return now()->subDay()->startOfDay();
-            }
+        // Yesterday
+        foreach (['yesterday', 'أمس', 'امس', 'البارحة', 'البارحه'] as $word) {
+            if (str_contains($q, $word)) return now()->subDay()->startOfDay();
         }
 
-        // Full date patterns: 2026-03-25, 25/03/2026, 25-03-2026
-        if (preg_match('/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/', $question, $m)) {
-            try {
-                return \Carbon\Carbon::createFromDate((int) $m[1], (int) $m[2], (int) $m[3])->startOfDay();
-            } catch (\Exception $e) {}
+        // Full date: YYYY-MM-DD or YYYY/MM/DD
+        if (preg_match('/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/', $q, $m)) {
+            try { return \Carbon\Carbon::createFromDate((int)$m[1], (int)$m[2], (int)$m[3])->startOfDay(); } catch (\Exception $e) {}
         }
-        if (preg_match('/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/', $question, $m)) {
-            try {
-                return \Carbon\Carbon::createFromDate((int) $m[3], (int) $m[2], (int) $m[1])->startOfDay();
-            } catch (\Exception $e) {}
+        // Full date: DD/MM/YYYY or DD-MM-YYYY
+        if (preg_match('/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/', $q, $m)) {
+            try { return \Carbon\Carbon::createFromDate((int)$m[3], (int)$m[2], (int)$m[1])->startOfDay(); } catch (\Exception $e) {}
         }
 
-        // Day number pattern: "يوم 25", "day 25", "25 من", "25 لهذا"
-        // Match Arabic and English day references
-        if (preg_match('/(?:يوم|day)\s*(\d{1,2})/u', $question, $m)) {
+        // "يوم 25", "day 25"
+        if (preg_match('/(?:يوم|day)\s*(\d{1,2})/u', $q, $m)) {
             $day = (int) $m[1];
             if ($day >= 1 && $day <= 31) {
-                try {
-                    return now()->startOfMonth()->day($day)->startOfDay();
-                } catch (\Exception $e) {}
+                try { return now()->startOfMonth()->day($day)->startOfDay(); } catch (\Exception $e) {}
             }
         }
 
-        // Bare number followed by contextual Arabic words like "لهاذا", "من هذا", "الشهر"
-        if (preg_match('/(\d{1,2})\s*(?:لهاذا|لهذا|من هذا|من هاذا|الشهر|this month)/u', $question, $m)) {
+        // "25 لهاذا", "25 من هذا الشهر", "25 this month"
+        if (preg_match('/(\d{1,2})\s*(?:لهاذا|لهذا|من هذا|من هاذا|الشهر|this month)/u', $q, $m)) {
             $day = (int) $m[1];
             if ($day >= 1 && $day <= 31) {
-                try {
-                    return now()->startOfMonth()->day($day)->startOfDay();
-                } catch (\Exception $e) {}
+                try { return now()->startOfMonth()->day($day)->startOfDay(); } catch (\Exception $e) {}
             }
         }
 
-        // "مواعيد 25" or "حجوزات 25" - appointment word followed by a number
-        if (preg_match('/(?:مواعيد|موعد|حجوزات|حجز)\s*(\d{1,2})/u', $question, $m)) {
+        // "مواعيد 25", "إيرادات 25" — keyword followed by day number
+        if (preg_match('/(?:مواعيد|موعد|حجوزات|حجز|إيرادات|ايرادات|مصاريف|فواتير)\s*(\d{1,2})/u', $q, $m)) {
             $day = (int) $m[1];
             if ($day >= 1 && $day <= 31) {
-                try {
-                    return now()->startOfMonth()->day($day)->startOfDay();
-                } catch (\Exception $e) {}
+                try { return now()->startOfMonth()->day($day)->startOfDay(); } catch (\Exception $e) {}
             }
         }
 
         return null;
     }
 
+    /**
+     * Detect if user is asking about a whole month (e.g., "this month", "هذا الشهر").
+     *
+     * @return array{start: \Carbon\Carbon, end: \Carbon\Carbon}|null
+     */
+    private function extractMonthRange(string $question): ?array
+    {
+        $q = mb_strtolower(trim($question));
+
+        $thisMonthWords = ['this month', 'هذا الشهر', 'هاذا الشهر', 'الشهر الحالي', 'الشهر هذا'];
+        foreach ($thisMonthWords as $word) {
+            if (str_contains($q, $word)) {
+                return [
+                    'start' => now()->startOfMonth(),
+                    'end' => now()->endOfMonth(),
+                ];
+            }
+        }
+
+        $lastMonthWords = ['last month', 'الشهر الماضي', 'الشهر السابق'];
+        foreach ($lastMonthWords as $word) {
+            if (str_contains($q, $word)) {
+                return [
+                    'start' => now()->subMonth()->startOfMonth(),
+                    'end' => now()->subMonth()->endOfMonth(),
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    // =========================================================================
+    // REALTIME CONTEXT BUILDERS (one per intent)
+    // =========================================================================
+
+    /**
+     * Gather realtime data context based on detected intents.
+     */
+    private function gatherRealtimeContext(array $intents, string $question): string
+    {
+        $parts = [];
+        $targetDate = $this->extractDateFromQuestion($question);
+        $monthRange = $this->extractMonthRange($question);
+
+        // If dashboard intent is the ONLY intent (or no other specific intent), gather everything
+        if (in_array('dashboard', $intents) && count($intents) === 1) {
+            $intents = ['revenue', 'expenses', 'patients', 'cases', 'reservations'];
+        }
+
+        foreach ($intents as $intent) {
+            switch ($intent) {
+                case 'revenue':
+                    $parts[] = $this->buildRevenueContext($targetDate, $monthRange);
+                    break;
+                case 'expenses':
+                    $parts[] = $this->buildExpensesContext($targetDate, $monthRange);
+                    break;
+                case 'patients':
+                    $parts[] = $this->buildPatientsContext($targetDate, $monthRange);
+                    break;
+                case 'cases':
+                    $parts[] = $this->buildCasesContext($targetDate, $monthRange);
+                    break;
+                case 'reservations':
+                    $parts[] = $this->buildReservationsContext($targetDate, $monthRange);
+                    break;
+                case 'dashboard':
+                    // Already expanded above
+                    break;
+            }
+        }
+
+        return implode("\n", array_filter($parts));
+    }
+
+    /**
+     * Build revenue/bills context.
+     */
+    private function buildRevenueContext(?\Carbon\Carbon $date, ?array $monthRange): string
+    {
+        $lines = [];
+
+        if ($date) {
+            $dateStr = $date->toDateString();
+            $label = $date->isToday() ? "Today ({$dateStr})" : $dateStr;
+
+            $dayBills = Bill::whereDate('created_at', $dateStr)->get();
+            $totalBills = $dayBills->count();
+            $totalRevenue = $dayBills->where('is_paid', true)->sum('price');
+            $totalUnpaid = $dayBills->where('is_paid', false)->sum('price');
+            $paidCount = $dayBills->where('is_paid', true)->count();
+            $unpaidCount = $dayBills->where('is_paid', false)->count();
+
+            $lines[] = "--- Revenue Summary for {$label} ---";
+            $lines[] = "Total Bills: {$totalBills}";
+            $lines[] = "Total Paid Revenue: {$totalRevenue}";
+            $lines[] = "Total Unpaid Amount: {$totalUnpaid}";
+            $lines[] = "Paid Bills: {$paidCount}, Unpaid Bills: {$unpaidCount}";
+
+            // Top doctors by revenue for this day
+            $doctorRevenue = $dayBills->where('is_paid', true)->groupBy('doctor_id')->map(function ($bills) {
+                return $bills->sum('price');
+            })->sortDesc()->take(5);
+
+            if ($doctorRevenue->isNotEmpty()) {
+                $lines[] = "Top Doctors by Revenue:";
+                foreach ($doctorRevenue as $doctorId => $revenue) {
+                    $doctor = \App\Models\User::find($doctorId);
+                    $doctorName = $doctor->name ?? "Doctor #{$doctorId}";
+                    $lines[] = "  - Dr. {$doctorName}: {$revenue}";
+                }
+            }
+
+            // List individual bills
+            if ($dayBills->isNotEmpty()) {
+                $lines[] = "Individual Bills:";
+                foreach ($dayBills->take(20) as $bill) {
+                    $patientName = $bill->patient->name ?? 'Unknown';
+                    $doctorName = $bill->doctor->name ?? 'Unknown';
+                    $status = $bill->is_paid ? 'Paid' : 'Unpaid';
+                    $lines[] = "  - {$patientName} | Dr. {$doctorName} | {$bill->price} | {$status}";
+                }
+            }
+        } elseif ($monthRange) {
+            $monthBills = Bill::whereBetween('created_at', [$monthRange['start'], $monthRange['end']])->get();
+            $label = $monthRange['start']->format('F Y');
+
+            $lines[] = "--- Revenue Summary for {$label} ---";
+            $lines[] = "Total Bills: " . $monthBills->count();
+            $lines[] = "Total Paid Revenue: " . $monthBills->where('is_paid', true)->sum('price');
+            $lines[] = "Total Unpaid Amount: " . $monthBills->where('is_paid', false)->sum('price');
+            $lines[] = "Paid Bills: " . $monthBills->where('is_paid', true)->count();
+            $lines[] = "Unpaid Bills: " . $monthBills->where('is_paid', false)->count();
+        } else {
+            // Default to today
+            $today = now()->toDateString();
+            $dayBills = Bill::whereDate('created_at', $today)->get();
+
+            $lines[] = "--- Revenue Summary for Today ({$today}) ---";
+            $lines[] = "Total Bills: " . $dayBills->count();
+            $lines[] = "Total Paid Revenue: " . $dayBills->where('is_paid', true)->sum('price');
+            $lines[] = "Total Unpaid Amount: " . $dayBills->where('is_paid', false)->sum('price');
+            $lines[] = "Paid Bills: " . $dayBills->where('is_paid', true)->count();
+            $lines[] = "Unpaid Bills: " . $dayBills->where('is_paid', false)->count();
+
+            // Also include all-time totals for general context
+            $allBills = Bill::all();
+            $lines[] = "";
+            $lines[] = "--- All-Time Revenue ---";
+            $lines[] = "Total Bills Ever: " . $allBills->count();
+            $lines[] = "Total Paid Revenue (All-Time): " . $allBills->where('is_paid', true)->sum('price');
+            $lines[] = "Total Unpaid (All-Time): " . $allBills->where('is_paid', false)->sum('price');
+        }
+
+        $lines[] = "";
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Build expenses context.
+     */
+    private function buildExpensesContext(?\Carbon\Carbon $date, ?array $monthRange): string
+    {
+        $lines = [];
+
+        if ($date) {
+            $dateStr = $date->toDateString();
+            $label = $date->isToday() ? "Today ({$dateStr})" : $dateStr;
+
+            $dayExpenses = ClinicExpense::whereDate('date', $dateStr)->with('category')->get();
+
+            $lines[] = "--- Expenses Summary for {$label} ---";
+            $lines[] = "Total Expenses: " . $dayExpenses->count();
+            $lines[] = "Total Expense Amount: " . $dayExpenses->sum(fn($e) => ($e->quantity ?? 1) * $e->price);
+            $lines[] = "Paid: " . $dayExpenses->where('is_paid', true)->count();
+            $lines[] = "Unpaid: " . $dayExpenses->where('is_paid', false)->count();
+
+            if ($dayExpenses->isNotEmpty()) {
+                $lines[] = "Expense Details:";
+                foreach ($dayExpenses->take(20) as $expense) {
+                    $categoryName = $expense->category->name ?? 'Uncategorized';
+                    $total = ($expense->quantity ?? 1) * $expense->price;
+                    $status = $expense->is_paid ? 'Paid' : 'Unpaid';
+                    $lines[] = "  - {$expense->name} | {$categoryName} | {$total} | {$status}";
+                }
+            }
+        } elseif ($monthRange) {
+            $monthExpenses = ClinicExpense::whereBetween('date', [$monthRange['start'], $monthRange['end']])->with('category')->get();
+            $label = $monthRange['start']->format('F Y');
+
+            $lines[] = "--- Expenses Summary for {$label} ---";
+            $lines[] = "Total Expenses: " . $monthExpenses->count();
+            $lines[] = "Total Amount: " . $monthExpenses->sum(fn($e) => ($e->quantity ?? 1) * $e->price);
+
+            // Group by category
+            $byCategory = $monthExpenses->groupBy(fn($e) => $e->category->name ?? 'Uncategorized');
+            if ($byCategory->isNotEmpty()) {
+                $lines[] = "By Category:";
+                foreach ($byCategory as $cat => $expenses) {
+                    $catTotal = $expenses->sum(fn($e) => ($e->quantity ?? 1) * $e->price);
+                    $lines[] = "  - {$cat}: {$catTotal} ({$expenses->count()} items)";
+                }
+            }
+        } else {
+            $today = now()->toDateString();
+            $dayExpenses = ClinicExpense::whereDate('date', $today)->get();
+
+            $lines[] = "--- Expenses Summary for Today ({$today}) ---";
+            $lines[] = "Total Expenses: " . $dayExpenses->count();
+            $lines[] = "Total Amount: " . $dayExpenses->sum(fn($e) => ($e->quantity ?? 1) * $e->price);
+
+            $allExpenses = ClinicExpense::all();
+            $lines[] = "";
+            $lines[] = "--- All-Time Expenses ---";
+            $lines[] = "Total Expenses Ever: " . $allExpenses->count();
+            $lines[] = "Total Amount (All-Time): " . $allExpenses->sum(fn($e) => ($e->quantity ?? 1) * $e->price);
+        }
+
+        $lines[] = "";
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Build patients context.
+     */
+    private function buildPatientsContext(?\Carbon\Carbon $date, ?array $monthRange): string
+    {
+        $lines = [];
+
+        if ($date) {
+            $dateStr = $date->toDateString();
+            $label = $date->isToday() ? "Today ({$dateStr})" : $dateStr;
+
+            $newPatients = Patient::whereDate('created_at', $dateStr)->get();
+
+            $lines[] = "--- Patients Summary for {$label} ---";
+            $lines[] = "New Patients Registered: " . $newPatients->count();
+
+            if ($newPatients->isNotEmpty()) {
+                $lines[] = "New Patient List:";
+                foreach ($newPatients->take(20) as $p) {
+                    $doctorName = $p->doctor->name ?? 'No Doctor';
+                    $lines[] = "  - {$p->name} | {$p->sex_label} | Age: {$p->age} | Dr. {$doctorName}";
+                }
+            }
+        } elseif ($monthRange) {
+            $label = $monthRange['start']->format('F Y');
+            $monthPatients = Patient::whereBetween('created_at', [$monthRange['start'], $monthRange['end']])->get();
+
+            $lines[] = "--- Patients Summary for {$label} ---";
+            $lines[] = "New Patients: " . $monthPatients->count();
+        } else {
+            $today = now()->toDateString();
+            $newToday = Patient::whereDate('created_at', $today)->count();
+            $total = Patient::count();
+
+            $lines[] = "--- Patients Summary for Today ({$today}) ---";
+            $lines[] = "New Patients Today: {$newToday}";
+            $lines[] = "Total Patients (All-Time): {$total}";
+        }
+
+        $lines[] = "";
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Build cases/treatments context.
+     */
+    private function buildCasesContext(?\Carbon\Carbon $date, ?array $monthRange): string
+    {
+        $lines = [];
+
+        if ($date) {
+            $dateStr = $date->toDateString();
+            $label = $date->isToday() ? "Today ({$dateStr})" : $dateStr;
+
+            $dayCases = CaseModel::whereDate('created_at', $dateStr)
+                ->with(['patient:id,name', 'doctor:id,name', 'category:id,name', 'status:id,name'])
+                ->get();
+
+            $lines[] = "--- Cases/Treatments for {$label} ---";
+            $lines[] = "Total Cases: " . $dayCases->count();
+            $lines[] = "Paid: " . $dayCases->where('is_paid', true)->count();
+            $lines[] = "Unpaid: " . $dayCases->where('is_paid', false)->count();
+            $lines[] = "Total Revenue (cases): " . $dayCases->sum('price');
+
+            if ($dayCases->isNotEmpty()) {
+                $lines[] = "Case Details:";
+                foreach ($dayCases->take(20) as $c) {
+                    $patientName = $c->patient->name ?? 'Unknown';
+                    $doctorName = $c->doctor->name ?? 'Unknown';
+                    $categoryName = $c->category->name ?? 'Unknown';
+                    $statusName = $c->status->name ?? 'Unknown';
+                    $paid = $c->is_paid ? 'Paid' : 'Unpaid';
+                    $lines[] = "  - {$patientName} | Dr. {$doctorName} | {$categoryName} | {$statusName} | {$c->price} | {$paid}";
+                }
+            }
+        } elseif ($monthRange) {
+            $label = $monthRange['start']->format('F Y');
+            $monthCases = CaseModel::whereBetween('created_at', [$monthRange['start'], $monthRange['end']])->get();
+
+            $lines[] = "--- Cases/Treatments for {$label} ---";
+            $lines[] = "Total Cases: " . $monthCases->count();
+            $lines[] = "Paid: " . $monthCases->where('is_paid', true)->count();
+            $lines[] = "Unpaid: " . $monthCases->where('is_paid', false)->count();
+            $lines[] = "Total Revenue: " . $monthCases->sum('price');
+        } else {
+            $today = now()->toDateString();
+            $todayCases = CaseModel::whereDate('created_at', $today)->count();
+            $total = CaseModel::count();
+
+            $lines[] = "--- Cases Summary for Today ({$today}) ---";
+            $lines[] = "Cases Today: {$todayCases}";
+            $lines[] = "Total Cases (All-Time): {$total}";
+        }
+
+        $lines[] = "";
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Build reservations/appointments context.
+     */
+    private function buildReservationsContext(?\Carbon\Carbon $date, ?array $monthRange): string
+    {
+        $lines = [];
+
+        if ($date) {
+            $dateStr = $date->toDateString();
+            $label = $date->isToday() ? "Today ({$dateStr})" : $dateStr;
+
+            $dateReservations = Reservation::byDate($dateStr)
+                ->with(['patient:id,name', 'doctor:id,name', 'status:id,name', 'reservationType:id,name'])
+                ->get();
+
+            $lines[] = "--- Reservations for {$label} ---";
+            $lines[] = "Total Appointments: " . $dateReservations->count();
+
+            if ($dateReservations->isNotEmpty()) {
+                foreach ($dateReservations as $res) {
+                    $patientName = $res->patient->name ?? 'Unknown';
+                    $doctorName = $res->doctor->name ?? 'Unknown';
+                    $statusName = $res->status->name ?? 'Unknown';
+                    $typeName = $res->reservationType->name ?? '';
+                    $time = $res->reservation_from_time . ' - ' . $res->reservation_to_time;
+                    $waiting = $res->is_waiting ? ' [WAITING]' : '';
+                    $lines[] = "  - {$time}: {$patientName} | Dr. {$doctorName} | {$statusName}" . ($typeName ? " | {$typeName}" : "") . $waiting;
+                }
+            } else {
+                $lines[] = "No reservations found for this date.";
+            }
+        } elseif ($monthRange) {
+            $label = $monthRange['start']->format('F Y');
+            $monthRes = Reservation::whereBetween('reservation_start_date', [$monthRange['start'], $monthRange['end']])->get();
+
+            $lines[] = "--- Reservations for {$label} ---";
+            $lines[] = "Total Appointments: " . $monthRes->count();
+        } else {
+            $today = now()->toDateString();
+            $todayRes = Reservation::byDate($today)
+                ->with(['patient:id,name', 'doctor:id,name', 'status:id,name', 'reservationType:id,name'])
+                ->get();
+
+            $lines[] = "--- Reservations for Today ({$today}) ---";
+            $lines[] = "Total Appointments: " . $todayRes->count();
+
+            if ($todayRes->isNotEmpty()) {
+                foreach ($todayRes as $res) {
+                    $patientName = $res->patient->name ?? 'Unknown';
+                    $doctorName = $res->doctor->name ?? 'Unknown';
+                    $statusName = $res->status->name ?? 'Unknown';
+                    $time = $res->reservation_from_time . ' - ' . $res->reservation_to_time;
+                    $lines[] = "  - {$time}: {$patientName} | Dr. {$doctorName} | {$statusName}";
+                }
+            } else {
+                $lines[] = "No reservations for today.";
+            }
+        }
+
+        $lines[] = "";
+        return implode("\n", $lines);
+    }
+
+    // =========================================================================
+    // MAIN CHAT METHOD
+    // =========================================================================
+
     public function chat(string $clinicId, string $question): array
     {
         try {
             $apiKey = config('services.openai.api_key');
-            // Hardcode gpt-4o-mini because gpt-5-nano takes ~10 seconds to fail before retrying, which makes it feel slow
             $model = 'gpt-4o-mini';
-            $systemMessage = 'You are a helpful AI assistant for a dental/medical clinic management system called SmartClinic. '
-                . 'You can greet users, answer general questions, and help with clinic-related queries. '
-                . 'When clinic data context is provided, use it to answer questions accurately. '
-                . 'If no relevant clinic data is provided, still respond helpfully. '
-                . 'Be professional, friendly, and concise. Support both Arabic and English. '
+
+            $systemMessage = 'You are a smart AI assistant for a dental/medical clinic management system called SmartClinic. '
+                . 'You have direct access to real-time clinic data including: revenue/bills, expenses, patients, cases/treatments, and reservations/appointments. '
+                . 'When real-time data context is provided, use it to give accurate, data-driven answers with specific numbers. '
+                . 'Always present financial data clearly with totals. '
+                . 'Be professional, friendly, and concise. Always respond in the same language the user asks in (Arabic or English). '
                 . 'The current date and time is: ' . now()->toDateTimeString() . '.';
 
-            // For simple greetings, skip the expensive embedding search
+            // For simple greetings, skip everything
             if ($this->isSimpleGreeting($question)) {
                 $answer = $this->callOpenAI($apiKey, $model, $systemMessage, $question, 300);
 
@@ -307,70 +715,49 @@ class VectorSearchService
                 ];
             }
 
-            // Step 1 & 2: Search similar embeddings
-            $similarEmbeddings = $this->searchSimilar($clinicId, $question, 5);
+            // Detect intent(s)
+            $intents = $this->detectIntent($question);
 
-            // Filter out low-similarity results (below 0.3 threshold)
-            $relevantEmbeddings = $similarEmbeddings->filter(function ($item) {
-                return $item->similarity >= 0.3;
-            });
-
-            // Build context only from relevant results
-            $originalRecords = [];
-            $context = '';
-            if ($relevantEmbeddings->isNotEmpty()) {
-                $originalRecords = $this->fetchOriginalRecords($relevantEmbeddings);
-                $context = $this->buildContext($originalRecords);
+            // Build realtime context from intent detection
+            $realtimeContext = '';
+            if (!empty($intents)) {
+                $realtimeContext = $this->gatherRealtimeContext($intents, $question);
             }
 
-            // Special handling: fetch reservations for a specific date if detected
-            if ($this->isAskingAboutReservations($question)) {
-                $targetDate = $this->extractDateFromQuestion($question);
+            // Vector search for additional context (skip if we have strong intent matches)
+            $originalRecords = [];
+            $vectorContext = '';
+            if (empty($intents)) {
+                // No specific intent detected — rely on vector search
+                $similarEmbeddings = $this->searchSimilar($clinicId, $question, 5);
+                $relevantEmbeddings = $similarEmbeddings->filter(fn($item) => $item->similarity >= 0.3);
 
-                if ($targetDate) {
-                    $dateString = $targetDate->toDateString();
-                    $dateReservations = Reservation::byDate($dateString)
-                        ->with(['patient:id,name', 'doctor:id,name', 'status:id,name', 'reservationType:id,name'])
-                        ->get();
-
-                    $label = $targetDate->isToday() ? "Today's" : $dateString;
-
-                    if ($dateReservations->isNotEmpty()) {
-                        $dateContext = "--- Reservations for {$label} ---\n";
-                        foreach ($dateReservations as $res) {
-                            $patientName = $res->patient->name ?? 'Unknown';
-                            $doctorName = $res->doctor->name ?? 'Unknown';
-                            $statusName = $res->status->name ?? 'Unknown';
-                            $typeName = $res->reservationType->name ?? '';
-                            $time = $res->reservation_from_time . ' - ' . $res->reservation_to_time;
-                            $dateContext .= "- {$time}: Patient {$patientName} with Dr. {$doctorName} (Status: {$statusName}" . ($typeName ? ", Type: {$typeName}" : "") . ")\n";
-                        }
-                        $context = $dateContext . "\n" . $context;
-                    } else {
-                        $context = "--- Reservations for {$label} ---\nNo reservations found for {$dateString}.\n\n" . $context;
-                    }
+                if ($relevantEmbeddings->isNotEmpty()) {
+                    $originalRecords = $this->fetchOriginalRecords($relevantEmbeddings);
+                    $vectorContext = $this->buildContext($originalRecords);
                 }
             }
+
+            // Combine contexts
+            $context = trim($realtimeContext . "\n" . $vectorContext);
 
             // Build the user message
             $userMessage = $question;
             if (!empty($context)) {
-                $userMessage = "Based on the following clinic records, answer this question:\n\n"
+                $userMessage = "Based on the following real-time clinic data, answer this question accurately:\n\n"
                     . "Question: {$question}\n\n"
-                    . "Clinic Data Context:\n{$context}";
+                    . "Clinic Data:\n{$context}";
             }
 
-            // Send to GPT for final answer
+            // Send to GPT
             $answer = $this->callOpenAI($apiKey, $model, $systemMessage, $userMessage, 1000);
 
             // Build source references
-            $sources = array_map(function ($record) {
-                return [
+            $sources = array_map(fn($record) => [
                 'type' => $record['source'],
                 'record_id' => $record['record_id'],
                 'similarity' => $record['similarity'],
-                ];
-            }, $originalRecords);
+            ], $originalRecords);
 
             return [
                 'success' => true,
@@ -380,8 +767,7 @@ class VectorSearchService
                 'answered_at' => now()->toDateTimeString(),
             ];
 
-        }
-        catch (\Exception $e) {
+        } catch (\Exception $e) {
             Log::error('AI Chat Error: ' . $e->getMessage(), [
                 'clinic_id' => $clinicId,
                 'question' => $question,
@@ -408,12 +794,9 @@ class VectorSearchService
             ],
         ];
 
-        // gpt-5-nano uses different parameter names
         if (str_contains($model, 'gpt-5')) {
             $body['max_completion_tokens'] = $maxTokens;
-        // gpt-5-nano does not support custom temperature
-        }
-        else {
+        } else {
             $body['max_tokens'] = $maxTokens;
             $body['temperature'] = 0.3;
         }
@@ -431,9 +814,7 @@ class VectorSearchService
 
         $content = $data['choices'][0]['message']['content'] ?? null;
 
-        // Handle both null AND empty string
         if (empty($content)) {
-            // If gpt-5-nano returns empty, fallback to gpt-4o-mini
             if (str_contains($model, 'gpt-5')) {
                 Log::warning('gpt-5-nano returned empty content, retrying with gpt-4o-mini');
                 return $this->callOpenAI($apiKey, 'gpt-4o-mini', $systemMessage, $userMessage, $maxTokens);
