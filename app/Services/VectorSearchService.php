@@ -181,32 +181,104 @@ class VectorSearchService
     }
 
     /**
-     * Check if the user is asking about today's reservations or appointments.
+     * Check if the user is asking about reservations or appointments.
      */
-    private function isAskingAboutTodayReservations(string $question): bool
+    private function isAskingAboutReservations(string $question): bool
     {
         $question = mb_strtolower(trim($question));
         
-        $timeWords = ['today', 'اليوم', 'النهارده', 'النهاردة'];
-        $appointmentWords = ['appointment', 'appointments', 'reservation', 'reservations', 'schedule', 'مواعيد', 'موعد', 'حجوزات', 'حجز', 'جدول'];
+        $appointmentWords = [
+            'appointment', 'appointments', 'reservation', 'reservations', 'schedule',
+            'مواعيد', 'موعد', 'حجوزات', 'حجز', 'جدول', 'مرضى',
+        ];
         
-        $hasTime = false;
-        foreach ($timeWords as $word) {
-            if (str_contains($question, $word)) {
-                $hasTime = true;
-                break;
-            }
-        }
-
-        $hasAppointment = false;
         foreach ($appointmentWords as $word) {
             if (str_contains($question, $word)) {
-                $hasAppointment = true;
-                break;
+                return true;
             }
         }
 
-        return $hasTime && $hasAppointment;
+        return false;
+    }
+
+    /**
+     * Extract a target date from the user's question.
+     * Supports: today, tomorrow, yesterday, specific day numbers, and full dates.
+     *
+     * @return \Carbon\Carbon|null  The parsed date or null if no date detected
+     */
+    private function extractDateFromQuestion(string $question): ?\Carbon\Carbon
+    {
+        $question = mb_strtolower(trim($question));
+
+        // Today keywords
+        $todayWords = ['today', 'اليوم', 'النهارده', 'النهاردة'];
+        foreach ($todayWords as $word) {
+            if (str_contains($question, $word)) {
+                return now()->startOfDay();
+            }
+        }
+
+        // Tomorrow keywords
+        $tomorrowWords = ['tomorrow', 'غدا', 'غداً', 'باچر', 'باجر', 'بكرة', 'بكره'];
+        foreach ($tomorrowWords as $word) {
+            if (str_contains($question, $word)) {
+                return now()->addDay()->startOfDay();
+            }
+        }
+
+        // Yesterday keywords
+        $yesterdayWords = ['yesterday', 'أمس', 'امس', 'البارحة', 'البارحه'];
+        foreach ($yesterdayWords as $word) {
+            if (str_contains($question, $word)) {
+                return now()->subDay()->startOfDay();
+            }
+        }
+
+        // Full date patterns: 2026-03-25, 25/03/2026, 25-03-2026
+        if (preg_match('/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/', $question, $m)) {
+            try {
+                return \Carbon\Carbon::createFromDate((int) $m[1], (int) $m[2], (int) $m[3])->startOfDay();
+            } catch (\Exception $e) {}
+        }
+        if (preg_match('/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/', $question, $m)) {
+            try {
+                return \Carbon\Carbon::createFromDate((int) $m[3], (int) $m[2], (int) $m[1])->startOfDay();
+            } catch (\Exception $e) {}
+        }
+
+        // Day number pattern: "يوم 25", "day 25", "25 من", "25 لهذا"
+        // Match Arabic and English day references
+        if (preg_match('/(?:يوم|day)\s*(\d{1,2})/u', $question, $m)) {
+            $day = (int) $m[1];
+            if ($day >= 1 && $day <= 31) {
+                try {
+                    return now()->startOfMonth()->day($day)->startOfDay();
+                } catch (\Exception $e) {}
+            }
+        }
+
+        // Bare number followed by contextual Arabic words like "لهاذا", "من هذا", "الشهر"
+        if (preg_match('/(\d{1,2})\s*(?:لهاذا|لهذا|من هذا|من هاذا|الشهر|this month)/u', $question, $m)) {
+            $day = (int) $m[1];
+            if ($day >= 1 && $day <= 31) {
+                try {
+                    return now()->startOfMonth()->day($day)->startOfDay();
+                } catch (\Exception $e) {}
+            }
+        }
+
+        // "مواعيد 25" or "حجوزات 25" - appointment word followed by a number
+        if (preg_match('/(?:مواعيد|موعد|حجوزات|حجز)\s*(\d{1,2})/u', $question, $m)) {
+            $day = (int) $m[1];
+            if ($day >= 1 && $day <= 31) {
+                try {
+                    return now()->startOfMonth()->day($day)->startOfDay();
+                } catch (\Exception $e) {}
+            }
+        }
+
+        return null;
     }
 
     public function chat(string $clinicId, string $question): array
@@ -251,24 +323,32 @@ class VectorSearchService
                 $context = $this->buildContext($originalRecords);
             }
 
-            // Special handling for "today's reservations"
-            if ($this->isAskingAboutTodayReservations($question)) {
-                $todayReservations = Reservation::today()
-                    ->with(['patient:id,name', 'doctor:id,name', 'status:id,name', 'reservationType:id,name'])
-                    ->get();
+            // Special handling: fetch reservations for a specific date if detected
+            if ($this->isAskingAboutReservations($question)) {
+                $targetDate = $this->extractDateFromQuestion($question);
 
-                if ($todayReservations->isNotEmpty()) {
-                    $todayContext = "--- Today's Reservations (" . now()->toDateString() . ") ---\n";
-                    foreach ($todayReservations as $res) {
-                        $patientName = $res->patient->name ?? 'Unknown';
-                        $doctorName = $res->doctor->name ?? 'Unknown';
-                        $statusName = $res->status->name ?? 'Unknown';
-                        $time = $res->reservation_from_time . ' - ' . $res->reservation_to_time;
-                        $todayContext .= "- {$time}: Patient {$patientName} with Dr. {$doctorName} ({$statusName})\n";
+                if ($targetDate) {
+                    $dateString = $targetDate->toDateString();
+                    $dateReservations = Reservation::byDate($dateString)
+                        ->with(['patient:id,name', 'doctor:id,name', 'status:id,name', 'reservationType:id,name'])
+                        ->get();
+
+                    $label = $targetDate->isToday() ? "Today's" : $dateString;
+
+                    if ($dateReservations->isNotEmpty()) {
+                        $dateContext = "--- Reservations for {$label} ---\n";
+                        foreach ($dateReservations as $res) {
+                            $patientName = $res->patient->name ?? 'Unknown';
+                            $doctorName = $res->doctor->name ?? 'Unknown';
+                            $statusName = $res->status->name ?? 'Unknown';
+                            $typeName = $res->reservationType->name ?? '';
+                            $time = $res->reservation_from_time . ' - ' . $res->reservation_to_time;
+                            $dateContext .= "- {$time}: Patient {$patientName} with Dr. {$doctorName} (Status: {$statusName}" . ($typeName ? ", Type: {$typeName}" : "") . ")\n";
+                        }
+                        $context = $dateContext . "\n" . $context;
+                    } else {
+                        $context = "--- Reservations for {$label} ---\nNo reservations found for {$dateString}.\n\n" . $context;
                     }
-                    $context = $todayContext . "\n" . $context;
-                } else {
-                    $context = "--- Today's Reservations (" . now()->toDateString() . ") ---\nNo reservations found for today.\n\n" . $context;
                 }
             }
 
