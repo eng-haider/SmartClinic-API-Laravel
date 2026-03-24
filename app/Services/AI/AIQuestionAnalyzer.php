@@ -46,7 +46,7 @@ class AIQuestionAnalyzer
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $this->apiKey,
                 'Content-Type' => 'application/json',
-            ])->timeout(10)->post('https://api.openai.com/v1/chat/completions', [
+            ])->timeout(6)->post('https://api.openai.com/v1/chat/completions', [
                 'model' => $this->model,
                 'messages' => [
                     ['role' => 'system', 'content' => $systemPrompt],

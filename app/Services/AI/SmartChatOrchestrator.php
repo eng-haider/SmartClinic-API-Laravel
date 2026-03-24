@@ -99,7 +99,7 @@ class SmartChatOrchestrator
             // Step 4: Vector search — only when tools can't fully answer
             // Skip for intents where DB tools already provide comprehensive data
             $originalRecords = [];
-            $skipVectorIntents = ['revenue', 'expenses', 'patients', 'reservations', 'cases', 'analytics'];
+            $skipVectorIntents = ['revenue', 'expenses', 'patients', 'reservations', 'cases', 'analytics', 'search_patient'];
             $shouldRunVector = $analysis['needs_vector_search'] && !in_array($analysis['intent'], $skipVectorIntents);
 
             if ($shouldRunVector) {
@@ -120,7 +120,7 @@ class SmartChatOrchestrator
             $context = $contextBuilder->build();
 
             // Step 6 & 7: Send to GPT and generate answer
-            $answer = $this->callGPT($question, $context, 1500);
+            $answer = $this->callGPT($question, $context, 800);
 
             // Build source references from vector search
             $sources = array_map(fn($record) => [
@@ -265,7 +265,7 @@ class SmartChatOrchestrator
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $apiKey,
             'Content-Type' => 'application/json',
-        ])->timeout(30)->post('https://api.openai.com/v1/chat/completions', $body);
+        ])->timeout(15)->post('https://api.openai.com/v1/chat/completions', $body);
 
         $data = $response->json();
 
@@ -273,27 +273,7 @@ class SmartChatOrchestrator
             throw new \Exception($data['error']['message'] ?? 'OpenAI API error');
         }
 
-        $content = $data['choices'][0]['message']['content'] ?? null;
-
-        if (empty($content)) {
-            if (str_contains($model, 'gpt-5')) {
-                Log::warning('gpt-5-nano returned empty content, retrying with gpt-4o-mini');
-                $body['model'] = 'gpt-4o-mini';
-                $body['max_tokens'] = $maxTokens;
-                $body['temperature'] = 0.3;
-                unset($body['max_completion_tokens']);
-
-                $response = Http::withHeaders([
-                    'Authorization' => 'Bearer ' . $apiKey,
-                    'Content-Type' => 'application/json',
-                ])->timeout(30)->post('https://api.openai.com/v1/chat/completions', $body);
-
-                $data = $response->json();
-                $content = $data['choices'][0]['message']['content'] ?? 'I could not generate a response. Please try again.';
-            } else {
-                $content = 'I could not generate a response. Please try again.';
-            }
-        }
+        $content = $data['choices'][0]['message']['content'] ?? 'I could not generate a response. Please try again.';
 
         return $content;
     }
