@@ -59,6 +59,19 @@ class TestAiChatbot extends Command
 
         $this->info("Tenant initialized successfully (DB: {$dbName}).");
         $this->newLine();
+        
+        $patient = \App\Models\Patient::where('name', 'like', '%علي طالب%')->first();
+        if ($patient) {
+            $this->info("Found Patient: " . $patient->name . " | Phone: " . $patient->phone);
+            $eb = DB::connection('pgsql_embeddings')->table('embeddings')->where('record_id', $patient->id)->where('table_name', 'patients')->first();
+            if ($eb) {
+                $this->info("Has embedding: YES");
+            } else {
+                $this->info("Has embedding: NO");
+            }
+        } else {
+            $this->error("Patient Ali Talib not found in DB.");
+        }
 
         // 1. First sync embeddings if they don't exist
         $this->info("Step 1: Skipping bulk sync to save OpenAI credits...");

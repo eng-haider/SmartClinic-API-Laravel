@@ -9,6 +9,7 @@ use App\Models\Patient;
 use App\Models\Reservation;
 use App\Models\CaseModel;
 use App\Models\Bill;
+use App\Models\MedicalKnowledge;
 use Illuminate\Http\Request;
 
 class AIController extends Controller
@@ -104,6 +105,53 @@ class AIController extends Controller
     }
 
     /**
+     * Sync medical knowledge entries with embeddings.
+     */
+    public function syncMedicalKnowledge(Request $request)
+    {
+        $request->validate([
+            'entries' => 'required|array|min:1',
+            'entries.*.title' => 'required|string|max:255',
+            'entries.*.content' => 'required|string',
+        ]);
+
+        $clinicId = tenant('id');
+        if (!$clinicId) {
+            return response()->json(['success' => false, 'message' => 'Clinic context not found.'], 400);
+        }
+
+        $embeddingService = app(EmbeddingService::class);
+        $synced = 0;
+        $failed = 0;
+
+        foreach ($request->input('entries') as $entry) {
+            try {
+                $vector = $embeddingService->generateEmbedding($entry['content']);
+                $vectorString = '[' . implode(',', $vector) . ']';
+
+                \Illuminate\Support\Facades\DB::connection('pgsql_embeddings')->statement(
+                    "INSERT INTO medical_knowledge (clinic_id, title, content, embedding, created_at, updated_at)
+                     VALUES (?, ?, ?, ?::vector, NOW(), NOW())",
+                    [$clinicId, $entry['title'], $entry['content'], $vectorString]
+                );
+                $synced++;
+            } catch (\Exception $e) {
+                $failed++;
+                \Illuminate\Support\Facades\Log::warning('Medical knowledge sync failed', [
+                    'title' => $entry['title'],
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Synced {$synced} entries, {$failed} failed.",
+            'data' => ['synced' => $synced, 'failed' => $failed],
+        ]);
+    }
+
+    /**
      * Generate AI database report
      */
     public function generateReport(Request $request)
@@ -181,18 +229,22 @@ class AIController extends Controller
             'success' => true,
             'data' => [
                 'capabilities' => [
-                    'ai_chat' => 'Ask natural language questions about your clinic data using AI vector search',
-                    'generate_reports' => 'Generate AI-powered reports based on database data',
-                    'answer_questions' => 'Ask questions about your clinic data and get AI answers',
-                    'analyze_trends' => 'Get insights about patient trends, revenue, and operations',
+                    'ai_chat' => 'Smart AI assistant with natural language understanding and real-time clinic data analysis',
+                    'ai_intent_analysis' => 'AI-powered question analysis using GPT-4o-mini for accurate intent detection',
+                    'analytics' => 'Advanced analytics: top doctors, revenue trends, month comparisons, growth metrics',
+                    'hybrid_search' => 'Hybrid search combining vector similarity, database queries, and knowledge base',
+                    'medical_knowledge' => 'Medical knowledge base with vector search for dental/medical Q&A',
                     'sync_embeddings' => 'Sync all clinic data for AI-powered search',
                 ],
                 'features' => [
-                    'vector_search' => 'Uses pgvector similarity search for accurate results',
-                    'rag_pipeline' => 'Retrieval-Augmented Generation for context-aware answers',
+                    'smart_pipeline' => 'Analyze → Tools → Vector Search → Context → GPT → Answer',
+                    'tool_based' => '8 specialized tools for revenue, patients, appointments, cases, analytics, and more',
+                    'vector_search' => 'pgvector similarity search with 0.75 threshold',
+                    'context_builder' => 'Intelligent context merging from multiple data sources',
                     'auto_sync' => 'Embeddings auto-update when records change',
                     'multi_tenant' => 'Each clinic\'s data is isolated and secure',
-                    'real_time_data' => 'Uses current database statistics',
+                    'caching' => 'Performance caching for heavy queries and analytics',
+                    'multilingual' => 'Full Arabic and English support',
                 ]
             ]
         ]);
