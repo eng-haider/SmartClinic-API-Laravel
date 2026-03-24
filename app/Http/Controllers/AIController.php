@@ -48,13 +48,13 @@ class AIController extends Controller
             ], 400);
         }
 
-        if (!tenant('has_ai_bot')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'AI Chatbot is not enabled for this clinic. Please contact support.',
-                'message_ar' => 'خدمة الذكاء الاصطناعي غير مفعلة لهذه العيادة. يرجى التواصل مع الدعم الفني.',
-            ], 403);
-        }
+        // if (!tenant('has_ai_bot')) {
+        //     return response()->json([
+        //         'success' => false,
+        //         'message' => 'AI Chatbot is not enabled for this clinic. Please contact support.',
+        //         'message_ar' => 'خدمة الذكاء الاصطناعي غير مفعلة لهذه العيادة. يرجى التواصل مع الدعم الفني.',
+        //     ], 403);
+        // }
 
         $result = $this->vectorSearchService->chat($clinicId, $request->input('question'));
 
@@ -169,7 +169,7 @@ class AIController extends Controller
         ]);
 
         $reportType = $request->input('report_type', 'general');
-        
+
         $result = $this->aiService->generateDatabaseReport($reportType);
 
         return response()->json([
@@ -194,16 +194,16 @@ class AIController extends Controller
             'question' => 'required|string|max:1000'
         ]);
 
-        if (!tenant() || !tenant('has_ai_bot')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'AI Chatbot is not enabled for this clinic. Please contact support.',
-                'message_ar' => 'خدمة الذكاء الاصطناعي غير مفعلة لهذه العيادة. يرجى التواصل مع الدعم الفني.',
-            ], 403);
-        }
+        // if (!tenant() || !tenant('has_ai_bot')) {
+        //     return response()->json([
+        //         'success' => false,
+        //         'message' => 'AI Chatbot is not enabled for this clinic. Please contact support.',
+        //         'message_ar' => 'خدمة الذكاء الاصطناعي غير مفعلة لهذه العيادة. يرجى التواصل مع الدعم الفني.',
+        //     ], 403);
+        // }
 
         $question = $request->input('question');
-        
+
         $result = $this->aiService->askQuestion($question);
 
         return response()->json([
