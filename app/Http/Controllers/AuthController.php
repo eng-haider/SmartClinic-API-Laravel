@@ -69,6 +69,12 @@ class AuthController extends Controller
                     'tenant_id' => $result['tenant_id'],
                     'clinic_name' => $result['clinic_name'],
                     'user_name' => $result['user_name'],
+                    'has_ai_bot' => $result['has_ai_bot'],
+                    'clinic' => [
+                        'id' => $result['tenant_id'],
+                        'name' => $result['clinic_name'],
+                        'has_ai_bot' => $result['has_ai_bot'],
+                    ],
                 ],
             ]);
         } catch (\Exception $e) {
@@ -130,6 +136,12 @@ class AuthController extends Controller
                     'token' => $result['token'],
                     'tenant_id' => $result['tenant_id'],
                     'clinic_name' => $result['clinic_name'],
+                    'has_ai_bot' => $result['has_ai_bot'],
+                    'clinic' => [
+                        'id' => $result['tenant_id'],
+                        'name' => $result['clinic_name'],
+                        'has_ai_bot' => $result['has_ai_bot'],
+                    ],
                 ],
             ]);
         } catch (\Exception $e) {

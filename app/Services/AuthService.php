@@ -38,7 +38,7 @@ class AuthService
         }
 
         DB::beginTransaction();
-        
+
         try {
             // Create clinic first
             $clinic = Clinic::create([
@@ -63,7 +63,7 @@ class AuthService
             $roleName = 'clinic_super_doctor';
 
             $user = $this->userRepository->create($userData);
-            
+
             // Set clinic_id separately for central database users
             // (clinic_id is not in fillable to avoid issues with tenant databases)
             $user->clinic_id = $clinic->id;
@@ -113,14 +113,14 @@ class AuthService
 
         // Get user's clinic
         $clinic = $centralUser->clinic;
-        
+
         if (!$clinic) {
             throw new \Exception('User is not associated with any clinic');
         }
 
         // Step 2: Ensure tenant exists, create if not
         $tenant = \App\Models\Tenant::find($clinic->id);
-        
+
         if (!$tenant) {
             // Auto-create tenant record
             $tenant = $this->createTenantForClinic($clinic);
@@ -145,7 +145,7 @@ class AuthService
 
         // Load roles and permissions explicitly
         $tenantUser->load(['roles.permissions', 'permissions']);
-        
+
         // Debug: Log what we got
         \Illuminate\Support\Facades\Log::info('Tenant user loaded', [
             'user_id' => $tenantUser->id,
@@ -162,6 +162,7 @@ class AuthService
             'token' => $token,
             'tenant_id' => $clinic->id,
             'clinic_name' => $clinic->name,
+            'has_ai_bot' => $clinic->has_ai_bot,
             'message' => 'Login successful',
         ];
     }
@@ -174,26 +175,26 @@ class AuthService
         $tenant = new \App\Models\Tenant();
         $tenant->setAttribute('id', $clinic->id);
         $tenant->exists = false;
-        
+
         // Copy clinic data to tenant
         $tenant->setAttribute('name', $clinic->name);
         $tenant->setAttribute('address', $clinic->address);
         $tenant->setAttribute('logo', $clinic->logo);
-        
+
         // Store database credentials for Hostinger
         $databaseName = config('tenancy.database.prefix') . $clinic->id;
         $tenant->setAttribute('db_name', $databaseName);
         $tenant->setAttribute('db_username', $databaseName);
         $tenant->setAttribute('db_password', env('TENANT_DB_PASSWORD'));
-        
+
         $tenant->saveQuietly();
         $tenant->refresh();
-        
+
         \Illuminate\Support\Facades\Log::info('Auto-created tenant record', [
             'tenant_id' => $tenant->id,
             'db_name' => $databaseName
         ]);
-        
+
         return $tenant;
     }
 
@@ -205,9 +206,9 @@ class AuthService
         $databaseName = $tenant->db_name ?? (config('tenancy.database.prefix') . $tenant->id);
         $tenantUsername = $tenant->db_username ?? $databaseName;
         $tenantPassword = $tenant->db_password ?? env('TENANT_DB_PASSWORD');
-        
+
         $centralConfig = config('database.connections.' . config('tenancy.database.central_connection'));
-        
+
         // Configure the tenant connection
         config([
             'database.connections.tenant.database' => $databaseName,
@@ -216,14 +217,14 @@ class AuthService
             'database.connections.tenant.host' => $centralConfig['host'],
             'database.connections.tenant.port' => $centralConfig['port'],
         ]);
-        
+
         // Purge and reconnect
         DB::purge('tenant');
-        
+
         // Test connection
         try {
             DB::connection('tenant')->getPdo();
-            
+
             // Check if database is already setup (has users table with data)
             try {
                 $userCount = DB::connection('tenant')->table('users')->count();
@@ -237,32 +238,32 @@ class AuthService
             } catch (\Exception $e) {
                 // Table doesn't exist, need to run migrations
             }
-            
+
             // Database exists but not setup - run migrations and seeders
             \Illuminate\Support\Facades\Log::info('Setting up tenant database', [
                 'database' => $databaseName
             ]);
-            
+
             // Run migrations
             \Illuminate\Support\Facades\Artisan::call('migrate', [
                 '--database' => 'tenant',
                 '--path' => 'database/migrations/tenant',
                 '--force' => true,
             ]);
-            
+
             // Run seeders
             \Illuminate\Support\Facades\Artisan::call('db:seed', [
                 '--database' => 'tenant',
                 '--class' => 'RoleAndPermissionSeeder',
                 '--force' => true,
             ]);
-            
+
             \Illuminate\Support\Facades\Artisan::call('db:seed', [
                 '--database' => 'tenant',
                 '--class' => 'TenantDatabaseSeeder',
                 '--force' => true,
             ]);
-            
+
             // Create user in tenant database
             $createdUser = User::on('tenant')->create([
                 'name' => $centralUser->name,
@@ -271,7 +272,7 @@ class AuthService
                 'password' => Hash::make($password),
                 'is_active' => true,
             ]);
-            
+
             // Assign role - need to refresh connection context first
             DB::purge('tenant');
             $tenantUser = User::on('tenant')->where('phone', $centralUser->phone)->first();
@@ -289,11 +290,11 @@ class AuthService
                     ]);
                 }
             }
-            
+
             \Illuminate\Support\Facades\Log::info('Tenant database setup completed', [
                 'database' => $databaseName
             ]);
-            
+
         } catch (\Exception $e) {
             throw new \Exception(
                 "Database '{$databaseName}' does not exist. " .
@@ -326,7 +327,7 @@ class AuthService
 
         // Get user's clinic
         $clinic = $user->clinic;
-        
+
         if (!$clinic) {
             throw new \Exception('User is not associated with any clinic');
         }
@@ -335,6 +336,7 @@ class AuthService
         return [
             'tenant_id' => $clinic->id,
             'clinic_name' => $clinic->name,
+            'has_ai_bot' => $clinic->has_ai_bot,
             'user_name' => $user->name,
             'message' => 'Credentials verified. Please proceed with tenant login.',
         ];
