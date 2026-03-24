@@ -62,14 +62,11 @@ class GetRevenueReportTool implements AIToolInterface
             $lines[] = "Today's Bills: " . $todayBills->count();
             $lines[] = "Today's Revenue: " . $todayBills->sum('price');
 
-            // All-time summary (cached for 5 minutes)
-            $allTimeStats = Cache::remember('revenue_all_time', 300, function () {
-                $all = Bill::all();
-                return [
-                    'total' => $all->count(),
-                    'revenue' => $all->sum('price'),
-                ];
-            });
+            // All-time summary
+            $allTimeStats = [
+                'total' => Bill::count(),
+                'revenue' => Bill::sum('price'),
+            ];
 
             $lines[] = "";
             $lines[] = "--- All-Time Revenue ---";

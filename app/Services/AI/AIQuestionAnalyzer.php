@@ -37,12 +37,7 @@ class AIQuestionAnalyzer
             return $greetingResult;
         }
 
-        // Check cache (60 second TTL for identical questions)
-        $cacheKey = 'ai_analysis:' . md5(mb_strtolower(trim($question)));
-        $cached = Cache::get($cacheKey);
-        if ($cached) {
-            return $cached;
-        }
+
 
         try {
             $systemPrompt = $this->buildSystemPrompt();
@@ -84,9 +79,6 @@ class AIQuestionAnalyzer
             }
 
             $result = $this->normalizeResult($parsed);
-
-            // Cache the result for 60 seconds
-            Cache::put($cacheKey, $result, 60);
 
             return $result;
 

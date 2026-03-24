@@ -51,8 +51,8 @@ class GetPatientsSummaryTool implements AIToolInterface
         } else {
             $today = now()->toDateString();
             $newToday = Patient::whereDate('created_at', $today)->count();
-            $total = Cache::remember('patients_total', 300, fn() => Patient::count());
-            $activeCount = Cache::remember('patients_active', 300, fn() => Patient::whereNull('deleted_at')->count());
+            $total = Patient::count();
+            $activeCount = Patient::whereNull('deleted_at')->count();
 
             $lines[] = "--- Patients Summary for Today ({$today}) ---";
             $lines[] = "New Patients Today: {$newToday}";
