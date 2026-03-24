@@ -229,7 +229,8 @@ class SmartChatOrchestrator
     private function callGPT(string $question, string $context, int $maxTokens = 1000): string
     {
         $apiKey = config('services.openai.api_key');
-        $model = config('services.openai.chat_model', 'gpt-4o-mini');
+        // Always use gpt-4o-mini for chat — it's the cheapest, fastest, and most reliable
+        $model = 'gpt-4o-mini';
 
         $systemMessage = 'You are a smart AI assistant for a dental/medical clinic management system called SmartClinic. '
             . 'You have direct access to real-time clinic data including: revenue/bills, expenses, patients, cases/treatments, and reservations/appointments. '
@@ -253,14 +254,9 @@ class SmartChatOrchestrator
                 ['role' => 'system', 'content' => $systemMessage],
                 ['role' => 'user', 'content' => $userMessage],
             ],
+            'max_tokens' => $maxTokens,
+            'temperature' => 0.3,
         ];
-
-        if (str_contains($model, 'gpt-5')) {
-            $body['max_completion_tokens'] = $maxTokens;
-        } else {
-            $body['max_tokens'] = $maxTokens;
-            $body['temperature'] = 0.3;
-        }
 
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $apiKey,
@@ -273,7 +269,11 @@ class SmartChatOrchestrator
             throw new \Exception($data['error']['message'] ?? 'OpenAI API error');
         }
 
-        $content = $data['choices'][0]['message']['content'] ?? 'I could not generate a response. Please try again.';
+        $content = trim($data['choices'][0]['message']['content'] ?? '');
+
+        if (empty($content)) {
+            $content = 'لم أتمكن من توليد إجابة. يرجى المحاولة مرة أخرى.';
+        }
 
         return $content;
     }
