@@ -280,6 +280,8 @@ class BillRepository
         }
 
 
+
+
         // Get cases with same date filter to calculate total case prices
         $casesQuery = CaseModel::query();
 
@@ -323,9 +325,9 @@ class BillRepository
         return [
 
             'total_price' => $totalPrice, // Total of ALL cases price
-            'total_paid_price' => $totalPaidCases, // Sum of paid cases price (is_paid = true)
+            'total_paid_price' => $query->sum('price'), // Sum of paid cases price (is_paid = true)
             'total_unpaid_price' => $totalUnpaidCases, // Sum of unpaid cases price (is_paid = false)
-            'total_expenses' => $totalExpenses,
+            'total_expenses' => $totalExpenses
             // 'total_paid_expenses' => $totalPaidExpenses,
             // 'total_unpaid_expenses' => $totalUnpaidExpenses,
         ];
