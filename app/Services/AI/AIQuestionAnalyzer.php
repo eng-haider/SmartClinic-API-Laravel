@@ -148,7 +148,7 @@ Analyze the user's question and return a JSON object with this exact structure:
 
 Rules:
 - "analytics" intent is for comparative/trend questions like "top doctor", "compare months", "growth rate", "why revenue decreased"
-- "revenue" intent is for questions about bills, income, payments, financial data
+- "revenue" intent is for questions about payments received from auditor (bills table), case prices set by doctor, unpaid amounts, financial data, income
 - "expenses" intent is for questions about clinic expenses, costs, spending
 - "patients" intent is for questions about patient counts, demographics, registrations
 - "reservations" intent is for questions about appointments, bookings, schedules
@@ -201,7 +201,7 @@ PROMPT;
 
         // Simple keyword-based fallback
         $intentMap = [
-            'revenue' => ['revenue', 'income', 'bill', 'payment', 'paid', 'unpaid', 'إيرادات', 'فواتير', 'دخل', 'مدفوع'],
+            'revenue' => ['revenue', 'income', 'bill', 'payment', 'paid', 'unpaid', 'إيرادات', 'فواتير', 'دخل', 'مدفوع', 'غير مدفوع', 'مبالغ'],
             'expenses' => ['expense', 'cost', 'spending', 'مصاريف', 'مصروف', 'نفقات', 'تكاليف'],
             'patients' => ['patient', 'patients', 'مرضى', 'مريض', 'مراجع'],
             'reservations' => ['appointment', 'reservation', 'schedule', 'booking', 'مواعيد', 'موعد', 'حجز'],

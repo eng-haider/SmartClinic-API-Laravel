@@ -69,7 +69,7 @@ class BillRepository
                 'notes',
             ])
 
-            
+
             ->defaultSort('-created_at');
 
         // If billable is requested, automatically load nested relationships
@@ -263,7 +263,7 @@ class BillRepository
      * - date_to (Y-m-d or Y-m-d H:i:s)
      * - doctor_id
      */
-    public function getStatisticsWithFilters(array $filters, int $perPage = 15, $doctorId=null): array
+    public function getStatisticsWithFilters(array $filters, int $perPage = 15, $doctorId = null): array
     {
         $query = $this->query();
 
@@ -277,21 +277,16 @@ class BillRepository
 
         if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
             $query->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]);
-        } 
+        }
 
-        $totalBills = $query->count();
-        $paidBills = (clone $query)->paid()->count();
-        $unpaidBills = (clone $query)->unpaid()->count();
-        $totalPaidPrice = (clone $query)->paid()->sum('price') ?? 0;
-        $totalUnpaidPrice = (clone $query)->unpaid()->sum('price') ?? 0;
 
         // Get cases with same date filter to calculate total case prices
         $casesQuery = CaseModel::query();
-        
+
         if ($doctorId !== null) {
             $casesQuery->where('doctor_id', $doctorId);
         }
-        
+
         if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
             $casesQuery->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]);
         } elseif (!empty($filters['date_from'])) {
@@ -305,11 +300,11 @@ class BillRepository
 
         // Get expenses with same date filter
         $expensesQuery = ClinicExpense::query();
-        
+
         if ($doctorId !== null) {
             $expensesQuery->where('doctor_id', $doctorId);
         }
-        
+
         if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
             $expensesQuery->whereBetween('date', [$filters['date_from'], $filters['date_to']]);
         } elseif (!empty($filters['date_from'])) {
@@ -319,26 +314,20 @@ class BillRepository
         }
 
         $totalExpenses = $expensesQuery->sum(DB::raw('price * COALESCE(quantity, 1)')) ?? 0;
-        $totalPaidExpenses = (clone $expensesQuery)->where('is_paid', true)->sum(DB::raw('price * COALESCE(quantity, 1)')) ?? 0;
-        $totalUnpaidExpenses = (clone $expensesQuery)->where('is_paid', false)->sum(DB::raw('price * COALESCE(quantity, 1)')) ?? 0;
+        // $totalPaidExpenses = (clone $expensesQuery)->where('is_paid', true)->sum(DB::raw('price * COALESCE(quantity, 1)')) ?? 0;
+        // $totalUnpaidExpenses = (clone $expensesQuery)->where('is_paid', false)->sum(DB::raw('price * COALESCE(quantity, 1)')) ?? 0;
 
-        // Calculate unpaid case price (total_price - total_paid_price)
-        $unpaidCasePrice = $totalPrice - $totalPaidCases;
+        // Calculate unpaid case price
+        $totalUnpaidCases = $totalPrice - $totalPaidCases;
 
         return [
-            'total_bills' => $totalBills,
-            'paid_bills' => $paidBills,
-            'unpaid_bills' => $unpaidBills,
-            'total_price' => $totalPrice, // Total of ALL cases price (not bills)
-            'total_paid_price' =>  $totalPaidPrice , // Total paid cases price
-            'total_unpaid_price' => $totalUnpaidPrice,
-            'unpaid_case_price' => $unpaidCasePrice, // total_price - total_paid_price
-            'remaining_amount' => $totalUnpaidPrice, // Remaining to be paid
-            'total_revenue' => $totalUnpaidPrice, // Unpaid cases price (total_price - total_paid_price)
-            'total_outstanding' => $totalUnpaidPrice, // Alias for backward compatibility
-            'total_expenses' => $totalExpenses, // Total expenses (paid + unpaid)
-            'total_paid_expenses' => $totalPaidExpenses,
-            'total_unpaid_expenses' => $totalUnpaidExpenses,
+
+            'total_price' => $totalPrice, // Total of ALL cases price
+            'total_paid_price' => $totalPaidCases, // Sum of paid cases price (is_paid = true)
+            'total_unpaid_price' => $totalUnpaidCases, // Sum of unpaid cases price (is_paid = false)
+            'total_expenses' => $totalExpenses,
+            // 'total_paid_expenses' => $totalPaidExpenses,
+            // 'total_unpaid_expenses' => $totalUnpaidExpenses,
         ];
     }
 }

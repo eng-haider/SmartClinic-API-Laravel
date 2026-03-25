@@ -233,7 +233,13 @@ class SmartChatOrchestrator
         $model = 'gpt-4o-mini';
 
         $systemMessage = 'You are a smart AI assistant for a dental/medical clinic management system called SmartClinic. '
-            . 'You have direct access to real-time clinic data including: revenue/bills, expenses, patients, cases/treatments, and reservations/appointments. '
+            . 'You have direct access to real-time clinic data including: payments/bills, expenses, patients, cases/treatments, and reservations/appointments. '
+            . 'IMPORTANT financial data model: '
+            . '- "Bills" (bills table) = payments received from the auditor/accountant, NOT invoices. Each bill records an amount paid. '
+            . '- "Cases" (cases table) = treatments with prices set by the doctor. Cases have an is_paid flag. '
+            . '- "Unpaid Amount" = sum of case prices where is_paid is false. '
+            . '- When user asks about "المبالغ المدفوعة" (paid amounts), report the total payments received (bills sum). '
+            . '- When user asks about unpaid amounts, report the sum of unpaid case prices. '
             . 'When real-time data context is provided, use it to give accurate, data-driven answers with specific numbers. '
             . 'Always present financial data clearly with totals. '
             . 'For analytics questions, provide insights and actionable recommendations. '

@@ -3,8 +3,8 @@
 namespace App\Services\AI\Tools;
 
 use App\Models\Bill;
+use App\Models\CaseModel;
 use App\Models\ClinicExpense;
-use Illuminate\Support\Facades\Cache;
 
 class GetRevenueReportTool implements AIToolInterface
 {
@@ -15,7 +15,7 @@ class GetRevenueReportTool implements AIToolInterface
 
     public function description(): string
     {
-        return 'Gets revenue and billing data including totals, paid/unpaid breakdowns, and doctor revenue rankings.';
+        return 'Gets financial data: payments received (bills), case prices, unpaid amounts, and expense breakdowns.';
     }
 
     public function execute(array $params): string
@@ -27,16 +27,20 @@ class GetRevenueReportTool implements AIToolInterface
 
         if ($start && $end) {
             $label = $start->eq($end) ? $start->toDateString() : $start->toDateString() . ' to ' . $end->toDateString();
+
+            // Payments received from auditor (bills table)
             $bills = Bill::whereBetween('created_at', [$start->startOfDay(), $end->endOfDay()])->get();
 
-            $lines[] = "--- Revenue Report for {$label} ---";
-            $lines[] = "Total Bills: " . $bills->count();
-            $lines[] = "Total Revenue: " . $bills->sum('price');
+            $lines[] = "--- Financial Report for {$label} ---";
+            $lines[] = "";
+            $lines[] = "=== Payments Received (Bills) ===";
+            $lines[] = "Number of Payments: " . $bills->count();
+            $lines[] = "Total Amount Received: " . $bills->sum('price');
 
-            // Top doctors by revenue
+            // Top doctors by payments received
             $doctorRevenue = $bills->groupBy('doctor_id')->map(fn($b) => $b->sum('price'))->sortDesc()->take(5);
             if ($doctorRevenue->isNotEmpty()) {
-                $lines[] = "Top Doctors by Revenue:";
+                $lines[] = "Top Doctors by Payments Received:";
                 foreach ($doctorRevenue as $doctorId => $revenue) {
                     $doctor = \App\Models\User::find($doctorId);
                     $doctorName = $doctor->name ?? "Doctor #{$doctorId}";
@@ -44,34 +48,62 @@ class GetRevenueReportTool implements AIToolInterface
                 }
             }
 
+            // Cases financial summary (doctor-set prices)
+            $endCopy = $end->copy();
+            $cases = CaseModel::whereBetween('created_at', [$start->startOfDay(), $endCopy->endOfDay()])->get();
+
+            $lines[] = "";
+            $lines[] = "=== Cases/Treatments Pricing ===";
+            $lines[] = "Total Cases: " . $cases->count();
+            $lines[] = "Total Case Prices (Doctor Charges): " . $cases->sum('price');
+            $lines[] = "Paid Cases: " . $cases->where('is_paid', true)->count();
+            $lines[] = "Unpaid Cases: " . $cases->where('is_paid', false)->count();
+            $lines[] = "Unpaid Amount: " . $cases->where('is_paid', false)->sum('price');
+
             // Individual bills (max 15)
             if ($bills->isNotEmpty()) {
-                $lines[] = "Individual Bills:";
+                $lines[] = "";
+                $lines[] = "=== Individual Payments ===";
                 foreach ($bills->take(15) as $bill) {
                     $patientName = $bill->patient->name ?? 'Unknown';
                     $doctorName = $bill->doctor->name ?? 'Unknown';
-                    $lines[] = "  - {$patientName} | Dr. {$doctorName} | {$bill->price}";
+                    $lines[] = "  - {$patientName} | Dr. {$doctorName} | Amount: {$bill->price}";
                 }
             }
         } else {
             // Default: today + all-time
             $today = now()->toDateString();
-            $todayBills = Bill::whereDate('created_at', $today)->get();
 
-            $lines[] = "--- Revenue for Today ({$today}) ---";
-            $lines[] = "Today's Bills: " . $todayBills->count();
-            $lines[] = "Today's Revenue: " . $todayBills->sum('price');
+            // Today's payments
+            $todayBills = Bill::whereDate('created_at', $today)->get();
+            $lines[] = "--- Financial Report for Today ({$today}) ---";
+            $lines[] = "";
+            $lines[] = "=== Today's Payments Received ===";
+            $lines[] = "Payments Today: " . $todayBills->count();
+            $lines[] = "Amount Received Today: " . $todayBills->sum('price');
+
+            // Today's cases
+            $todayCases = CaseModel::whereDate('created_at', $today)->get();
+            $lines[] = "";
+            $lines[] = "=== Today's Cases ===";
+            $lines[] = "Cases Today: " . $todayCases->count();
+            $lines[] = "Case Prices Today: " . $todayCases->sum('price');
+            $lines[] = "Unpaid Cases Today: " . $todayCases->where('is_paid', false)->count();
+            $lines[] = "Unpaid Amount Today: " . $todayCases->where('is_paid', false)->sum('price');
 
             // All-time summary
-            $allTimeStats = [
-                'total' => Bill::count(),
-                'revenue' => Bill::sum('price'),
-            ];
+            $allTimeBills = Bill::sum('price');
+            $allTimeBillCount = Bill::count();
+            $allTimeCasePrice = CaseModel::sum('price');
+            $allTimeUnpaidPrice = CaseModel::where('is_paid', false)->sum('price');
+            $allTimeUnpaidCount = CaseModel::where('is_paid', false)->count();
 
             $lines[] = "";
-            $lines[] = "--- All-Time Revenue ---";
-            $lines[] = "Total Bills: {$allTimeStats['total']}";
-            $lines[] = "Total Revenue: {$allTimeStats['revenue']}";
+            $lines[] = "--- All-Time Financial Summary ---";
+            $lines[] = "Total Payments Received (Bills): {$allTimeBillCount} payments, Amount: {$allTimeBills}";
+            $lines[] = "Total Case Prices (Doctor Charges): {$allTimeCasePrice}";
+            $lines[] = "Total Unpaid Cases: {$allTimeUnpaidCount}";
+            $lines[] = "Total Unpaid Amount: {$allTimeUnpaidPrice}";
         }
 
         // Expenses summary

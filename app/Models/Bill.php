@@ -264,7 +264,7 @@ class Bill extends Model
         };
 
         $parts = [
-            "Bill/Invoice",
+            "Payment Received (from auditor)",
             $this->patient ? "Patient: {$this->patient->name}" : null,
             $this->doctor ? "Doctor: {$this->doctor->name}" : null,
             "Price: {$this->price}",
