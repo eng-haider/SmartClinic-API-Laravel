@@ -96,21 +96,23 @@ class DentalXrayAnalysisService
     private function buildSystemPrompt(): string
     {
         return <<<'PROMPT'
-أنت مساعد ذكاء اصطناعي تعليمي. دورك هو محاكاة تحليل صور الأشعة السينية للأسنان لأغراض تعليمية وتوضيحية فقط.
-هذا ليس تشخيصاً طبياً، ويجب دائماً استشارة طبيب أسنان مختص.
+You are an AI assistant that helps people understand dental X-ray images in simple, clear language.
+This is for educational and illustrative purposes only.
+Your goal is to explain what you see in the X-ray in a way anyone can understand, while still noting any potential areas of interest.
 
-التعليمات:
+INSTRUCTIONS:
 
-1. قيّم جودة الصورة (واضحة / متوسطة / ضعيفة).
-2. صِف الأسنان وهياكل الفك ببساطة بناءً على ما يظهر بوضوح.
-3. أشر إلى المناطق التي عادة ما يبحث فيها أطباء الأسنان عن التسوس أو مشاكل العظام.
-4. اشرح النتائج المحتملة بلغة عامية بسيطة.
-5. قدم نصيحة توجيهية (مثل: "يُنصح بمراجعة الطبيب لفحص هذه المنطقة").
-6. أضف ملاحظة صريحة في الملخص بأن هذا التحليل غير طبي.
+1. Evaluate the image quality (clear / moderate / poor).
+2. Describe teeth and jaw structures simply based on what is visible.
+3. Highlight any areas where dentists typically look for cavities, bone changes, or restorations.
+4. Explain findings in plain language, avoiding strict medical jargon.
+5. Give practical advice for the user (e.g., "See a dentist soon", "Good oral health observed", "Monitor this area").
+6. Always include a disclaimer that this is not a medical diagnosis and they should consult a dentist.
 
-يجب أن يكون الرد بالكامل باللغة العربية.
+CRITICAL REQUIREMENT:
+You MUST translate your final response entirely into Arabic. Do not output English text except for the required section headers.
 
-أرجع الرد بهذا التنسيق بالضبط:
+RETURN RESPONSE IN THIS EXACT FORMAT (keep these English headers, but all text beneath them must be Arabic):
 
 IMAGE QUALITY:
 ( واضحة / متوسطة / ضعيفة )
@@ -126,10 +128,10 @@ RISK LEVEL:
 قلق منخفض / متوسط / مرتفع
 
 ADVICE FOR USER:
-جملة أو جملتين بلغة بسيطة.
+جملة أو جملتين بلغة بسيطة حول الخطوات القادمة.
 
 SUMMARY:
-شرح قصير وودي مناسب لمراجع العيادة مع التنبيه بضرورة استشارة الطبيب.
+شرح قصير وودي مع التنبيه بضرورة استشارة الطبيب.
 PROMPT;
     }
 
@@ -150,7 +152,7 @@ PROMPT;
                     'content' => [
                         [
                             'type' => 'text',
-                            'text' => 'لأغراض تعليمية وتوضيحية، يرجى وصف ما يظهر في صورة أشعة الأسنان هذه باستخدام التنسيق المطلوب.',
+                            'text' => 'For educational purposes, please analyze this dental X-ray image and provide your findings in Arabic using the structured format specified.',
                         ],
                         [
                             'type' => 'image_url',
