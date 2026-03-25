@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AIService;
+use App\Services\AI\DentalXrayAnalysisService;
 use App\Services\VectorSearchService;
 use App\Services\EmbeddingService;
 use App\Models\Patient;
@@ -16,11 +17,13 @@ class AIController extends Controller
 {
     private AIService $aiService;
     private VectorSearchService $vectorSearchService;
+    private DentalXrayAnalysisService $xrayService;
 
-    public function __construct(AIService $aiService, VectorSearchService $vectorSearchService)
+    public function __construct(AIService $aiService, VectorSearchService $vectorSearchService, DentalXrayAnalysisService $xrayService)
     {
         $this->aiService = $aiService;
         $this->vectorSearchService = $vectorSearchService;
+        $this->xrayService = $xrayService;
     }
 
     /**
@@ -237,6 +240,43 @@ class AIController extends Controller
     }
 
     /**
+     * Analyze a dental X-ray image using AI Vision.
+     */
+    public function analyzeXray(Request $request)
+    {
+        $request->validate([
+            'image' => 'required_without:image_base64|file|mimes:jpeg,jpg,png,webp|max:10240',
+            'image_base64' => 'required_without:image|string',
+            'patient_id' => 'sometimes|integer|exists:patients,id',
+        ]);
+
+        $result = $this->xrayService->analyze(
+            $request->file('image'),
+            $request->input('image_base64'),
+            $request->input('patient_id')
+        );
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to analyze X-ray image',
+                'error' => $result['error'],
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'X-ray analyzed successfully',
+            'data' => [
+                'analysis' => $result['analysis'],
+                'raw_response' => $result['raw_response'],
+                'patient_id' => $result['patient_id'],
+                'analyzed_at' => $result['analyzed_at'],
+            ],
+        ]);
+    }
+
+    /**
      * Get AI capabilities
      */
     public function getCapabilities()
@@ -251,6 +291,7 @@ class AIController extends Controller
                     'hybrid_search' => 'Hybrid search combining vector similarity, database queries, and knowledge base',
                     'medical_knowledge' => 'Medical knowledge base with vector search for dental/medical Q&A',
                     'sync_embeddings' => 'Sync all clinic data for AI-powered search',
+                    'dental_xray_analysis' => 'AI-powered dental X-ray image analysis using GPT-4o Vision for patient-friendly reports',
                 ],
                 'features' => [
                     'smart_pipeline' => 'Analyze → Tools → Vector Search → Context → GPT → Answer',

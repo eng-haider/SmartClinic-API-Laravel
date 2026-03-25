@@ -177,6 +177,7 @@ Route::middleware([
     // ============================================
     Route::middleware('jwt')->prefix('ai')->group(function () {
         Route::post('chat', [AIController::class, 'chat']);
+        Route::post('analyze-xray', [AIController::class, 'analyzeXray']);
         Route::post('sync-embeddings', [AIController::class, 'syncEmbeddings']);
         Route::post('sync-medical-knowledge', [AIController::class, 'syncMedicalKnowledge']);
         Route::get('capabilities', [AIController::class, 'getCapabilities']);
