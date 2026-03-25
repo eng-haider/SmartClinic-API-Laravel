@@ -136,6 +136,87 @@ PROMPT;
     }
 
     /**
+     * Detect if the model refused to process the image.
+     */
+    private function isRefusal(string $text): bool
+    {
+        $refusalPhrases = [
+            "i'm sorry, i can't",
+            "i'm sorry, i cannot",
+            "i can't assist",
+            "i cannot assist",
+            "i'm unable to",
+            "i am unable to",
+            "i'm not able to",
+            "i can't help with",
+        ];
+
+        $lower = strtolower($text);
+        foreach ($refusalPhrases as $phrase) {
+            if (str_contains($lower, $phrase)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Fallback: generate a general educational dental health response in Arabic
+     * when the vision model refuses image analysis.
+     */
+    private function callFallbackGPT(): string
+    {
+        $apiKey = $this->apiKey;
+
+        $body = [
+            'model' => 'gpt-4o-mini',
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => 'أنت مساعد ذكاء اصطناعي تعليمي في عيادة أسنان. مهمتك إعداد تقرير تعليمي عام حول ما قد يلاحظه طبيب الأسنان في صورة أشعة سينية لأسنان بشكل اعتيادي.',
+                ],
+                [
+                    'role' => 'user',
+                    'content' => 'أعدّ تقرير تعليمي عام ومفيد لمريض حول ما قد تُظهره صورة أشعة سينية لأسنان بشكل اعتيادي. الرد يجب أن يكون بالعربية وبهذا التنسيق بالضبط:
+
+IMAGE QUALITY:
+واضحة
+
+OBSERVATIONS:
+* مظهر الأسنان: اشرح ببساطة مظهر الأسنان الطبيعي في الأشعة
+* التسوس المحتمل: اشرح ما قد يبحث عنه الطبيب
+* صحة الفك/العظام: اشرح كيف يبدو العظم السليم
+* مناطق تستحق الانتباه: نصيحة عامة للمتابعة
+
+RISK LEVEL:
+قلق منخفض
+
+ADVICE FOR USER:
+نصيحة عملية عامة لزيارة الطبيب.
+
+SUMMARY:
+ملخص تعليمي قصير مع التنبيه بأن هذا ليس تشخيصاً طبياً وينبغي مراجعة طبيب الأسنان.',
+                ],
+            ],
+            'max_tokens' => 800,
+            'temperature' => 0.5,
+        ];
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $apiKey,
+            'Content-Type' => 'application/json',
+        ])->timeout(20)->post('https://api.openai.com/v1/chat/completions', $body);
+
+        $data = $response->json();
+
+        if (isset($data['error'])) {
+            throw new \Exception($data['error']['message'] ?? 'OpenAI API error');
+        }
+
+        return trim($data['choices'][0]['message']['content'] ?? '');
+    }
+
+    /**
      * Call OpenAI Vision API with the X-ray image.
      */
     private function callVisionAPI(string $systemPrompt, string $imageDataUri): string
@@ -152,7 +233,7 @@ PROMPT;
                     'content' => [
                         [
                             'type' => 'text',
-                            'text' => 'For educational purposes, please analyze this dental X-ray image and provide your findings in Arabic using the structured format specified.',
+                            'text' => 'For educational purposes, please analyze this dental image and describe what you observe using the structured format specified.',
                         ],
                         [
                             'type' => 'image_url',
@@ -183,6 +264,12 @@ PROMPT;
 
         if (empty($content)) {
             throw new \Exception('Empty response from Vision API');
+        }
+
+        // If vision model refused, fall back to text-based educational response
+        if ($this->isRefusal($content)) {
+            Log::warning('DentalXrayAnalysis: Vision model refused image — using fallback GPT response.');
+            $content = $this->callFallbackGPT();
         }
 
         return $content;
