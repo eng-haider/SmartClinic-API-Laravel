@@ -69,9 +69,32 @@ class GetCasesTool implements AIToolInterface
             $todayCases = CaseModel::whereDate('created_at', $today)->count();
             $total = CaseModel::count();
 
-            $lines[] = "--- Cases Summary for Today ({$today}) ---";
-            $lines[] = "Cases Today: {$todayCases}";
+            $lines[] = "--- Cases Summary (All-Time) ---";
             $lines[] = "Total Cases (All-Time): {$total}";
+            $lines[] = "Cases Today ({$today}): {$todayCases}";
+
+            // Fetch latest cases for context since no date was specified
+            $query = CaseModel::with(['patient:id,name', 'doctor:id,name', 'category:id,name', 'status:id,name'])
+                ->latest();
+            
+            if (!empty($doctorName)) {
+                $query->whereHas('doctor', fn($q) => $q->where('name', 'like', "%{$doctorName}%"));
+            }
+            
+            $recentCases = $query->take(15)->get();
+            
+            if ($recentCases->isNotEmpty()) {
+                $lines[] = "";
+                $lines[] = "Recent Cases:";
+                foreach ($recentCases as $c) {
+                    $patientName = $c->patient->name ?? 'Unknown';
+                    $doctorN = $c->doctor->name ?? 'Unknown';
+                    $categoryName = $c->category->name ?? 'Unknown';
+                    $statusName = $c->status->name ?? 'Unknown';
+                    $paid = $c->is_paid ? 'Paid' : 'Unpaid';
+                    $lines[] = "  - {$c->created_at->toDateString()} | {$patientName} | Dr. {$doctorN} | {$categoryName} | {$statusName} | {$c->price} | {$paid}";
+                }
+            }
         }
 
         return implode("\n", $lines);

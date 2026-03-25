@@ -54,16 +54,27 @@ class GetPatientsSummaryTool implements AIToolInterface
             $total = Patient::count();
             $activeCount = Patient::whereNull('deleted_at')->count();
 
-            $lines[] = "--- Patients Summary for Today ({$today}) ---";
-            $lines[] = "New Patients Today: {$newToday}";
+            $lines[] = "--- Patients Summary (All-Time) ---";
             $lines[] = "Total Patients (All-Time): {$total}";
             $lines[] = "Active Patients: {$activeCount}";
+            $lines[] = "New Patients Today: {$newToday}";
 
             // New this month
             $newThisMonth = Patient::whereMonth('created_at', now()->month)
                 ->whereYear('created_at', now()->year)
                 ->count();
             $lines[] = "New Patients This Month: {$newThisMonth}";
+
+            // Contextual latest patients
+            $latest = Patient::with(['doctor:id,name'])->latest()->take(15)->get();
+            if ($latest->isNotEmpty()) {
+                $lines[] = "";
+                $lines[] = "Most Recently Registered Patients:";
+                foreach ($latest as $p) {
+                    $doctorName = $p->doctor->name ?? 'No Doctor';
+                    $lines[] = "  - {$p->created_at->toDateString()} | {$p->name} | {$p->sex_label} | Age: {$p->age} | Dr. {$doctorName}";
+                }
+            }
         }
 
         return implode("\n", $lines);

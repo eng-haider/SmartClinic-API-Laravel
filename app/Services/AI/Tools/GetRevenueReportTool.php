@@ -76,7 +76,7 @@ class GetRevenueReportTool implements AIToolInterface
 
             // Today's payments
             $todayBills = Bill::whereDate('created_at', $today)->get();
-            $lines[] = "--- Financial Report for Today ({$today}) ---";
+            $lines[] = "--- Financial Summary (All-Time & Today {$today}) ---";
             $lines[] = "";
             $lines[] = "=== Today's Payments Received ===";
             $lines[] = "Payments Today: " . $todayBills->count();
@@ -88,7 +88,6 @@ class GetRevenueReportTool implements AIToolInterface
             $lines[] = "=== Today's Cases ===";
             $lines[] = "Cases Today: " . $todayCases->count();
             $lines[] = "Case Prices Today: " . $todayCases->sum('price');
-            $lines[] = "Unpaid Cases Today: " . $todayCases->where('is_paid', false)->count();
             $lines[] = "Unpaid Amount Today: " . $todayCases->where('is_paid', false)->sum('price');
 
             // All-time summary
@@ -104,6 +103,33 @@ class GetRevenueReportTool implements AIToolInterface
             $lines[] = "Total Case Prices (Doctor Charges): {$allTimeCasePrice}";
             $lines[] = "Total Unpaid Cases: {$allTimeUnpaidCount}";
             $lines[] = "Total Unpaid Amount: {$allTimeUnpaidPrice}";
+
+            // Recent Cases (Context for LLM)
+            $recentCases = CaseModel::with(['patient:id,name', 'doctor:id,name', 'category:id,name', 'status:id,name'])->latest()->take(15)->get();
+            if ($recentCases->isNotEmpty()) {
+                $lines[] = "";
+                $lines[] = "=== Recent Cases (Context) ===";
+                foreach ($recentCases as $c) {
+                    $patientName = $c->patient->name ?? 'Unknown';
+                    $doctorN = $c->doctor->name ?? 'Unknown';
+                    $categoryName = $c->category->name ?? 'Unknown';
+                    $statusName = $c->status->name ?? 'Unknown';
+                    $paid = $c->is_paid ? 'Paid' : 'Unpaid';
+                    $lines[] = "  - {$c->created_at->toDateString()} | {$patientName} | Dr. {$doctorN} | {$categoryName} | {$statusName} | {$c->price} | {$paid}";
+                }
+            }
+            
+            // Recent Payments (Context for LLM)
+            $recentBills = Bill::with(['patient:id,name', 'doctor:id,name'])->latest()->take(15)->get();
+            if ($recentBills->isNotEmpty()) {
+                $lines[] = "";
+                $lines[] = "=== Recent Payments (Context) ===";
+                foreach ($recentBills as $bill) {
+                    $patientName = $bill->patient->name ?? 'Unknown';
+                    $doctorName = $bill->doctor->name ?? 'Unknown';
+                    $lines[] = "  - {$bill->created_at->toDateString()} | {$patientName} | Dr. {$doctorName} | Amount: {$bill->price}";
+                }
+            }
         }
 
         // Expenses summary

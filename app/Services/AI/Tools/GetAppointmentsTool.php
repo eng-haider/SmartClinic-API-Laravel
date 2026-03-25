@@ -73,25 +73,52 @@ class GetAppointmentsTool implements AIToolInterface
                 $lines[] = "No appointments found for this period.";
             }
         } else {
-            // Default: today
+            // Default: "All-time" logic when no specific date
             $today = now()->toDateString();
-            $todayRes = Reservation::byDate($today)
-                ->with(['patient:id,name', 'doctor:id,name', 'status:id,name', 'reservationType:id,name'])
+            $todayCount = Reservation::byDate($today)->count();
+            
+            $lines[] = "--- Appointments Summary (All-Time) ---";
+            $lines[] = "Appointments Today: {$todayCount}";
+
+            $query = Reservation::with(['patient:id,name', 'doctor:id,name', 'status:id,name', 'reservationType:id,name']);
+            if (!empty($doctorName)) {
+                $query->whereHas('doctor', fn($q) => $q->where('name', 'like', "%{$doctorName}%"));
+            }
+
+            // Recent past appointments
+            $recent = (clone $query)->where('reservation_start_date', '<', $today)
+                ->orderByDesc('reservation_start_date')
+                ->take(10)
+                ->get();
+                
+            // Upcoming appointments
+            $upcoming = (clone $query)->where('reservation_start_date', '>=', $today)
+                ->orderBy('reservation_start_date')
+                ->take(10)
                 ->get();
 
-            $lines[] = "--- Appointments for Today ({$today}) ---";
-            $lines[] = "Total Appointments: " . $todayRes->count();
-
-            if ($todayRes->isNotEmpty()) {
-                foreach ($todayRes->take(20) as $res) {
+            if ($upcoming->isNotEmpty()) {
+                $lines[] = "";
+                $lines[] = "Upcoming Appointments:";
+                foreach ($upcoming as $res) {
                     $patientName = $res->patient->name ?? 'Unknown';
                     $doctorN = $res->doctor->name ?? 'Unknown';
                     $statusName = $res->status->name ?? 'Unknown';
-                    $time = $res->reservation_from_time . ' - ' . $res->reservation_to_time;
-                    $lines[] = "  - {$time}: {$patientName} | Dr. {$doctorN} | {$statusName}";
+                    $time = $res->reservation_from_time;
+                    $lines[] = "  - {$res->reservation_start_date} {$time}: {$patientName} | Dr. {$doctorN} | {$statusName}";
                 }
-            } else {
-                $lines[] = "No appointments for today.";
+            }
+
+            if ($recent->isNotEmpty()) {
+                $lines[] = "";
+                $lines[] = "Recent Past Appointments:";
+                foreach ($recent as $res) {
+                    $patientName = $res->patient->name ?? 'Unknown';
+                    $doctorN = $res->doctor->name ?? 'Unknown';
+                    $statusName = $res->status->name ?? 'Unknown';
+                    $time = $res->reservation_from_time;
+                    $lines[] = "  - {$res->reservation_start_date} {$time}: {$patientName} | Dr. {$doctorN} | {$statusName}";
+                }
             }
         }
 
