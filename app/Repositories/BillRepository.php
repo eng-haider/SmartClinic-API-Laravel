@@ -327,7 +327,7 @@ class BillRepository
 
             'total_price' => $totalPrice, // Total of ALL cases price
             'total_paid_price' => $totalPaidBills, // Sum of paid cases price (is_paid = true)
-            'total_unpaid_price' => $totalUnpaidCases - $totalPaidBills, // Sum of unpaid cases price (is_paid = false)
+            'total_unpaid_price' => $totalPrice - $totalPaidBills, // Sum of unpaid cases price (is_paid = false)
             'total_expenses' => $totalExpenses
             // 'total_paid_expenses' => $totalPaidExpenses,
             // 'total_unpaid_expenses' => $totalUnpaidExpenses,
