@@ -13,9 +13,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('tenants', function (Blueprint $table) {
-            $table->string('db_name')->nullable()->after('data');
-            $table->string('db_username')->nullable()->after('db_name');
-            $table->string('db_password')->nullable()->after('db_username');
+            if (!Schema::hasColumn('tenants', 'db_name')) {
+                $table->string('db_name')->nullable()->after('data');
+            }
+            if (!Schema::hasColumn('tenants', 'db_username')) {
+                $table->string('db_username')->nullable()->after('db_name');
+            }
+            if (!Schema::hasColumn('tenants', 'db_password')) {
+                $table->string('db_password')->nullable()->after('db_username');
+            }
         });
     }
 
