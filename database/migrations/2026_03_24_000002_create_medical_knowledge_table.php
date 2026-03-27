@@ -17,23 +17,25 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::connection($this->connection)->create('medical_knowledge', function (Blueprint $table) {
-            $table->id();
-            $table->string('clinic_id')->nullable()->index();
-            $table->string('title');
-            $table->text('content');
-            $table->timestamps();
-        });
+        if (!Schema::connection($this->connection)->hasTable('medical_knowledge')) {
+            Schema::connection($this->connection)->create('medical_knowledge', function (Blueprint $table) {
+                $table->id();
+                $table->string('clinic_id')->nullable()->index();
+                $table->string('title');
+                $table->text('content');
+                $table->timestamps();
+            });
 
-        // Add vector column (not supported by Blueprint)
-        DB::connection($this->connection)->statement(
-            'ALTER TABLE medical_knowledge ADD COLUMN embedding vector(1536)'
-        );
+            // Add vector column (not supported by Blueprint)
+            DB::connection($this->connection)->statement(
+                'ALTER TABLE medical_knowledge ADD COLUMN embedding vector(1536)'
+            );
 
-        // Create HNSW index for fast cosine similarity search
-        DB::connection($this->connection)->statement(
-            'CREATE INDEX medical_knowledge_embedding_idx ON medical_knowledge USING hnsw (embedding vector_cosine_ops)'
-        );
+            // Create HNSW index for fast cosine similarity search
+            DB::connection($this->connection)->statement(
+                'CREATE INDEX medical_knowledge_embedding_idx ON medical_knowledge USING hnsw (embedding vector_cosine_ops)'
+            );
+        }
     }
 
     /**
