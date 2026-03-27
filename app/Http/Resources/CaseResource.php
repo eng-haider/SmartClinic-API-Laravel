@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\SpecialtyManager;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,12 +10,13 @@ class CaseResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
+     * Dynamically includes specialty-specific fields via SpecialtyManager.
      *
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
-        return [
+        $data = [
             'id' => $this->id,
             'patient' => $this->when($this->relationLoaded('patient'), [
                 'id' => $this->patient_id,
@@ -38,8 +40,6 @@ class CaseResource extends JsonResource
             ]),
             'notes' => $this->notes,
             'price' => $this->price,
-            'tooth_num' => $this->tooth_num,
-            'root_stuffing' => $this->root_stuffing,
             'is_paid' => $this->is_paid,
             'payment_status' => $this->is_paid ? 'Paid' : 'Unpaid',
             'case_date' => $this->case_date?->format('Y-m-d H:i:s'),
@@ -61,5 +61,10 @@ class CaseResource extends JsonResource
             'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
             'deleted_at' => $this->deleted_at?->format('Y-m-d H:i:s'),
         ];
+
+        // Merge specialty-specific fields
+        // Dental: tooth_num, root_stuffing
+        // Ophthalmology: eye_side, visual_acuity, iop, etc.
+        return array_merge($data, SpecialtyManager::handler()->resourceFields($this->resource));
     }
 }

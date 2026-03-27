@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\SpecialtyManager;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 
@@ -17,21 +18,24 @@ class CaseRequest extends FormRequest
 
     /**
      * Get the validation rules that apply to the request.
+     * Dynamically merges specialty-specific rules via SpecialtyManager.
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'patient_id' => 'required|exists:patients,id',
             'doctor_id' => 'nullable|exists:users,id',
             'case_categores_id' => 'required|exists:case_categories,id',
             'status_id' => 'nullable|exists:statuses,id',
             'notes' => 'nullable|string|max:5000',
             'price' => 'nullable|integer|min:0',
-            'tooth_num' => 'nullable|string|max:500',
-            'root_stuffing' => 'nullable|string|max:500',
             'is_paid' => 'nullable|boolean',
             'case_date' => 'nullable|date',
         ];
+
+        // Merge specialty-specific rules (dental: tooth_num, root_stuffing)
+        // (ophthalmology: eye_side, visual_acuity, iop, etc.)
+        return array_merge($rules, SpecialtyManager::handler()->validationRules());
     }
 
     /**

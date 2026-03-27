@@ -3,6 +3,7 @@
 namespace App\Modules\Dental;
 
 use App\Contracts\SpecialtyHandlerInterface;
+use App\Models\DentalEncounterDetail;
 
 /**
  * DentalEncounterHandler
@@ -12,8 +13,8 @@ use App\Contracts\SpecialtyHandlerInterface;
  * - Tooth chart features
  * - X-ray analysis capability
  *
- * For Phase 1 this reads dental fields from the existing cases table columns.
- * In Phase 2, it will also read/write from dental_encounter_details table.
+ * Reads dental fields from existing cases table columns (backward compat).
+ * Also writes to dental_encounter_details table for normalization (Phase 2).
  */
 class DentalEncounterHandler implements SpecialtyHandlerInterface
 {
@@ -37,12 +38,15 @@ class DentalEncounterHandler implements SpecialtyHandlerInterface
     /**
      * Include dental fields in API output.
      * Reads from existing cases table columns (backward compatible).
+     * Falls back to detail table if columns are null.
      */
     public function resourceFields($encounter): array
     {
         return [
-            'tooth_num' => $encounter->tooth_num,
-            'root_stuffing' => $encounter->root_stuffing,
+            'tooth_num'     => $encounter->tooth_num
+                ?? $encounter->dentalDetails?->tooth_num,
+            'root_stuffing' => $encounter->root_stuffing
+                ?? $encounter->dentalDetails?->root_stuffing,
         ];
     }
 
@@ -56,20 +60,22 @@ class DentalEncounterHandler implements SpecialtyHandlerInterface
     }
 
     /**
-     * Post-save hook for dental encounters.
-     * Phase 1: No-op (data is in cases table columns).
-     * Phase 2: Will also save to dental_encounter_details table.
+     * Post-save hook: also save to dental_encounter_details table.
+     * Dual-write: data stays in cases columns AND detail table.
      */
     public function afterSave($encounter, array $data): void
     {
-        // Phase 2: Will save to dental_encounter_details table
-        // DentalEncounterDetail::updateOrCreate(
-        //     ['case_id' => $encounter->id],
-        //     array_filter([
-        //         'tooth_num' => $data['tooth_num'] ?? null,
-        //         'root_stuffing' => $data['root_stuffing'] ?? null,
-        //     ])
-        // );
+        $dentalData = array_filter([
+            'tooth_num'     => $data['tooth_num'] ?? null,
+            'root_stuffing' => $data['root_stuffing'] ?? null,
+        ], fn($v) => $v !== null);
+
+        if (!empty($dentalData)) {
+            DentalEncounterDetail::updateOrCreate(
+                ['case_id' => $encounter->id],
+                $dentalData
+            );
+        }
     }
 
     /**

@@ -32,10 +32,10 @@ class SpecialtyManager
      * Add new specialties here as they are implemented.
      */
     private const HANDLERS = [
-        'dental'  => \App\Modules\Dental\DentalEncounterHandler::class,
-        'general' => \App\Modules\General\GeneralEncounterHandler::class,
+        'dental'        => \App\Modules\Dental\DentalEncounterHandler::class,
+        'ophthalmology' => \App\Modules\Ophthalmology\OphthalmologyEncounterHandler::class,
+        'general'       => \App\Modules\General\GeneralEncounterHandler::class,
         // Future:
-        // 'ophthalmology' => \App\Modules\Ophthalmology\OphthalmologyEncounterHandler::class,
         // 'dermatology'   => \App\Modules\Dermatology\DermatologyEncounterHandler::class,
     ];
 
