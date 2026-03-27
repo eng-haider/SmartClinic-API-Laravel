@@ -70,10 +70,12 @@ class AuthController extends Controller
                     'clinic_name' => $result['clinic_name'],
                     'user_name' => $result['user_name'],
                     'has_ai_bot' => $result['has_ai_bot'],
+                    'specialty' => $result['specialty'],
                     'clinic' => [
                         'id' => $result['tenant_id'],
                         'name' => $result['clinic_name'],
                         'has_ai_bot' => $result['has_ai_bot'],
+                        'specialty' => $result['specialty'],
                     ],
                 ],
             ]);
@@ -137,10 +139,12 @@ class AuthController extends Controller
                     'tenant_id' => $result['tenant_id'],
                     'clinic_name' => $result['clinic_name'],
                     'has_ai_bot' => $result['has_ai_bot'],
+                    'specialty' => $result['specialty'],
                     'clinic' => [
                         'id' => $result['tenant_id'],
                         'name' => $result['clinic_name'],
                         'has_ai_bot' => $result['has_ai_bot'],
+                        'specialty' => $result['specialty'],
                     ],
                 ],
             ]);

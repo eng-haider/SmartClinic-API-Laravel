@@ -163,6 +163,7 @@ class AuthService
             'tenant_id' => $clinic->id,
             'clinic_name' => $clinic->name,
             'has_ai_bot' => $clinic->has_ai_bot,
+            'specialty' => $clinic->specialty ?? 'dental',
             'message' => 'Login successful',
         ];
     }
@@ -337,6 +338,7 @@ class AuthService
             'tenant_id' => $clinic->id,
             'clinic_name' => $clinic->name,
             'has_ai_bot' => $clinic->has_ai_bot,
+            'specialty' => $clinic->specialty ?? 'dental',
             'user_name' => $user->name,
             'message' => 'Credentials verified. Please proceed with tenant login.',
         ];
