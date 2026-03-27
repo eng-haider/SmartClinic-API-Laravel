@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('tenants', function (Blueprint $table) {
-            $table->boolean('has_ai_bot')->default(false)->after('api_whatsapp');
+            if (!Schema::hasColumn('tenants', 'has_ai_bot')) {
+                $table->boolean('has_ai_bot')->default(false)->after('api_whatsapp');
+            }
         });
     }
 
