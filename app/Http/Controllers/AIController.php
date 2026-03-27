@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AIService;
-use App\Services\AI\DentalXrayAnalysisService;
+use App\Modules\Dental\DentalXrayAnalysisService;
 use App\Services\VectorSearchService;
 use App\Services\EmbeddingService;
 use App\Models\Patient;
