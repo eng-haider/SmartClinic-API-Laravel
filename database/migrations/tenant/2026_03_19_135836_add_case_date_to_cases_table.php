@@ -11,11 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('cases', function (Blueprint $table) {
+        try {
             if (!Schema::hasColumn('cases', 'case_date')) {
-                $table->date('case_date')->nullable()->after('is_paid');
+                Schema::table('cases', function (Blueprint $table) {
+                    $table->date('case_date')->nullable()->after('is_paid');
+                });
             }
-        });
+        } catch (\Exception $e) {
+            // Silently ignore if column already exists
+        }
     }
 
     /**
