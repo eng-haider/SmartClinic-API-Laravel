@@ -8,6 +8,11 @@ use Illuminate\Database\Schema\Blueprint;
 return new class extends Migration
 {
     /**
+     * Disable transactions to prevent PostgreSQL abort errors.
+     */
+    public $withinTransaction = false;
+
+    /**
      * The database connection that should be used by the migration.
      */
     protected $connection = 'pgsql_embeddings';
