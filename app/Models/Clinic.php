@@ -46,6 +46,7 @@ class Clinic extends Model
     protected $fillable = [
         'id',
         'name',
+        'specialty',
         'address',
         'rx_img',
         'whatsapp_template_sid',

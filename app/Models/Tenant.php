@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Services\SpecialtyManager;
+
 use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
@@ -34,6 +36,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     protected $fillable = [
         'id',
         'name',
+        'specialty',
         'address',
         'rx_img',
         'whatsapp_template_sid',
@@ -123,6 +126,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         return [
             'id',
             'name',
+            'specialty',
             'address',
             'rx_img',
             'whatsapp_template_sid',
@@ -137,5 +141,52 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             'api_whatsapp',
             'has_ai_bot',
         ];
+    }
+
+    // ========================================
+    // Specialty & Feature Methods
+    // ========================================
+
+    /**
+     * Check if this tenant is a dental clinic.
+     */
+    public function isDental(): bool
+    {
+        return ($this->specialty ?? 'dental') === 'dental';
+    }
+
+    /**
+     * Get the tenant's specialty (defaults to 'dental').
+     */
+    public function getSpecialty(): string
+    {
+        return $this->specialty ?? 'dental';
+    }
+
+    /**
+     * Get the tenant's feature flags.
+     */
+    public function features()
+    {
+        return $this->hasMany(TenantFeature::class, 'tenant_id');
+    }
+
+    /**
+     * Check if a specific feature is enabled for this tenant.
+     * Falls back to specialty handler defaults if not set in DB.
+     */
+    public function hasFeature(string $featureKey): bool
+    {
+        $feature = $this->features()
+            ->where('feature_key', $featureKey)
+            ->first();
+
+        if ($feature) {
+            return $feature->is_enabled;
+        }
+
+        // Fall back to specialty handler defaults
+        $defaults = SpecialtyManager::handler($this->getSpecialty())->defaultFeatures();
+        return $defaults[$featureKey] ?? false;
     }
 }
