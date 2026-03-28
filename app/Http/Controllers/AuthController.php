@@ -30,13 +30,12 @@ class AuthController extends Controller
                 'success' => true,
                 'message' => $result['message'],
                 'data' => [
-                    'user' => new UserResource($result['user']),
+                    'user'  => new UserResource($result['user']),
                     'clinic' => [
-                        'id' => $result['clinic']->id,
-                        'name' => $result['clinic']->name,
-                        'address' => $result['clinic']->address,
-                        'phone' => $result['clinic']->phone,
-                        'email' => $result['clinic']->email,
+                        'id'        => $result['clinic']->id,
+                        'name'      => $result['clinic']->name,
+                        'specialty' => $result['clinic']->specialty,
+                        'address'   => $result['clinic']->address,
                     ],
                     'token' => $result['token'],
                 ],

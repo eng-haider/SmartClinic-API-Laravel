@@ -5,10 +5,14 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\Clinic;
 use App\Models\ClinicSetting;
+use App\Models\Tenant;
+use App\Models\DatabasePool;
 use App\Repositories\UserRepository;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthService
@@ -23,84 +27,160 @@ class AuthService
     }
 
     /**
-     * Register a new user
+     * Register a new clinic with full database pool setup (migrate + seed).
      */
     public function register(array $data): array
     {
-        // Check if email exists
-        if (!empty($data['email']) && $this->userRepository->emailExists($data['email'])) {
-            throw new \Exception('Email already registered');
-        }
+        $centralConnection = config('tenancy.database.central_connection');
 
         // Check if phone exists
         if (!empty($data['phone']) && $this->userRepository->phoneExists($data['phone'])) {
             throw new \Exception('Phone already registered');
         }
 
-        DB::beginTransaction();
+        if (!empty($data['email']) && $this->userRepository->emailExists($data['email'])) {
+            throw new \Exception('Email already registered');
+        }
 
+        // Check pool availability
+        if (DatabasePool::availableCount() === 0) {
+            throw new \Exception('Service temporarily unavailable: no database slots available. Contact administrator.');
+        }
+
+        // Generate unique tenant ID from clinic name
+        $baseId   = '_' . preg_replace('/[^a-z0-9]+/', '_', strtolower($data['clinic_name']));
+        $tenantId = $baseId;
+        $counter  = 1;
+        while (Tenant::where('id', $tenantId)->exists()) {
+            $tenantId = $baseId . '_' . $counter++;
+        }
+
+        // Claim a database from the pool (atomic)
+        $poolSlot         = DatabasePool::claim($tenantId);
+        $databaseName     = $poolSlot->db_name;
+        $databaseUsername = $poolSlot->db_username;
+        $databasePassword = $poolSlot->db_password;
+
+        // ── Step 1: Create central records ────────────────────────────────
+        $tenant      = null;
+        $centralUser = null;
+
+        DB::connection($centralConnection)->beginTransaction();
         try {
-            // Generate a unique string ID for the clinic from its name
-            $baseId = '_' . preg_replace('/[^a-z0-9]+/', '_', strtolower($data['clinic_name']));
-            $clinicId = $baseId;
-            $counter  = 1;
-            while (DB::table('clinics')->where('id', $clinicId)->exists()) {
-                $clinicId = $baseId . '_' . $counter++;
-            }
+            $tenant = Tenant::create([
+                'id'          => $tenantId,
+                'name'        => $data['clinic_name'],
+                'specialty'   => $data['specialty'],
+                'address'     => $data['clinic_address'] ?? null,
+                'has_ai_bot'  => false,
+                'db_name'     => $databaseName,
+                'db_username' => $databaseUsername,
+                'db_password' => $databasePassword,
+            ]);
 
-            // Insert clinic with explicit id using raw query builder
-            // (Clinic model has a hardcoded connection that causes Eloquent create() to drop 'id')
-            DB::table('clinics')->insert([
-                'id'         => $clinicId,
+            DB::connection($centralConnection)->table('clinics')->insert([
+                'id'         => $tenantId,
                 'name'       => $data['clinic_name'],
-                'address'    => $data['clinic_address'],
+                'specialty'  => $data['specialty'],
+                'address'    => $data['clinic_address'] ?? null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-            $clinic = Clinic::findOrFail($clinicId);
+            $clinic = Clinic::on($centralConnection)->findOrFail($tenantId);
 
-            // Create default settings for the clinic from setting definitions
-            $this->clinicSettingService->createDefaultSettingsForClinic($clinic);
+            $centralUser = User::on($centralConnection)->create([
+                'name'      => $data['name'],
+                'phone'     => $data['phone'],
+                'email'     => $data['email'] ?? null,
+                'password'  => Hash::make($data['password']),
+                'is_active' => true,
+            ]);
+            $centralUser->clinic_id = $tenantId;
+            $centralUser->save();
 
-            // Hash password
-            $userData = [
-                'name' => $data['name'],
-                'phone' => $data['phone'],
-                'email' => $data['email'] ?? null,
-                'password' => Hash::make($data['password']),
-            ];
-
-            // Always set role to clinic_super_doctor for registration
-            $roleName = 'clinic_super_doctor';
-
-            $user = $this->userRepository->create($userData);
-
-            // Set clinic_id separately for central database users
-            // (clinic_id is not in fillable to avoid issues with tenant databases)
-            $user->clinic_id = $clinic->id;
-            $user->save();
-
-            // Assign role using Spatie
-            $user->assignRole($roleName);
-
-            // Refresh user to load relationships
-            $user->load('roles', 'clinic');
-
-            // Generate token
-            $token = JWTAuth::fromUser($user);
-
-            DB::commit();
-
-            return [
-                'user' => $user,
-                'clinic' => $clinic,
-                'token' => $token,
-                'message' => 'User and clinic registered successfully',
-            ];
+            DB::connection($centralConnection)->commit();
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection($centralConnection)->rollBack();
+            $poolSlot->update(['status' => 'available', 'tenant_id' => null, 'claimed_at' => null]);
             throw $e;
         }
+
+        // ── Step 2: Setup tenant database (migrate + seed + user) ─────────
+        try {
+            $centralConfig = config('database.connections.' . $centralConnection);
+
+            config([
+                'database.connections.tenant.host'     => $centralConfig['host'],
+                'database.connections.tenant.port'     => $centralConfig['port'],
+                'database.connections.tenant.database' => $databaseName,
+                'database.connections.tenant.username' => $databaseUsername,
+                'database.connections.tenant.password' => $databasePassword,
+            ]);
+            DB::purge('tenant');
+            DB::connection('tenant')->getPdo();
+
+            $originalDefault = config('database.default');
+            config(['database.default' => 'tenant']);
+
+            try {
+                Artisan::call('migrate', [
+                    '--database' => 'tenant',
+                    '--path'     => 'database/migrations/tenant',
+                    '--force'    => true,
+                ]);
+
+                app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
+                Artisan::call('db:seed', [
+                    '--class' => 'TenantDatabaseSeeder',
+                    '--force' => true,
+                ]);
+            } finally {
+                config(['database.default' => $originalDefault]);
+                DB::purge('tenant');
+            }
+
+            // Create user in tenant DB
+            $tenantUser = User::on('tenant')->create([
+                'name'      => $data['name'],
+                'phone'     => $data['phone'],
+                'email'     => $data['email'] ?? null,
+                'password'  => Hash::make($data['password']),
+                'is_active' => true,
+            ]);
+
+            $roleId = DB::connection('tenant')->table('roles')
+                ->where('name', 'clinic_super_doctor')
+                ->value('id') ?? 1;
+
+            DB::connection('tenant')->table('model_has_roles')->insert([
+                'role_id'    => $roleId,
+                'model_type' => 'App\\Models\\User',
+                'model_id'   => $tenantUser->id,
+            ]);
+        } catch (\Exception $e) {
+            // Rollback central records and release pool slot
+            try {
+                $tenant->forceDelete();
+                DB::connection($centralConnection)->table('clinics')->where('id', $tenantId)->delete();
+                $centralUser->forceDelete();
+                $poolSlot->update(['status' => 'available', 'tenant_id' => null, 'claimed_at' => null]);
+            } catch (\Exception $cleanupError) {
+                // Log but don't rethrow cleanup errors
+            }
+            throw $e;
+        }
+
+        // Generate JWT for the central user
+        $centralUser->load('roles', 'clinic');
+        $token = JWTAuth::fromUser($centralUser);
+
+        return [
+            'user'    => $centralUser,
+            'clinic'  => $clinic,
+            'token'   => $token,
+            'message' => 'Clinic registered successfully. You can now login.',
+        ];
     }
 
     /**
