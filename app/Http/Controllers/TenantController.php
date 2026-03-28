@@ -282,7 +282,7 @@ class TenantController extends Controller
 
             DB::connection('tenant')->table('model_has_roles')->insert([
                 'role_id'    => $roleId,
-                'model_type' => 'App\\Models\\User',
+                'model_type' => (new \App\Models\User)->getMorphClass(), // 'User' via morph map
                 'model_id'   => $tenantUser->id,
             ]);
             Log::info('✓ Tenant user created with role', ['id' => $tenantUser->id]);

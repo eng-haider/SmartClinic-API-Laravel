@@ -155,7 +155,7 @@ class AuthService
 
             DB::connection('tenant')->table('model_has_roles')->insert([
                 'role_id'    => $roleId,
-                'model_type' => 'App\\Models\\User',
+                'model_type' => (new User)->getMorphClass(), // 'User' via morph map
                 'model_id'   => $tenantUser->id,
             ]);
         } catch (\Exception $e) {
@@ -244,24 +244,37 @@ class AuthService
             throw new \Exception('User account is inactive in tenant database');
         }
 
-        // Load roles and permissions: must set database.default to 'tenant' so Spatie's
-        // Role/Permission models query the tenant DB (not the central DB which has no roles).
-        $originalDefault = config('database.default');
-        config(['database.default' => 'tenant']);
-        try {
-            app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
-            $tenantUser->load(['roles.permissions', 'permissions']);
-        } finally {
-            config(['database.default' => $originalDefault]);
-            app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
-        }
+        // Query roles and permissions directly from the tenant DB.
+        // Using explicit DB::connection('tenant') bypasses Spatie's ORM connection
+        // resolution entirely — no risk of querying the empty central DB.
+        // Check both 'User' (morph alias) and 'App\Models\User' (full class) for compatibility
+        // with tenants created before and after the morph map was applied.
+        $tenantDb  = DB::connection('tenant');
+        $morphType = (new User)->getMorphClass(); // resolves to 'User' via morph map
 
-        // Build roles/permissions from the pre-loaded in-memory collections
-        // (must be done before database.default is restored, but load() already ran above)
-        $roles       = $tenantUser->roles->pluck('name');
-        $permissions = $tenantUser->roles->flatMap(fn($r) => $r->permissions->pluck('name'))
-                        ->merge($tenantUser->permissions->pluck('name'))
-                        ->unique()->values();
+        $roleIds = $tenantDb->table('model_has_roles')
+            ->whereIn('model_type', [$morphType, 'App\\Models\\User'])
+            ->where('model_id', $tenantUser->id)
+            ->pluck('role_id');
+
+        $roles = $tenantDb->table('roles')
+            ->whereIn('id', $roleIds)
+            ->pluck('name');
+
+        $permissionIdsFromRoles = $tenantDb->table('role_has_permissions')
+            ->whereIn('role_id', $roleIds)
+            ->pluck('permission_id');
+
+        $permissionIdsFromUser = $tenantDb->table('model_has_permissions')
+            ->whereIn('model_type', [$morphType, 'App\\Models\\User'])
+            ->where('model_id', $tenantUser->id)
+            ->pluck('permission_id');
+
+        $allPermissionIds = $permissionIdsFromRoles->merge($permissionIdsFromUser)->unique();
+
+        $permissions = $allPermissionIds->isNotEmpty()
+            ? $tenantDb->table('permissions')->whereIn('id', $allPermissionIds)->pluck('name')->unique()->values()
+            : collect();
 
         // Generate token for tenant user
         $token = JWTAuth::fromUser($tenantUser);
@@ -390,7 +403,7 @@ class AuthService
 
         DB::connection('tenant')->table('model_has_roles')->insert([
             'role_id'    => $roleId,
-            'model_type' => 'App\\Models\\User',
+            'model_type' => (new User)->getMorphClass(), // 'User' via morph map
             'model_id'   => $tenantUser->id,
         ]);
 
