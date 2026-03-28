@@ -238,19 +238,32 @@ class TenantController extends Controller
             DB::connection('tenant')->getPdo();
             Log::info('✓ Connected to tenant database', ['database' => $databaseName]);
 
-            Artisan::call('migrate', [
-                '--database' => 'tenant',
-                '--path'     => 'database/migrations/tenant',
-                '--force'    => true,
-            ]);
-            Log::info('✓ Migrations completed');
+            // Switch the default connection so ALL models (including Spatie Permission)
+            // write to the tenant DB, not the central DB.
+            $originalDefault = config('database.default');
+            config(['database.default' => 'tenant']);
 
-            Artisan::call('db:seed', [
-                '--database' => 'tenant',
-                '--class'    => 'TenantDatabaseSeeder',
-                '--force'    => true,
-            ]);
-            Log::info('✓ Tenant data seeded');
+            try {
+                Artisan::call('migrate', [
+                    '--database' => 'tenant',
+                    '--path'     => 'database/migrations/tenant',
+                    '--force'    => true,
+                ]);
+                Log::info('✓ Migrations completed');
+
+                // Clear Spatie permission cache so it re-binds to the tenant connection
+                app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
+                Artisan::call('db:seed', [
+                    '--class' => 'TenantDatabaseSeeder',
+                    '--force' => true,
+                ]);
+                Log::info('✓ Tenant data seeded');
+            } finally {
+                // Always restore the original default connection
+                config(['database.default' => $originalDefault]);
+                DB::purge('tenant');
+            }
 
             $tenantUser = User::on('tenant')->create([
                 'name'      => $validated['user_name'],
