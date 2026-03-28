@@ -171,15 +171,49 @@ class AuthService
             throw $e;
         }
 
-        // Generate JWT for the central user
-        $centralUser->load('roles', 'clinic');
-        $token = JWTAuth::fromUser($centralUser);
+        // Query roles & permissions for the tenant user directly from the tenant DB
+        // (same approach as smartLogin — avoids any Spatie ORM / connection-default issues)
+        $tenantDb  = DB::connection('tenant');
+        $morphType = (new User)->getMorphClass();
+
+        $roleIds = $tenantDb->table('model_has_roles')
+            ->whereIn('model_type', [$morphType, 'App\\Models\\User'])
+            ->where('model_id', $tenantUser->id)
+            ->pluck('role_id');
+
+        $roles = $tenantDb->table('roles')
+            ->whereIn('id', $roleIds)
+            ->pluck('name');
+
+        $permissionIdsFromRoles = $tenantDb->table('role_has_permissions')
+            ->whereIn('role_id', $roleIds)
+            ->pluck('permission_id');
+
+        $permissionIdsFromUser = $tenantDb->table('model_has_permissions')
+            ->whereIn('model_type', [$morphType, 'App\\Models\\User'])
+            ->where('model_id', $tenantUser->id)
+            ->pluck('permission_id');
+
+        $allPermissionIds = $permissionIdsFromRoles->merge($permissionIdsFromUser)->unique();
+
+        $permissions = $allPermissionIds->isNotEmpty()
+            ? $tenantDb->table('permissions')->whereIn('id', $allPermissionIds)->pluck('name')->unique()->values()
+            : collect();
+
+        // Generate JWT for the TENANT user so the returned token works immediately
+        // for all tenant-aware API routes without requiring a separate smart-login call.
+        $token = JWTAuth::fromUser($tenantUser);
 
         return [
-            'user'    => $centralUser,
-            'clinic'  => $clinic,
-            'token'   => $token,
-            'message' => 'Clinic registered successfully. You can now login.',
+            'user'        => $tenantUser,
+            'roles'       => $roles,
+            'permissions' => $permissions,
+            'token'       => $token,
+            'tenant_id'   => $tenantId,
+            'clinic_name' => $data['clinic_name'],
+            'has_ai_bot'  => false,
+            'specialty'   => $data['specialty'],
+            'message'     => 'Clinic registered successfully.',
         ];
     }
 

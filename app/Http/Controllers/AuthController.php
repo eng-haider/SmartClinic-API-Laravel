@@ -26,18 +26,33 @@ class AuthController extends Controller
         try {
             $result = $this->authService->register($request->validated());
 
+            $user = $result['user'];
             return response()->json([
                 'success' => true,
                 'message' => $result['message'],
                 'data' => [
-                    'user'  => new UserResource($result['user']),
-                    'clinic' => [
-                        'id'        => $result['clinic']->id,
-                        'name'      => $result['clinic']->name,
-                        'specialty' => $result['clinic']->specialty,
-                        'address'   => $result['clinic']->address,
+                    'user' => [
+                        'id'          => $user->id,
+                        'name'        => $user->name,
+                        'email'       => $user->email,
+                        'phone'       => $user->phone,
+                        'roles'       => $result['roles'],
+                        'permissions' => $result['permissions'],
+                        'is_active'   => $user->is_active,
+                        'created_at'  => $user->created_at?->format('Y-m-d H:i:s'),
+                        'updated_at'  => $user->updated_at?->format('Y-m-d H:i:s'),
                     ],
-                    'token' => $result['token'],
+                    'token'       => $result['token'],
+                    'tenant_id'   => $result['tenant_id'],
+                    'clinic_name' => $result['clinic_name'],
+                    'has_ai_bot'  => $result['has_ai_bot'],
+                    'specialty'   => $result['specialty'],
+                    'clinic' => [
+                        'id'        => $result['tenant_id'],
+                        'name'      => $result['clinic_name'],
+                        'specialty' => $result['specialty'],
+                        'has_ai_bot' => $result['has_ai_bot'],
+                    ],
                 ],
             ], 201);
         } catch (\Exception $e) {
