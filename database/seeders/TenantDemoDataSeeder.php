@@ -547,11 +547,11 @@ class TenantDemoDataSeeder extends Seeder
                 'encounter_type' => 'ophthalmology',
                 'eye_data'       => [
                     'eye_side'            => 'both',
-                    'visual_acuity_left'  => '6/60 unaided → 6/6 corrected',
-                    'visual_acuity_right' => '6/60 unaided → 6/6 corrected',
+                    'visual_acuity_left'  => '6/60',
+                    'visual_acuity_right' => '6/60',
                     'refraction_left'     => '-4.00 / -0.50 x 10',
                     'refraction_right'    => '-3.75 / -0.75 x 170',
-                    'anterior_segment'    => 'Cornea clear. Topography normal. Central thickness OD 545µm OS 542µm.',
+                    'anterior_segment'    => 'Cornea clear. Topography normal. CCT OD 545 OS 542.',
                     'diagnosis'           => 'High myopia OU. LASIK planned. Consent obtained.',
                 ],
             ],
@@ -583,7 +583,7 @@ class TenantDemoDataSeeder extends Seeder
                 'encounter_type' => 'ophthalmology',
                 'eye_data'       => [
                     'eye_side'           => 'left',
-                    'visual_acuity_left' => '6/24 (amblyopic)',
+                    'visual_acuity_left' => '6/24',
                     'visual_acuity_right'=> '6/6',
                     'refraction_left'    => '+2.50 / -1.00 x 90',
                     'refraction_right'   => '+0.50',
