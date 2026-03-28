@@ -70,14 +70,14 @@ class TenantController extends Controller
             'message' => 'Tenant ID preview generated',
             'message_ar' => 'تم إنشاء معاينة معرف العيادة',
             'data' => [
-                'name' => $name,
-                'generated_id' => $generatedId,
-                'database_name' => $databaseName,
-                'is_available' => !$tenantExists && !$clinicExists && !$dbExists,
+                'name'           => $name,
+                'generated_id'   => $generatedId,
+                'suggested_db'   => $databaseName,
+                'is_available'   => !$tenantExists && !$clinicExists,
+                'next_step'      => "Create database '{$databaseName}' in Hostinger cPanel → MySQL Databases, then call POST /api/tenants with db_name, db_username, db_password.",
                 'checks' => [
                     'tenant_exists' => $tenantExists,
                     'clinic_exists' => $clinicExists,
-                    'database_exists' => $dbExists,
                 ],
             ],
         ]);
@@ -89,34 +89,36 @@ class TenantController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'address' => 'nullable|string|max:500',
-            'rx_img' => 'nullable|string',
-            'whatsapp_template_sid' => 'nullable|string',
-            'whatsapp_phone' => 'nullable|string|max:20',
-            'logo' => 'nullable|string',
+            'name'                   => 'required|string|max:255',
+            'address'                => 'nullable|string|max:500',
+            'rx_img'                 => 'nullable|string',
+            'whatsapp_template_sid'  => 'nullable|string',
+            'whatsapp_phone'         => 'nullable|string|max:20',
+            'logo'                   => 'nullable|string',
+            // Database credentials (must be created manually in Hostinger cPanel first)
+            'db_name'                => 'required|string|max:100',
+            'db_username'            => 'required|string|max:100',
+            'db_password'            => 'required|string',
             // User data
-            'user_name' => 'required|string|max:255',
-            'user_phone' => 'required|string|max:20',
-            'user_email' => 'nullable|email|max:255',
-            'user_password' => 'required|string|min:6',
-            'has_ai_bot' => 'nullable|boolean',
+            'user_name'              => 'required|string|max:255',
+            'user_phone'             => 'required|string|max:20',
+            'user_email'             => 'nullable|email|max:255',
+            'user_password'          => 'required|string|min:6',
+            'has_ai_bot'             => 'nullable|boolean',
         ]);
 
         // Generate unique tenant ID from name
         $tenantId = $this->generateUniqueTenantId($validated['name']);
-        // Database name: u876784197_tenant_haider (manually created on Hostinger)
-        $cleanName = ltrim($tenantId, '_'); // Remove leading underscore from _haider -> haider
-        $databaseName = config('tenancy.database.prefix') . '_' . $cleanName;
-        $databaseUsername = $databaseName; // Username = database name on Hostinger
-        $databasePassword = '9!iSeEys:6sO'; // Hostinger database password
+        // Use the database credentials provided (created manually in Hostinger cPanel)
+        $databaseName     = $validated['db_name'];
+        $databaseUsername = $validated['db_username'];
+        $databasePassword = $validated['db_password'];
         $centralConnection = config('tenancy.database.central_connection');
-        
+
         Log::info('=== CREATING NEW TENANT ===', [
-            'name' => $validated['name'],
+            'name'         => $validated['name'],
             'generated_id' => $tenantId,
-            'database' => $databaseName,
-            'note' => 'Database must be manually created on Hostinger first',
+            'database'     => $databaseName,
         ]);
 
         // Check if tenant already exists
@@ -218,32 +220,29 @@ class TenantController extends Controller
         // Setup tenant database
         try {
             $centralConfig = config('database.connections.' . $centralConnection);
-            
+
             config([
                 'database.connections.tenant.database' => $databaseName,
                 'database.connections.tenant.username' => $databaseUsername,
                 'database.connections.tenant.password' => $databasePassword,
-                'database.connections.tenant.host' => $centralConfig['host'],
-                'database.connections.tenant.port' => $centralConfig['port'],
+                'database.connections.tenant.host'     => $centralConfig['host'],
+                'database.connections.tenant.port'     => $centralConfig['port'],
             ]);
-            
+
             DB::purge('tenant');
-            
-            // Test the connection to manually created database
+
+            // Verify the database was already created in Hostinger cPanel
             try {
                 DB::connection('tenant')->getPdo();
-                Log::info('✓ Connected to manually created database', ['database' => $databaseName]);
             } catch (\Exception $e) {
                 throw new \Exception(
                     "Cannot connect to database '{$databaseName}'. " .
-                    "Please manually create it on Hostinger with:\n" .
-                    "- Database name: {$databaseName}\n" .
-                    "- Username: {$databaseUsername}\n" .
-                    "- Password: {$databasePassword}\n" .
+                    "Please create it first in Hostinger cPanel → MySQL Databases using: " .
+                    "Database name: {$databaseName}, Username: {$databaseUsername}. " .
                     "Error: " . $e->getMessage()
                 );
             }
-            
+
             Log::info('✓ Tenant database connected', ['database' => $databaseName]);
             
             // Run migrations
