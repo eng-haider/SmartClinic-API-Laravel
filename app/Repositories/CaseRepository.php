@@ -58,6 +58,7 @@ class CaseRepository
                 'status',
                 'notes',
                 'bills',
+                'ophthalmologyEncounterDetails',
             ])
             ->defaultSort('-created_at');
     }

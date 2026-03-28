@@ -104,6 +104,14 @@ class CaseModel extends Model
     }
 
     /**
+     * Get the ophthalmology encounter details for the case.
+     */
+    public function ophthalmologyEncounterDetails()
+    {
+        return $this->hasMany(OphthalmologyEncounterDetail::class, 'case_id');
+    }
+
+    /**
      * Get the class name for polymorphic relations.
      * This ensures compatibility with legacy data stored as 'App\Models\Case'
      */
