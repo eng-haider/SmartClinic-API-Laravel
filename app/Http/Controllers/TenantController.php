@@ -185,17 +185,18 @@ class TenantController extends Controller
             ]);
             Log::info('✓ Tenant created', ['id' => $tenant->id]);
 
-            $clinic = Clinic::on($centralConnection)->create([
-                'id'                    => $tenantId,
-                'name'                  => $validated['name'],
-                'specialty'             => $validated['specialty'],
-                'address'               => $validated['address'] ?? null,
-                'rx_img'                => $validated['rx_img'] ?? null,
-                'whatsapp_template_sid' => $validated['whatsapp_template_sid'] ?? null,
-                'whatsapp_phone'        => $validated['whatsapp_phone'] ?? null,
-                'logo'                  => $validated['logo'] ?? null,
-                'has_ai_bot'            => $validated['has_ai_bot'] ?? false,
-            ]);
+            $clinic = new Clinic();
+            $clinic->setConnection($centralConnection);
+            $clinic->id                    = $tenantId;
+            $clinic->name                  = $validated['name'];
+            $clinic->specialty             = $validated['specialty'];
+            $clinic->address               = $validated['address'] ?? null;
+            $clinic->rx_img                = $validated['rx_img'] ?? null;
+            $clinic->whatsapp_template_sid = $validated['whatsapp_template_sid'] ?? null;
+            $clinic->whatsapp_phone        = $validated['whatsapp_phone'] ?? null;
+            $clinic->logo                  = $validated['logo'] ?? null;
+            $clinic->has_ai_bot            = $validated['has_ai_bot'] ?? false;
+            $clinic->save();
             Log::info('✓ Clinic created', ['id' => $clinic->id]);
 
             $centralUser = User::on($centralConnection)->create([
