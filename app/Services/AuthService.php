@@ -40,13 +40,24 @@ class AuthService
         DB::beginTransaction();
 
         try {
-            // Create clinic first
-            $clinic = Clinic::create([
-                'name' => $data['clinic_name'],
-                'address' => $data['clinic_address'],
-                'phone' => $data['clinic_phone'] ?? null,
-                'email' => $data['clinic_email'] ?? null,
+            // Generate a unique string ID for the clinic from its name
+            $baseId = '_' . preg_replace('/[^a-z0-9]+/', '_', strtolower($data['clinic_name']));
+            $clinicId = $baseId;
+            $counter  = 1;
+            while (DB::table('clinics')->where('id', $clinicId)->exists()) {
+                $clinicId = $baseId . '_' . $counter++;
+            }
+
+            // Insert clinic with explicit id using raw query builder
+            // (Clinic model has a hardcoded connection that causes Eloquent create() to drop 'id')
+            DB::table('clinics')->insert([
+                'id'         => $clinicId,
+                'name'       => $data['clinic_name'],
+                'address'    => $data['clinic_address'],
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
+            $clinic = Clinic::findOrFail($clinicId);
 
             // Create default settings for the clinic from setting definitions
             $this->clinicSettingService->createDefaultSettingsForClinic($clinic);
