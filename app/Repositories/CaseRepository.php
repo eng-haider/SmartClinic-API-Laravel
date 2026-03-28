@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\CaseModel;
+use App\Services\SpecialtyManager;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -99,7 +100,11 @@ class CaseRepository
      */
     public function create(array $data): CaseModel
     {
-        return CaseModel::create($data);
+        $handler = SpecialtyManager::handler();
+        $caseData = $handler->beforeSave($data);
+        $case = CaseModel::create($caseData);
+        $handler->afterSave($case, $data);
+        return $case;
     }
 
     /**
@@ -107,8 +112,11 @@ class CaseRepository
      */
     public function update(int $id, array $data): CaseModel
     {
+        $handler = SpecialtyManager::handler();
+        $caseData = $handler->beforeSave($data);
         $case = $this->query()->findOrFail($id);
-        $case->update($data);
+        $case->update($caseData);
+        $handler->afterSave($case, $data);
         return $case->fresh(['patient', 'doctor', 'category', 'status']);
     }
 

@@ -104,11 +104,19 @@ class CaseModel extends Model
     }
 
     /**
-     * Get the ophthalmology encounter details for the case.
+     * Get the ophthalmology encounter details for the case (collection, for API include).
      */
     public function ophthalmologyEncounterDetails()
     {
         return $this->hasMany(OphthalmologyEncounterDetail::class, 'case_id');
+    }
+
+    /**
+     * Get the single ophthalmology encounter detail for the case (for resource output).
+     */
+    public function ophthalmologyDetails()
+    {
+        return $this->hasOne(OphthalmologyEncounterDetail::class, 'case_id');
     }
 
     /**
