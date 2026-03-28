@@ -244,21 +244,38 @@ class AuthService
             throw new \Exception('User account is inactive in tenant database');
         }
 
-        // Load roles and permissions explicitly on the tenant connection
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
-        $tenantUser->load(['roles.permissions', 'permissions']);
+        // Load roles and permissions: must set database.default to 'tenant' so Spatie's
+        // Role/Permission models query the tenant DB (not the central DB which has no roles).
+        $originalDefault = config('database.default');
+        config(['database.default' => 'tenant']);
+        try {
+            app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+            $tenantUser->load(['roles.permissions', 'permissions']);
+        } finally {
+            config(['database.default' => $originalDefault]);
+            app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        }
+
+        // Build roles/permissions from the pre-loaded in-memory collections
+        // (must be done before database.default is restored, but load() already ran above)
+        $roles       = $tenantUser->roles->pluck('name');
+        $permissions = $tenantUser->roles->flatMap(fn($r) => $r->permissions->pluck('name'))
+                        ->merge($tenantUser->permissions->pluck('name'))
+                        ->unique()->values();
 
         // Generate token for tenant user
         $token = JWTAuth::fromUser($tenantUser);
 
         return [
-            'user' => $tenantUser,
-            'token' => $token,
-            'tenant_id' => $clinic->id,
+            'user'        => $tenantUser,
+            'roles'       => $roles,
+            'permissions' => $permissions,
+            'token'       => $token,
+            'tenant_id'   => $clinic->id,
             'clinic_name' => $clinic->name,
-            'has_ai_bot' => $clinic->has_ai_bot,
-            'specialty' => $clinic->specialty ?? 'dental',
-            'message' => 'Login successful',
+            'has_ai_bot'  => $clinic->has_ai_bot,
+            'specialty'   => $clinic->specialty ?? 'dental',
+            'message'     => 'Login successful',
         ];
     }
 
