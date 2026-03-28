@@ -86,10 +86,10 @@ class TenantDemoDataSeeder extends Seeder
 
     private function configureTenantConnection(): void
     {
-        // Allow env-var overrides; fall back to hardcoded constants.
-        Config::set('database.connections.tenant.database', env('TENANT_DB_DATABASE', self::DB_NAME));
-        Config::set('database.connections.tenant.username', env('TENANT_DB_USERNAME', self::DB_USER));
-        Config::set('database.connections.tenant.password', env('TENANT_DB_PASSWORD', self::DB_PASSWORD));
+        // Always target the hardcoded tenant DB — env vars are intentionally ignored.
+        Config::set('database.connections.tenant.database', self::DB_NAME);
+        Config::set('database.connections.tenant.username', self::DB_USER);
+        Config::set('database.connections.tenant.password', self::DB_PASSWORD);
 
         // Purge any cached connection so the new config is picked up.
         DB::purge('tenant');
