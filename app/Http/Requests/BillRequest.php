@@ -53,8 +53,12 @@ class BillRequest extends FormRequest
              $data['doctor_id'] = auth()->id();
         }
 
-        // Set default bill_date to current datetime if not provided
-        $data['bill_date'] = $this->bill_date ?? now()->toDateTimeString();
+        // Set default bill_date to current datetime only when creating
+        if ($this->isMethod('POST')) {
+            $data['bill_date'] = $this->bill_date ?? now()->toDateTimeString();
+        } elseif ($this->has('bill_date')) {
+            $data['bill_date'] = $this->bill_date;
+        }
 
         if (!empty($data)) {
             $this->merge($data);
