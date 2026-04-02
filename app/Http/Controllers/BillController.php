@@ -115,7 +115,7 @@ class BillController extends Controller
                     ], 404);
                 }
 
-                if ($bill->billable_type !== 'App\Models\CaseModel') {
+                if (!in_array($bill->billable_type, ['Case', 'CaseModel', 'App\Models\Case', 'App\Models\CaseModel'])) {
                     return response()->json([
                         'success' => false,
                         'message' => 'price and bill_date can only be updated for case bills',
