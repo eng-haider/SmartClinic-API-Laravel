@@ -18,6 +18,7 @@ use App\Http\Controllers\ClinicExpenseController;
 use App\Http\Controllers\ClinicExpenseCategoryController;
 use App\Http\Controllers\ClinicSettingController;
 use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\MedicationController;
 use App\Http\Controllers\RecipeController;
 use App\Http\Controllers\DoctorController;
 use App\Http\Controllers\SecretaryController;
@@ -106,6 +107,13 @@ Route::middleware([
     Route::middleware('jwt')->group(function () {
         Route::apiResource('reservations', ReservationController::class);
         Route::patch('reservations/{reservation}/status', [ReservationController::class, 'changeStatus']);
+    });
+
+    // Medication library routes
+    Route::middleware('jwt')->group(function () {
+        Route::get('medications', [MedicationController::class, 'index']);
+        Route::post('medications', [MedicationController::class, 'store']);
+        Route::delete('medications/{id}', [MedicationController::class, 'destroy']);
     });
 
     // Recipe routes

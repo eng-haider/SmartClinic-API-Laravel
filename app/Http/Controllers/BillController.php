@@ -102,8 +102,29 @@ class BillController extends Controller
     public function update(BillRequest $request, int $id): JsonResponse
     {
         try {
+            $data = $request->validated();
+
+            // price and bill_date can only be updated for case bills
+            if (array_key_exists('price', $data) || array_key_exists('bill_date', $data)) {
+                $bill = $this->billRepository->getById($id);
+
+                if (!$bill) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Bill not found',
+                    ], 404);
+                }
+
+                if ($bill->billable_type !== 'App\Models\CaseModel') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'price and bill_date can only be updated for case bills',
+                    ], 422);
+                }
+            }
+
             // Multi-tenancy: Database is already isolated by tenant
-            $bill = $this->billRepository->update($id, $request->validated());
+            $bill = $this->billRepository->update($id, $data);
 
             return response()->json([
                 'success' => true,
