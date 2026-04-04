@@ -20,6 +20,7 @@ class SmartChatOrchestrator
 {
     private AIQuestionAnalyzer $analyzer;
     private EmbeddingService $embeddingService;
+    private SpecialtyChatConfig $specialtyConfig;
 
     /** @var array<string, AIToolInterface> */
     private array $tools = [];
@@ -28,6 +29,7 @@ class SmartChatOrchestrator
     {
         $this->analyzer = $analyzer;
         $this->embeddingService = $embeddingService;
+        $this->specialtyConfig = new SpecialtyChatConfig();
         $this->registerTools();
     }
 
@@ -232,20 +234,7 @@ class SmartChatOrchestrator
         // Always use gpt-4o-mini for chat — it's the cheapest, fastest, and most reliable
         $model = 'gpt-4o-mini';
 
-        $systemMessage = 'You are a smart AI assistant for a dental/medical clinic management system called SmartClinic. '
-            . 'You have direct access to real-time clinic data including: payments/bills, expenses, patients, cases/treatments, and reservations/appointments. '
-            . 'IMPORTANT financial data model: '
-            . '- "Bills" (bills table) = payments received from the auditor/accountant, NOT invoices. Each bill records an amount paid. '
-            . '- "Cases" (cases table) = treatments with prices set by the doctor. Cases have an is_paid flag. '
-            . '- "Unpaid Amount" = sum of case prices where is_paid is false. '
-            . '- When user asks about "المبالغ المدفوعة" (paid amounts), report the total payments received (bills sum). '
-            . '- When user asks about unpaid amounts, report the sum of unpaid case prices. '
-            . 'When real-time data context is provided, use it to give accurate, data-driven answers with specific numbers. '
-            . 'Always present financial data clearly with totals. '
-            . 'For analytics questions, provide insights and actionable recommendations. '
-            . 'Be professional, friendly, and concise. Always respond in the same language the user asks in (Arabic or English). '
-            . 'If data shows trends, explain possible reasons. '
-            . 'The current date and time is: ' . now()->toDateTimeString() . '.';
+        $systemMessage = $this->specialtyConfig->buildChatSystemPrompt();
 
         $userMessage = $question;
         if (!empty($context)) {
@@ -298,6 +287,7 @@ class SmartChatOrchestrator
                 'intent' => $analysis['intent'],
                 'date_range' => $analysis['date_range']['type'],
             ],
+            'specialty' => $this->specialtyConfig->specialty(),
             'answered_at' => now()->toDateTimeString(),
             'response_time_ms' => round((microtime(true) - $startTime) * 1000),
         ];

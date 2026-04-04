@@ -25,7 +25,7 @@ class CaseRequest extends FormRequest
         $rules = [
             'patient_id' => 'required|exists:patients,id',
             'doctor_id' => 'nullable|exists:users,id',
-            'case_categores_id' => 'required|exists:case_categories,id',
+            'case_categores_id' => 'nullable|exists:case_categories,id',
             'status_id' => 'nullable|exists:statuses,id',
             'notes' => 'nullable|string|max:5000',
             'price' => 'nullable|integer|min:0',

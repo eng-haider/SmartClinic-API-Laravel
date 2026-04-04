@@ -10,11 +10,13 @@ class AIQuestionAnalyzer
 {
     private string $apiKey;
     private string $model;
+    private SpecialtyChatConfig $specialtyConfig;
 
     public function __construct()
     {
         $this->apiKey = config('services.openai.api_key');
         $this->model = config('services.openai.analyzer_model', 'gpt-4o-mini');
+        $this->specialtyConfig = new SpecialtyChatConfig();
     }
 
     /**
@@ -121,48 +123,11 @@ class AIQuestionAnalyzer
 
     /**
      * Build the system prompt that instructs GPT to return structured JSON.
+     * Specialty-aware via SpecialtyChatConfig.
      */
     private function buildSystemPrompt(): string
     {
-        $today = now()->toDateString();
-
-        return <<<PROMPT
-You are an AI question analyzer for a dental/medical clinic management system.
-Analyze the user's question and return a JSON object with this exact structure:
-
-{
-  "intent": "<one of: revenue, expenses, patients, reservations, cases, analytics, medical_question, search_patient, general>",
-  "entities": {
-    "patient_name": "<extracted patient name or empty string>",
-    "doctor_name": "<extracted doctor name or empty string>"
-  },
-  "date_range": {
-    "type": "<one of: today, yesterday, tomorrow, this_week, last_week, this_month, last_month, specific_date, custom, none>",
-    "start": "<ISO date string or null>",
-    "end": "<ISO date string or null>"
-  },
-  "needs_database": <true if the question requires real-time clinic database data>,
-  "needs_vector_search": <true if the question might match embedded records like patient names or case details>,
-  "needs_knowledge_base": <true if the question is about medical knowledge, procedures, or dental terminology>
-}
-
-Rules:
-- "analytics" intent is for comparative/trend questions like "top doctor", "compare months", "growth rate", "why revenue decreased"
-- "revenue" intent is for questions about payments received from auditor (bills table), case prices set by doctor, unpaid amounts, financial data, income
-- "expenses" intent is for questions about clinic expenses, costs, spending
-- "patients" intent is for questions about patient counts, demographics, registrations
-- "reservations" intent is for questions about appointments, bookings, schedules
-- "cases" intent is for questions about treatments, procedures, dental cases
-- "search_patient" intent is when user is looking for a specific patient by name
-- "medical_question" intent is for general medical/dental knowledge questions
-- "general" intent is for greetings, help requests, or unrelated questions
-- Today's date is: {$today}
-- Support Arabic and English questions
-- For date_range, if user says "today" set type to "today", if "this month" set type to "this_month", etc.
-- If a specific date is mentioned, set type to "specific_date" and fill start/end
-- If no date is mentioned, set type to "none"
-- Return ONLY valid JSON, no extra text
-PROMPT;
+        return $this->specialtyConfig->buildAnalyzerSystemPrompt();
     }
 
     /**
@@ -189,6 +154,7 @@ PROMPT;
 
     /**
      * Fallback analysis using simple keyword matching when OpenAI is unavailable.
+     * Includes specialty-specific keywords.
      */
     private function fallbackAnalysis(string $question): array
     {
@@ -199,21 +165,31 @@ PROMPT;
         $needsVector = true;
         $needsKb = false;
 
+        // Base keywords + specialty-specific case keywords
+        $specialtyCaseKeywords = $this->specialtyConfig->caseKeywords();
+        $baseCaseKeywords = ['case', 'treatment', 'procedure', 'حالات', 'حالة', 'علاج'];
+
         // Simple keyword-based fallback
         $intentMap = [
             'revenue' => ['revenue', 'income', 'bill', 'payment', 'paid', 'unpaid', 'إيرادات', 'فواتير', 'دخل', 'مدفوع', 'غير مدفوع', 'مبالغ'],
             'expenses' => ['expense', 'cost', 'spending', 'مصاريف', 'مصروف', 'نفقات', 'تكاليف'],
             'patients' => ['patient', 'patients', 'مرضى', 'مريض', 'مراجع'],
             'reservations' => ['appointment', 'reservation', 'schedule', 'booking', 'مواعيد', 'موعد', 'حجز'],
-            'cases' => ['case', 'treatment', 'procedure', 'حالات', 'حالة', 'علاج'],
+            'cases' => array_merge($baseCaseKeywords, $specialtyCaseKeywords),
             'analytics' => ['top', 'compare', 'trend', 'growth', 'decrease', 'increase', 'best', 'worst', 'مقارنة', 'أفضل'],
+            'medical_question' => $this->specialtyConfig->medicalKeywords(),
         ];
 
         foreach ($intentMap as $intentName => $keywords) {
             foreach ($keywords as $keyword) {
                 if (str_contains($q, $keyword)) {
                     $intent = $intentName;
-                    $needsDb = true;
+                    if ($intentName === 'medical_question') {
+                        $needsDb = false;
+                        $needsKb = true;
+                    } else {
+                        $needsDb = true;
+                    }
                     break 2;
                 }
             }
