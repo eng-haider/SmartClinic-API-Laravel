@@ -133,11 +133,12 @@ class ClinicExpenseRepository
      * Creates a covering Bill for each expense that still has a remaining balance.
      * Returns counts of processed and skipped expenses.
      */
-    public function bulkMarkAsPaidByDateRange(string $startDate, string $endDate): array
+    public function bulkMarkAsPaidByDateRange(string $startDate, string $endDate, ?int $categoryId = null): array
     {
         $expenses = $this->query()
             ->whereBetween('date', [$startDate, $endDate])
             ->where('is_paid', false)
+            ->when($categoryId, fn($q) => $q->where('clinic_expense_category_id', $categoryId))
             ->get();
 
         $marked  = 0;

@@ -35,10 +35,10 @@ class ClinicExpenseController extends Controller
         ]);
 
         $perPage = $request->input('per_page', 15);
-        
+
         // Multi-tenancy: No need for clinic_id filter, database is already isolated by tenant
         $expenses = $this->repository->getAllWithFilters($filters, $perPage, null);
-        
+
         // Calculate summary statistics for the filtered results
         $summary = $this->repository->getFilteredSummary($filters, null);
 
@@ -247,18 +247,20 @@ class ClinicExpenseController extends Controller
     {
         $request->validate([
             'from' => 'required|date',
-            'to'   => 'required|date|after_or_equal:from',
+            'to' => 'required|date|after_or_equal:from',
+            'category_id' => 'required|integer|exists:clinic_expense_categories,id',
         ]);
 
         $result = $this->repository->bulkMarkAsPaidByDateRange(
             $request->input('from'),
-            $request->input('to')
+            $request->input('to'),
+            $request->input('category_id')
         );
 
         return response()->json([
             'success' => true,
             'message' => "{$result['marked']} expense(s) marked as paid, {$result['skipped']} already covered.",
-            'data'    => $result,
+            'data' => $result,
         ]);
     }
 
