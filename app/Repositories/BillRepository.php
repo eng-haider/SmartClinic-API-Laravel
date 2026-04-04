@@ -101,7 +101,7 @@ class BillRepository
      */
     public function getById(int $id): ?Bill
     {
-        $query = $this->query()->with(['patient', 'doctor', 'billable.patient', 'billable.doctor', 'billable.category', 'billable.status']);
+        $query = $this->query()->with(['patient', 'doctor', 'billable']);
 
         return $query->find($id);
     }
