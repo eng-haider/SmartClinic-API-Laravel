@@ -64,13 +64,13 @@ class ClinicExpenseRepository
     }
 
     /**
-     * Get expense by ID
+     * Get expense by ID — respects ?include= query parameter
      */
     public function getById(int $id): ?ClinicExpense
     {
-        $query = $this->query()->with(['category', 'doctor', 'creator', 'updator']);
-        
-        return $query->find($id);
+        return $this->queryBuilder()
+            ->with(['category', 'doctor', 'creator', 'updator'])
+            ->find($id);
     }
 
     /**

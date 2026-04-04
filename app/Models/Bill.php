@@ -31,6 +31,17 @@ class Bill extends Model
                 $bill->updator_id = auth()->id();
             }
         });
+
+        // Sync is_paid on ClinicExpense when a bill instalment is added or removed
+        $syncExpense = function ($bill) {
+            if ($bill->billable_type === \App\Models\ClinicExpense::class && $bill->billable_id) {
+                $expense = \App\Models\ClinicExpense::find($bill->billable_id);
+                $expense?->syncIsPaid();
+            }
+        };
+
+        static::saved($syncExpense);
+        static::deleted($syncExpense);
     }
 
     /**

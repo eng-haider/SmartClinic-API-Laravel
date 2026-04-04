@@ -88,6 +88,18 @@ class ClinicExpense extends Model
     }
 
     /**
+     * Recalculate and persist is_paid based on bills sum vs total.
+     * Called automatically whenever a linked Bill is saved or deleted.
+     */
+    public function syncIsPaid(): void
+    {
+        $paid  = (float) $this->bills()->sum('price');
+        $total = (float) $this->total;
+
+        $this->updateQuietly(['is_paid' => $total > 0 && $paid >= $total]);
+    }
+
+    /**
      * Get the expense category.
      */
     public function category(): BelongsTo
