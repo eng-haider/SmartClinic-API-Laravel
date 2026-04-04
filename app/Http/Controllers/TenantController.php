@@ -333,12 +333,15 @@ class TenantController extends Controller
     {
         $baseId = Str::slug($clinicName, '_');
         
-        // If slug is empty or invalid, use fallback
+        // If slug is empty or invalid (e.g. Arabic/non-Latin name), use fallback
         if (empty($baseId) || is_numeric($baseId) || strlen($baseId) < 2) {
             $baseId = preg_replace('/[^a-z0-9]+/i', '_', strtolower($clinicName));
-            if (empty($baseId) || strlen($baseId) < 2) {
-                $baseId = 'clinic_' . Str::lower(Str::random(6));
-            }
+            $baseId = trim($baseId, '_');
+        }
+
+        // If still empty or contains no alphanumeric chars (pure Arabic/non-ASCII), generate from hash
+        if (empty($baseId) || strlen($baseId) < 2 || !preg_match('/[a-z0-9]/i', $baseId)) {
+            $baseId = 'clinic_' . substr(md5($clinicName), 0, 8);
         }
         
         $counter = 1;
