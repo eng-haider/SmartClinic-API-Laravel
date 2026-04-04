@@ -9,17 +9,26 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('recipe_items', function (Blueprint $table) {
-            $table->unsignedBigInteger('recipes_id')->nullable()->after('id');
-            $table->string('dosage')->nullable()->after('name');
-            $table->string('frequency')->nullable()->after('dosage');
-            $table->string('duration')->nullable()->after('frequency');
+            if (!Schema::hasColumn('recipe_items', 'recipes_id')) {
+                $table->unsignedBigInteger('recipes_id')->nullable()->after('id');
+                $table->foreign('recipes_id')
+                      ->references('id')
+                      ->on('recipes')
+                      ->onDelete('cascade');
+                $table->index('recipes_id');
+            }
 
-            $table->foreign('recipes_id')
-                  ->references('id')
-                  ->on('recipes')
-                  ->onDelete('cascade');
+            if (!Schema::hasColumn('recipe_items', 'dosage')) {
+                $table->string('dosage')->nullable()->after('name');
+            }
 
-            $table->index('recipes_id');
+            if (!Schema::hasColumn('recipe_items', 'frequency')) {
+                $table->string('frequency')->nullable()->after('dosage');
+            }
+
+            if (!Schema::hasColumn('recipe_items', 'duration')) {
+                $table->string('duration')->nullable()->after('frequency');
+            }
         });
     }
 
