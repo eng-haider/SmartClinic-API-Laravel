@@ -20,7 +20,7 @@ class BillRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'patient_id' => 'required|exists:patients,id',
+            'patient_id' => 'nullable|exists:patients,id',
             'billable_id' => 'nullable|integer',
             'billable_type' => 'nullable|string|max:255',
             'price' => 'required|integer|min:0',
@@ -30,9 +30,8 @@ class BillRequest extends FormRequest
             'bill_date' => 'nullable|date',
         ];
 
-        // Make patient_id optional on update
+        // Make price optional on update
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
-            $rules['patient_id'] = 'sometimes|exists:patients,id';
             $rules['price'] = 'sometimes|integer|min:0';
         }
 
