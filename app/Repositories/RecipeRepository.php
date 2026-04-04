@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\Recipe;
+use App\Models\RecipeItem;
 use Illuminate\Http\Request;
 use Spatie\QueryBuilder\QueryBuilder;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -57,7 +58,23 @@ class RecipeRepository
      */
     public function create(array $data)
     {
-        return Recipe::create($data);
+        $items = $data['recipe_items'] ?? [];
+        unset($data['recipe_items']);
+
+        $recipe = Recipe::create($data);
+
+        foreach ($items as $item) {
+            RecipeItem::create([
+                'recipes_id' => $recipe->id,
+                'doctors_id' => $recipe->doctors_id,
+                'name'       => $item['medication_name'],
+                'dosage'     => $item['dosage'] ?? null,
+                'frequency'  => $item['frequency'] ?? null,
+                'duration'   => $item['duration'] ?? null,
+            ]);
+        }
+
+        return $recipe->load(['patient', 'doctor', 'recipeItems']);
     }
 
     /**

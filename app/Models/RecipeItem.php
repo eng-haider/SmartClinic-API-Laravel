@@ -26,6 +26,9 @@ class RecipeItem extends Model
         'name',
         'recipes_id',
         'doctors_id',
+        'dosage',
+        'frequency',
+        'duration',
     ];
 
     /**
