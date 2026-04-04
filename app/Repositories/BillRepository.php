@@ -26,6 +26,16 @@ class BillRepository
      */
     protected function queryBuilder(): QueryBuilder
     {
+        // Strip nested billable includes (billable.* ) from the request — morphWith() handles them automatically
+        $includes = request('include', '');
+        if (is_string($includes) && str_contains($includes, 'billable.')) {
+            $filtered = collect(explode(',', $includes))
+                ->map(fn($i) => trim($i))
+                ->filter(fn($i) => !str_starts_with($i, 'billable.'))
+                ->implode(',');
+            request()->merge(['include' => $filtered]);
+        }
+
         $query = QueryBuilder::for(Bill::class)
             ->allowedFilters([
                 'patient_id',
