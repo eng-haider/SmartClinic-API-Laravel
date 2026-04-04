@@ -62,29 +62,11 @@ class BillRepository
                 'creator',
                 'updator',
                 'billable',
-                'billable.patient',
-                'billable.doctor',
-                'billable.category',
-                'billable.status',
                 'notes',
             ])
 
 
             ->defaultSort('-created_at');
-
-        // If billable is requested, automatically load nested relationships
-        $includes = request()->get('include', []);
-        if (is_string($includes)) {
-            $includes = explode(',', $includes);
-        }
-        if (in_array('billable', $includes)) {
-            $query->with([
-                'billable.patient',
-                'billable.doctor',
-                'billable.category',
-                'billable.status'
-            ]);
-        }
 
         return $query;
     }

@@ -88,7 +88,10 @@ class Bill extends Model
      */
     public function billable()
     {
-        return $this->morphTo();
+        return $this->morphTo()->morphWith([
+            \App\Models\CaseModel::class    => ['patient', 'doctor', 'category', 'status'],
+            \App\Models\ClinicExpense::class => ['category', 'doctor'],
+        ]);
     }
 
     /**
