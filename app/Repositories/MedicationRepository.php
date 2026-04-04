@@ -8,11 +8,11 @@ use Illuminate\Database\Eloquent\Collection;
 class MedicationRepository
 {
     /**
-     * Get all medications for a clinic, with optional name search.
+     * Get all medications with optional name search.
      */
-    public function getAllForClinic(int $clinicId, ?string $search = null): Collection
+    public function getAll(?string $search = null): Collection
     {
-        $query = Medication::where('clinic_id', $clinicId);
+        $query = Medication::query();
 
         if ($search) {
             $query->where('name', 'like', '%' . $search . '%');
@@ -22,34 +22,29 @@ class MedicationRepository
     }
 
     /**
-     * Find a medication by name for a clinic.
+     * Find a medication by name.
      */
-    public function findByNameAndClinic(string $name, int $clinicId): ?Medication
+    public function findByName(string $name): ?Medication
     {
-        return Medication::where('clinic_id', $clinicId)
-            ->where('name', $name)
-            ->first();
+        return Medication::where('name', $name)->first();
     }
 
     /**
-     * Create a new medication for a clinic.
+     * Create a new medication.
      */
-    public function create(string $name, int $clinicId): Medication
+    public function create(string $name): Medication
     {
         return Medication::create([
             'name' => $name,
-            'clinic_id' => $clinicId,
         ]);
     }
 
     /**
-     * Find a medication by ID scoped to a clinic.
+     * Find a medication by ID.
      */
-    public function findByIdAndClinic(int $id, int $clinicId): ?Medication
+    public function findById(int $id): ?Medication
     {
-        return Medication::where('id', $id)
-            ->where('clinic_id', $clinicId)
-            ->first();
+        return Medication::find($id);
     }
 
     /**

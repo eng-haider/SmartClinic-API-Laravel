@@ -7,7 +7,6 @@ use App\Http\Resources\MedicationResource;
 use App\Repositories\MedicationRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class MedicationController extends Controller
 {
@@ -20,10 +19,9 @@ class MedicationController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $clinicId = Auth::user()->clinic_id;
         $search = $request->query('search');
 
-        $medications = $this->repository->getAllForClinic($clinicId, $search);
+        $medications = $this->repository->getAll($search);
 
         return response()->json(
             MedicationResource::collection($medications)
@@ -35,16 +33,15 @@ class MedicationController extends Controller
      */
     public function store(MedicationRequest $request): JsonResponse
     {
-        $clinicId = Auth::user()->clinic_id;
         $name = $request->validated()['name'];
 
-        $existing = $this->repository->findByNameAndClinic($name, $clinicId);
+        $existing = $this->repository->findByName($name);
 
         if ($existing) {
             return response()->json(new MedicationResource($existing), 200);
         }
 
-        $medication = $this->repository->create($name, $clinicId);
+        $medication = $this->repository->create($name);
 
         return response()->json(new MedicationResource($medication), 201);
     }
@@ -54,8 +51,7 @@ class MedicationController extends Controller
      */
     public function destroy(int $id): JsonResponse
     {
-        $clinicId = Auth::user()->clinic_id;
-        $medication = $this->repository->findByIdAndClinic($id, $clinicId);
+        $medication = $this->repository->findById($id);
 
         if (!$medication) {
             return response()->json([
