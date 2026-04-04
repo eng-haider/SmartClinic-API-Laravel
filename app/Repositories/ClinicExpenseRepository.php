@@ -129,6 +129,49 @@ class ClinicExpenseRepository
     }
 
     /**
+     * Mark all unpaid expenses within a date range as paid.
+     * Creates a covering Bill for each expense that still has a remaining balance.
+     * Returns counts of processed and skipped expenses.
+     */
+    public function bulkMarkAsPaidByDateRange(string $startDate, string $endDate): array
+    {
+        $expenses = $this->query()
+            ->whereBetween('date', [$startDate, $endDate])
+            ->where('is_paid', false)
+            ->get();
+
+        $marked  = 0;
+        $skipped = 0;
+
+        foreach ($expenses as $expense) {
+            $alreadyPaid = (int) $expense->bills()->sum('price');
+            $total       = (int) round(($expense->quantity ?? 1) * $expense->price);
+            $remaining   = $total - $alreadyPaid;
+
+            if ($remaining > 0) {
+                \App\Models\Bill::create([
+                    'billable_id'   => $expense->id,
+                    'billable_type' => \App\Models\ClinicExpense::class,
+                    'price'         => $remaining,
+                    'doctor_id'     => $expense->doctor_id,
+                    'bill_date'     => now(),
+                ]);
+                // is_paid synced automatically via Bill::saved() → syncIsPaid()
+                $marked++;
+            } else {
+                $expense->updateQuietly(['is_paid' => true]);
+                $skipped++;
+            }
+        }
+
+        return [
+            'marked'  => $marked,
+            'skipped' => $skipped,
+            'total'   => $expenses->count(),
+        ];
+    }
+
+    /**
      * Get total expenses
      */
     public function getTotal(?string $startDate = null, ?string $endDate = null): float
@@ -155,24 +198,42 @@ class ClinicExpenseRepository
     }
 
     /**
-     * Mark expense as paid
+     * Mark expense as paid — creates a covering Bill for any remaining balance.
      */
     public function markAsPaid(int $id): ClinicExpense
     {
         $expense = $this->query()->findOrFail($id);
-        $expense->update(['is_paid' => true]);
-        
+
+        $alreadyPaid = (int) $expense->bills()->sum('price');
+        $total       = (int) round(($expense->quantity ?? 1) * $expense->price);
+        $remaining   = $total - $alreadyPaid;
+
+        if ($remaining > 0) {
+            \App\Models\Bill::create([
+                'billable_id'   => $expense->id,
+                'billable_type' => \App\Models\ClinicExpense::class,
+                'price'         => $remaining,
+                'doctor_id'     => $expense->doctor_id,
+                'bill_date'     => now(),
+            ]);
+            // is_paid is synced automatically via Bill::saved() → syncIsPaid()
+        } else {
+            $expense->update(['is_paid' => true]);
+        }
+
         return $expense->fresh();
     }
 
     /**
-     * Mark expense as unpaid
+     * Mark expense as unpaid — removes all bill instalments.
      */
     public function markAsUnpaid(int $id): ClinicExpense
     {
         $expense = $this->query()->findOrFail($id);
-        $expense->update(['is_paid' => false]);
-        
+
+        // Delete all linked bill instalments; Bill::deleted() will call syncIsPaid()
+        $expense->bills()->delete();
+
         return $expense->fresh();
     }
 

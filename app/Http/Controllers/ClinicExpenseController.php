@@ -18,7 +18,7 @@ class ClinicExpenseController extends Controller
     {
         $this->middleware('permission:view-clinic-expenses')->only(['index', 'show', 'statistics']);
         $this->middleware('permission:create-expense')->only(['store']);
-        $this->middleware('permission:edit-expense')->only(['update', 'markAsPaid', 'markAsUnpaid']);
+        $this->middleware('permission:edit-expense')->only(['update', 'markAsPaid', 'markAsUnpaid', 'markAsPaidByDateRange']);
         $this->middleware('permission:delete-expense')->only(['destroy']);
     }
 
@@ -237,6 +237,28 @@ class ClinicExpenseController extends Controller
             'success' => true,
             'message' => 'Expenses retrieved successfully',
             'data' => ClinicExpenseResource::collection($expenses),
+        ]);
+    }
+
+    /**
+     * Mark all unpaid expenses within a date range as paid.
+     */
+    public function markAsPaidByDateRange(Request $request): JsonResponse
+    {
+        $request->validate([
+            'from' => 'required|date',
+            'to'   => 'required|date|after_or_equal:from',
+        ]);
+
+        $result = $this->repository->bulkMarkAsPaidByDateRange(
+            $request->input('from'),
+            $request->input('to')
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$result['marked']} expense(s) marked as paid, {$result['skipped']} already covered.",
+            'data'    => $result,
         ]);
     }
 

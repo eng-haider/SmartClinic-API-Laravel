@@ -134,6 +134,7 @@ Route::middleware([
     Route::middleware('jwt')->group(function () {
         Route::apiResource('clinic-expense-categories', ClinicExpenseCategoryController::class);
         Route::apiResource('clinic-expenses', ClinicExpenseController::class);
+        Route::post('clinic-expenses/bulk-mark-paid', [ClinicExpenseController::class, 'markAsPaidByDateRange']);
     });
 
     // Note routes
