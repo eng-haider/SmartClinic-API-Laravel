@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClinicExpense extends Model
@@ -75,6 +76,15 @@ class ClinicExpense extends Model
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Get all bill payment records for this expense (via polymorphic bills table).
+     * Each Bill record represents one partial or full payment instalment.
+     */
+    public function bills(): MorphMany
+    {
+        return $this->morphMany(Bill::class, 'billable');
     }
 
     /**

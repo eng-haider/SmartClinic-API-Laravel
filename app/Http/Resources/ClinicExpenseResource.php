@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Http\Resources\BillResource;
 
 class ClinicExpenseResource extends JsonResource
 {
@@ -35,6 +36,7 @@ class ClinicExpenseResource extends JsonResource
             'doctor' => new UserResource($this->whenLoaded('doctor')),
             'creator' => new UserResource($this->whenLoaded('creator')),
             'updator' => new UserResource($this->whenLoaded('updator')),
+            'bills' => BillResource::collection($this->whenLoaded('bills')),
         ];
     }
 }

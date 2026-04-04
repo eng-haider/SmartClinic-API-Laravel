@@ -48,6 +48,7 @@ class ClinicExpenseRepository
                 'doctor',
                 'creator',
                 'updator',
+                'bills',
             ])
             ->defaultSort('-date');
     }
