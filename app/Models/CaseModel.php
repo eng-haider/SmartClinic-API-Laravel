@@ -1,5 +1,7 @@
 <?php
 namespace App\Models;
+use App\Events\CaseCreated;
+use App\Events\CaseCompleted;
 use App\Traits\HasEmbeddings;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +17,28 @@ class CaseModel extends Model
      * @var string
      */
     protected $table = 'cases';
+
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (CaseModel $case) {
+            CaseCreated::dispatch($case);
+        });
+
+        static::updated(function (CaseModel $case) {
+            // Fire CaseCompleted when status changes to a "completed" status
+            if ($case->wasChanged('status_id') && $case->status_id === self::COMPLETED_STATUS_ID) {
+                CaseCompleted::dispatch($case);
+            }
+        });
+    }
+
+    /**
+     * Status ID that represents "completed". Override via clinic settings if needed.
+     */
+    public const COMPLETED_STATUS_ID = 3;
 
     /**
      * The attributes that are mass assignable.

@@ -33,6 +33,11 @@ use App\Http\Controllers\Report\CaseReportController;
 use App\Http\Controllers\Report\ReservationReportController;
 use App\Http\Controllers\Report\FinancialReportController;
 use App\Http\Controllers\AIController;
+use App\Http\Controllers\AutomationRuleController;
+use App\Http\Controllers\AutomationTargetController;
+use App\Http\Controllers\MessageTemplateController;
+use App\Http\Controllers\MessagingSettingController;
+use App\Http\Controllers\ConversationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -190,6 +195,33 @@ Route::middleware([
         Route::post('sync-embeddings', [AIController::class, 'syncEmbeddings']);
         Route::post('sync-medical-knowledge', [AIController::class, 'syncMedicalKnowledge']);
         Route::get('capabilities', [AIController::class, 'getCapabilities']);
+    });
+
+    // ============================================
+    // MESSAGING & AUTOMATION ROUTES (JWT required)
+    // ============================================
+    Route::middleware('jwt')->prefix('messaging')->group(function () {
+        // Messaging Settings
+        Route::get('settings', [MessagingSettingController::class, 'index']);
+        Route::post('settings', [MessagingSettingController::class, 'upsert']);
+
+        // Message Templates
+        Route::apiResource('templates', MessageTemplateController::class);
+        Route::get('templates/{id}/preview', [MessageTemplateController::class, 'preview']);
+
+        // Automation Rules
+        Route::apiResource('automation-rules', AutomationRuleController::class);
+        Route::post('automation-rules/{id}/trigger', [AutomationRuleController::class, 'trigger']);
+
+        // Automation Targets
+        Route::get('automation-targets', [AutomationTargetController::class, 'index']);
+        Route::get('automation-targets/{id}', [AutomationTargetController::class, 'show']);
+        Route::post('automation-targets/{id}/cancel', [AutomationTargetController::class, 'cancel']);
+
+        // Conversations
+        Route::get('conversations', [ConversationController::class, 'index']);
+        Route::get('conversations/{id}', [ConversationController::class, 'show']);
+        Route::post('conversations/{id}/send', [ConversationController::class, 'sendMessage']);
     });
 
     // ============================================

@@ -27,7 +27,16 @@ use App\Http\Controllers\Report\FinancialReportController;
 use App\Http\Controllers\DemoRegisterController;
 use App\Http\Controllers\AIController;
 use App\Http\Controllers\DemoAIController;
+use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
+
+// ============================================
+// WHATSAPP WEBHOOK ROUTES (No auth - called by Meta)
+// ============================================
+Route::prefix('webhooks/whatsapp')->withoutMiddleware('throttle:api')->group(function () {
+    Route::get('/', [WebhookController::class, 'verify']);
+    Route::post('/', [WebhookController::class, 'handle']);
+});
 
 // ============================================
 // TENANT MANAGEMENT ROUTES (Central Database)
