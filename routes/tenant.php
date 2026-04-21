@@ -204,6 +204,8 @@ Route::middleware([
         // Messaging Settings
         Route::get('settings', [MessagingSettingController::class, 'index']);
         Route::post('settings', [MessagingSettingController::class, 'upsert']);
+        Route::post('settings/test-connection', [MessagingSettingController::class, 'testConnection']);
+        Route::get('settings/webhook-info', [MessagingSettingController::class, 'webhookInfo']);
 
         // Message Templates
         Route::apiResource('templates', MessageTemplateController::class);
