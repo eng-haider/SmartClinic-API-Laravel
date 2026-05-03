@@ -217,6 +217,13 @@ class TenantClinicSettingsSeeder extends Seeder
                 'description' => 'Default payment method (cash, card, transfer)',
                 'is_active' => true,
             ],
+            [
+                'setting_key' => 'doctor_bills_isolation',
+                'setting_value' => '0',
+                'setting_type' => 'boolean',
+                'description' => 'When enabled, doctors with the "doctor" role can only see their own bills and cases. Admins and super-doctors are unaffected.',
+                'is_active' => true,
+            ],
 
             // ========================
             // DISPLAY CATEGORY

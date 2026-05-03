@@ -179,11 +179,15 @@ class BillRepository
     /**
      * Get bills by patient
      */
-    public function getByPatient(int $patientId, int $perPage = 15): LengthAwarePaginator
+    public function getByPatient(int $patientId, int $perPage = 15, ?int $doctorId = null): LengthAwarePaginator
     {
         $query = $this->query()
             ->with(['patient', 'doctor', 'billable.patient', 'billable.doctor', 'billable.category', 'billable.status'])
             ->byPatient($patientId);
+
+        if ($doctorId !== null) {
+            $query->where('doctor_id', $doctorId);
+        }
 
         return $query->orderBy('created_at', 'desc')->paginate($perPage);
     }

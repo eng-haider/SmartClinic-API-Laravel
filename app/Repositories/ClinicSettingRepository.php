@@ -252,7 +252,7 @@ class ClinicSettingRepository extends BaseRepository
         }
 
         // Financial category
-        if (in_array($key, ['tax_rate', 'enable_invoicing', 'default_payment_method'])) {
+        if (in_array($key, ['tax_rate', 'enable_invoicing', 'default_payment_method', 'doctor_bills_isolation'])) {
             return 'financial';
         }
 
@@ -306,10 +306,11 @@ class ClinicSettingRepository extends BaseRepository
             'whatsapp_number' => 17,
             'reminder_before_hours' => 18,
 
-            // Financial (19-21)
+            // Financial (19-22)
             'tax_rate' => 19,
             'enable_invoicing' => 20,
             'default_payment_method' => 21,
+            'doctor_bills_isolation' => 22,
 
             // Display (22-25)
             'show_image_case' => 22,
