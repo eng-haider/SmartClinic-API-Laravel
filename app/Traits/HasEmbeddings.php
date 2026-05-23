@@ -13,6 +13,10 @@ use Illuminate\Support\Facades\Log;
  *
  * Each model using this trait must implement:
  * - toEmbeddingContent(): string
+ *
+ * All work is deferred to app()->terminating() so it runs AFTER the
+ * HTTP response is sent — POST/PATCH return immediately while embedding
+ * sync happens in the background of the same PHP process.
  */
 trait HasEmbeddings
 {
@@ -21,71 +25,91 @@ trait HasEmbeddings
      */
     public static function bootHasEmbeddings(): void
     {
-        // Generate embedding when a new record is created
         static::created(function ($model) {
-            try {
-                $clinicId = tenant('id');
-                if ($clinicId) {
-                    // Pre-compute content so the background Job doesn't need to query the tenant DB
-                    $content = trim($model->toEmbeddingContent());
-                    if (!empty($content)) {
-                        \App\Jobs\SyncEmbeddingJob::dispatch($clinicId, $model->getEmbeddingTableName(), $model->getKey(), $content);
-                    }
-                }
-            } catch (\Exception $e) {
-                Log::warning('Embedding job dispatch failed on create: ' . $e->getMessage(), [
-                    'model' => get_class($model),
-                    'id' => $model->getKey(),
-                ]);
+            $clinicId = tenant('id');
+            if (!$clinicId) {
+                return;
             }
-        });
 
-        // Regenerate embedding when record is updated and content changed
-        static::updated(function ($model) {
-            try {
-                $clinicId = tenant('id');
-                if ($clinicId) {
+            app()->terminating(function () use ($model, $clinicId) {
+                try {
                     $content = trim($model->toEmbeddingContent());
-                    
-                    if (empty($content)) {
-                        return; // Nothing to sync
+                    if ($content === '') {
+                        return;
                     }
-
-                    // Check if embedding exists with same content in the central pgsql_embeddings DB
-                    $existingEmbedding = \App\Models\Embedding::forClinic($clinicId)
-                        ->forRecord($model->getEmbeddingTableName(), $model->getKey())
-                        ->first();
-
-                    // Only dispatch job if content actually changed
-                    if (!$existingEmbedding || $existingEmbedding->content !== $content) {
-                        \App\Jobs\SyncEmbeddingJob::dispatch($clinicId, $model->getEmbeddingTableName(), $model->getKey(), $content);
-                    }
-                }
-            } catch (\Exception $e) {
-                Log::warning('Embedding job dispatch failed on update: ' . $e->getMessage(), [
-                    'model' => get_class($model),
-                    'id' => $model->getKey(),
-                ]);
-            }
-        });
-
-        // Remove embedding when record is deleted
-        static::deleted(function ($model) {
-            try {
-                $clinicId = tenant('id');
-                if ($clinicId) {
-                    app(EmbeddingService::class)->deleteEmbedding(
+                    \App\Jobs\SyncEmbeddingJob::dispatch(
                         $clinicId,
                         $model->getEmbeddingTableName(),
-                        $model->getKey()
+                        $model->getKey(),
+                        $content
                     );
+                } catch (\Throwable $e) {
+                    Log::warning('Embedding job dispatch failed on create: ' . $e->getMessage(), [
+                        'model' => get_class($model),
+                        'id' => $model->getKey(),
+                    ]);
                 }
-            } catch (\Exception $e) {
-                Log::warning('Embedding delete failed: ' . $e->getMessage(), [
-                    'model' => get_class($model),
-                    'id' => $model->getKey(),
-                ]);
+            });
+        });
+
+        static::updated(function ($model) {
+            $clinicId = tenant('id');
+            if (!$clinicId) {
+                return;
             }
+
+            // Cheap short-circuit: if the model didn't actually change any
+            // persisted attributes, skip the embedding work entirely.
+            if (empty($model->getChanges())) {
+                return;
+            }
+
+            $tableName = $model->getEmbeddingTableName();
+            $recordId = $model->getKey();
+
+            app()->terminating(function () use ($model, $clinicId, $tableName, $recordId) {
+                try {
+                    $content = trim($model->toEmbeddingContent());
+                    if ($content === '') {
+                        return;
+                    }
+
+                    $existingEmbedding = \App\Models\Embedding::forClinic($clinicId)
+                        ->forRecord($tableName, $recordId)
+                        ->first();
+
+                    if (!$existingEmbedding || $existingEmbedding->content !== $content) {
+                        \App\Jobs\SyncEmbeddingJob::dispatch($clinicId, $tableName, $recordId, $content);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Embedding job dispatch failed on update: ' . $e->getMessage(), [
+                        'model' => get_class($model),
+                        'id' => $recordId,
+                    ]);
+                }
+            });
+        });
+
+        static::deleted(function ($model) {
+            $clinicId = tenant('id');
+            if (!$clinicId) {
+                return;
+            }
+
+            $tableName = $model->getEmbeddingTableName();
+            $recordId = $model->getKey();
+            $modelClass = get_class($model);
+
+            app()->terminating(function () use ($clinicId, $tableName, $recordId, $modelClass) {
+                try {
+                    app(EmbeddingService::class)->deleteEmbedding($clinicId, $tableName, $recordId);
+                } catch (\Throwable $e) {
+                    Log::warning('Embedding delete failed: ' . $e->getMessage(), [
+                        'model' => $modelClass,
+                        'id' => $recordId,
+                    ]);
+                }
+            });
         });
     }
 

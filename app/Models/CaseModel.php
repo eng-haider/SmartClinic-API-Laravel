@@ -23,14 +23,20 @@ class CaseModel extends Model
      */
     protected static function booted(): void
     {
+        // Dispatch events AFTER the HTTP response is sent so automation
+        // rule lookups + target inserts don't block the POST/PATCH.
         static::created(function (CaseModel $case) {
-            CaseCreated::dispatch($case);
+            app()->terminating(function () use ($case) {
+                CaseCreated::dispatch($case);
+            });
         });
 
         static::updated(function (CaseModel $case) {
-            // Fire CaseCompleted when status changes to a "completed" status
+            // wasChanged() must be evaluated here — model state is reset later.
             if ($case->wasChanged('status_id') && $case->status_id === self::COMPLETED_STATUS_ID) {
-                CaseCompleted::dispatch($case);
+                app()->terminating(function () use ($case) {
+                    CaseCompleted::dispatch($case);
+                });
             }
         });
     }

@@ -74,22 +74,72 @@ class ClinicExpenseRepository
     }
 
     /**
-     * Create a new expense
+     * Create a new expense. When is_paid=true is passed, a covering Bill is
+     * created for the full amount so is_paid is derived from real payments
+     * (kept in sync via Bill::saved() → ClinicExpense::syncIsPaid()).
      */
     public function create(array $data): ClinicExpense
     {
-        return $this->query()->create($data);
+        $shouldBePaid = (bool) ($data['is_paid'] ?? false);
+        // Let the Bill drive is_paid — never write it directly on create.
+        unset($data['is_paid']);
+
+        return DB::transaction(function () use ($data, $shouldBePaid) {
+            $expense = $this->query()->create($data);
+
+            if ($shouldBePaid) {
+                $this->createCoveringBill($expense);
+            }
+
+            return $expense->refresh();
+        });
     }
 
     /**
-     * Update an expense
+     * Update an expense. When is_paid toggles true, a covering Bill is created
+     * for the remaining balance; when it toggles false, all bills are removed.
      */
     public function update(int $id, array $data): ClinicExpense
     {
-        $expense = $this->query()->findOrFail($id);
-        $expense->update($data);
-        
-        return $expense->fresh(['category', 'doctor', 'creator', 'updator']);
+        return DB::transaction(function () use ($id, $data) {
+            $expense = $this->query()->findOrFail($id);
+
+            $paidIntent = array_key_exists('is_paid', $data) ? (bool) $data['is_paid'] : null;
+            unset($data['is_paid']); // Bills are the source of truth.
+
+            $expense->update($data);
+
+            if ($paidIntent === true && !$expense->is_paid) {
+                $this->createCoveringBill($expense);
+            } elseif ($paidIntent === false && $expense->is_paid) {
+                $expense->bills()->delete();
+            }
+
+            return $expense->fresh(['category', 'doctor', 'creator', 'updator']);
+        });
+    }
+
+    /**
+     * Create a Bill that covers the remaining unpaid balance of an expense.
+     * Bill::saved() calls ClinicExpense::syncIsPaid() so is_paid stays in sync.
+     */
+    private function createCoveringBill(ClinicExpense $expense): void
+    {
+        $alreadyPaid = (int) $expense->bills()->sum('price');
+        $total       = (int) round(($expense->quantity ?? 1) * $expense->price);
+        $remaining   = $total - $alreadyPaid;
+
+        if ($remaining <= 0) {
+            return;
+        }
+
+        \App\Models\Bill::create([
+            'billable_id'   => $expense->id,
+            'billable_type' => \App\Models\ClinicExpense::class,
+            'price'         => $remaining,
+            'doctor_id'     => $expense->doctor_id,
+            'bill_date'     => now(),
+        ]);
     }
 
     /**
