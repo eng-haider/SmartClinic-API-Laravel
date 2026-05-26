@@ -257,7 +257,7 @@ class Patient extends Model
     public function scopeAllCasesPaid($query)
     {
         return $query->whereDoesntHave('cases', function ($q) {
-            $q->where('is_paid', false);
+            $q->where('is_paid', '!=', true);
         })->whereHas('cases'); // Must have at least one case
     }
 
