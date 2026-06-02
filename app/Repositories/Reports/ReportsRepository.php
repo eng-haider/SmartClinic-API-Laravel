@@ -18,6 +18,21 @@ use Carbon\Carbon;
 class ReportsRepository
 {
     /**
+     * Billable types that count as revenue (patient case payments).
+     *
+     * The bills table is polymorphic and shared across cases, clinic expenses,
+     * reservations, etc. Because the morph map is non-enforcing, case bills may
+     * be stored under any of these variants, so revenue queries must match all
+     * of them. Mirrors the set used in App\Http\Resources\BillResource.
+     */
+    private const CASE_BILLABLE_TYPES = [
+        'App\Models\Case',
+        'App\Models\CaseModel',
+        'Case',
+        'CaseModel',
+    ];
+
+    /**
      * ============================
      * DASHBOARD OVERVIEW
      * ============================
@@ -240,18 +255,25 @@ class ReportsRepository
     }
 
     /**
-     * Get revenue by date range
+     * Get revenue by date range.
+     *
+     * Revenue = payments collected for patient cases only. Bills are polymorphic
+     * (a single bills table also holds clinic-expense, reservation and standalone
+     * payments), so we restrict to case bills here — otherwise expense-covering
+     * bills would be counted as income and inflate revenue.
      */
     public function getRevenueByDateRange($doctorId = null, ?string $dateFrom = null, ?string $dateTo = null): int
     {
-        $query = Bill::query()->where('is_paid', true);
-        
+        $query = Bill::query()
+            ->where('is_paid', true)
+            ->whereIn('billable_type', self::CASE_BILLABLE_TYPES);
+
         if ($doctorId) {
             $query->where('doctor_id', $doctorId);
         }
-        
+
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
-        
+
         return (int) ($query->sum('price') ?? 0);
     }
 
@@ -260,8 +282,10 @@ class ReportsRepository
      */
     public function getRevenueTrend($doctorId = null, string $period = 'month', ?string $dateFrom = null, ?string $dateTo = null): array
     {
-        $query = Bill::query()->where('is_paid', true);
-        
+        $query = Bill::query()
+            ->where('is_paid', true)
+            ->whereIn('billable_type', self::CASE_BILLABLE_TYPES);
+
         if ($doctorId) {
             $query->where('doctor_id', $doctorId);
         }
@@ -280,17 +304,18 @@ class ReportsRepository
             ->select('doctor_id', DB::raw('SUM(price) as total_revenue'), DB::raw('COUNT(*) as bills_count'))
             ->with('doctor:id,name,email')
             ->where('is_paid', true)
+            ->whereIn('billable_type', self::CASE_BILLABLE_TYPES)
             ->whereNotNull('doctor_id')
             ->groupBy('doctor_id');
-        
+
         if ($doctorId) {
             $query->where('doctor_id', $doctorId);
         }
-        
+
         $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
-        
+
         $results = $query->get();
-        
+
         return $results->map(function ($item) {
             return [
                 'doctor_id' => $item->doctor_id,
