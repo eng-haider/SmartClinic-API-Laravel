@@ -218,6 +218,40 @@ class ClinicExpenseController extends Controller
     }
 
     /**
+     * Get the expenses summary card (total / paid / unpaid) filtered by date.
+     *
+     * Accepts a single `date` (one day) or a `from`/`to` range. When nothing
+     * is provided it defaults to today.
+     */
+    public function summary(Request $request): JsonResponse
+    {
+        $request->validate([
+            'date' => 'nullable|date',
+            'from' => 'nullable|date',
+            'to' => 'nullable|date|after_or_equal:from',
+        ]);
+
+        if ($request->filled('date')) {
+            $from = $to = $request->input('date');
+        } else {
+            $from = $request->input('from', now()->toDateString());
+            $to = $request->input('to', now()->toDateString());
+        }
+
+        $summary = $this->repository->getDateSummary($from, $to);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Expenses summary retrieved successfully',
+            'data' => $summary,
+            'filters' => [
+                'from' => $from,
+                'to' => $to,
+            ],
+        ]);
+    }
+
+    /**
      * Get expenses by date range.
      */
     public function byDateRange(Request $request): JsonResponse

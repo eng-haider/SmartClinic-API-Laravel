@@ -313,6 +313,38 @@ class ClinicExpenseRepository
     }
 
     /**
+     * Get the expenses summary card (total / paid / unpaid) for a date or range.
+     *
+     * Paid is derived from the linked Bills (the source of truth for payments),
+     * so partially-paid expenses are split correctly. Unpaid = total - paid.
+     * When no dates are given, all expenses are included.
+     */
+    public function getDateSummary(?string $from = null, ?string $to = null): array
+    {
+        $expenseQuery = $this->query()
+            ->when($from, fn ($q) => $q->where('date', '>=', $from))
+            ->when($to, fn ($q) => $q->where('date', '<=', $to));
+
+        $total = (float) (clone $expenseQuery)->sum(DB::raw('price * COALESCE(quantity, 1)'));
+        $count = (clone $expenseQuery)->count();
+
+        $paid = (float) \App\Models\Bill::query()
+            ->where('billable_type', ClinicExpense::class)
+            ->whereIn('billable_id', (clone $expenseQuery)->select('id'))
+            ->sum('price');
+
+        $unpaid = max($total - $paid, 0);
+
+        return [
+            'total' => $total,
+            'paid' => $paid,
+            'unpaid' => $unpaid,
+            'count' => $count,
+            'currency' => 'IQD',
+        ];
+    }
+
+    /**
      * Get summary statistics for filtered expenses
      */
     public function getFilteredSummary(array $filters): array

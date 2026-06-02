@@ -162,6 +162,7 @@ Route::middleware('jwt')->group(function () {
     Route::patch('clinic-expenses/{id}/mark-paid', [ClinicExpenseController::class, 'markAsPaid'])->name('clinic-expenses.mark-paid');
     Route::patch('clinic-expenses/{id}/mark-unpaid', [ClinicExpenseController::class, 'markAsUnpaid'])->name('clinic-expenses.mark-unpaid');
     Route::post('clinic-expenses/bulk-mark-paid', [ClinicExpenseController::class, 'markAsPaidByDateRange'])->name('clinic-expenses.bulk-mark-paid');
+    Route::get('clinic-expenses-summary', [ClinicExpenseController::class, 'summary'])->name('clinic-expenses.summary');
     Route::get('clinic-expenses-statistics', [ClinicExpenseController::class, 'statistics'])->name('clinic-expenses.statistics');
     Route::get('clinic-expenses-unpaid', [ClinicExpenseController::class, 'unpaid'])->name('clinic-expenses.unpaid');
     Route::get('clinic-expenses-by-date-range', [ClinicExpenseController::class, 'byDateRange'])->name('clinic-expenses.by-date-range');
