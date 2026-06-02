@@ -243,11 +243,15 @@ class Patient extends Model
 
     /**
      * Scope a query to only include patients with unpaid cases.
+     *
+     * Free cases (price = 0) are treated as paid, so they never make a patient
+     * show up as having unpaid cases. Mirrors scopeAllCasesPaid().
      */
     public function scopeHasUnpaidCases($query)
     {
         return $query->whereHas('cases', function ($q) {
-            $q->where('is_paid', false);
+            $q->where('price', '!=', 0)
+              ->where('is_paid', false);
         });
     }
 
