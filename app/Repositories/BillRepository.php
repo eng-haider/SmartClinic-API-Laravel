@@ -261,24 +261,9 @@ class BillRepository
      */
     public function getStatisticsWithFilters(array $filters, int $perPage = 15, $doctorId = null): array
     {
-        $query = $this->query();
-
-        if ($doctorId !== null) {
-            $query->where('doctor_id', $doctorId);
-        }
-
-        if (!empty($filters['doctor_id'])) {
-            $query->where('doctor_id', $filters['doctor_id']);
-        }
-
-        if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
-            $query->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]);
-        }
-
-
-
-
-        // Get cases with same date filter to calculate total case prices
+        // total_price        = sum of case prices (cases table) in the range.
+        // total_paid_price   = money collected toward cases = paid CASE bills in the range.
+        // total_unpaid_price = total_price - total_paid_price (remaining of the case prices).
         $casesQuery = CaseModel::query();
 
         if ($doctorId !== null) {
@@ -293,8 +278,31 @@ class BillRepository
             $casesQuery->where('created_at', '<=', $filters['date_to']);
         }
 
-        $totalPrice = $casesQuery->sum('price') ?? 0; // Total of all cases price
-        $totalPaidCases = (clone $casesQuery)->where('is_paid', true)->sum('price') ?? 0;
+        $totalPrice = $casesQuery->sum('price') ?? 0; // Total of all case prices in range
+
+        // Paid case bills = money actually collected toward cases. The bills table is
+        // polymorphic (shared with expenses/reservations), so restrict to case billable
+        // types. The morph map is non-enforcing, so a case bill may be stored under any
+        // of these variants (the DB trigger stores 'App\Models\Case').
+        $caseBillableTypes = ['Case', 'CaseModel', 'App\\Models\\Case', 'App\\Models\\CaseModel'];
+
+        $paidCaseBillsQuery = Bill::query()
+            ->where('is_paid', true)
+            ->whereIn('billable_type', $caseBillableTypes);
+
+        if ($doctorId !== null) {
+            $paidCaseBillsQuery->where('doctor_id', $doctorId);
+        }
+
+        if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
+            $paidCaseBillsQuery->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]);
+        } elseif (!empty($filters['date_from'])) {
+            $paidCaseBillsQuery->where('created_at', '>=', $filters['date_from']);
+        } elseif (!empty($filters['date_to'])) {
+            $paidCaseBillsQuery->where('created_at', '<=', $filters['date_to']);
+        }
+
+        $totalPaidPrice = $paidCaseBillsQuery->sum('price') ?? 0;
 
         // Get expenses with same date filter
         $expensesQuery = ClinicExpense::query();
@@ -315,16 +323,14 @@ class BillRepository
         // $totalPaidExpenses = (clone $expensesQuery)->where('is_paid', true)->sum(DB::raw('price * COALESCE(quantity, 1)')) ?? 0;
         // $totalUnpaidExpenses = (clone $expensesQuery)->where('is_paid', false)->sum(DB::raw('price * COALESCE(quantity, 1)')) ?? 0;
 
-        // Calculate unpaid case price
-        $totalUnpaidCases = $totalPrice - $totalPaidCases;
+        // Remaining of the case prices = total case price minus money collected.
+        $totalUnpaidPrice = $totalPrice - $totalPaidPrice;
 
-        $totalPaidBills = $query->sum('price');
         return [
-
-            'total_price' => $totalPrice, // Total of ALL cases price
-            'total_paid_price' => $totalPaidBills, // Sum of paid cases price (is_paid = true)
-            'total_unpaid_price' => $totalPrice - $totalPaidBills, // Sum of unpaid cases price (is_paid = false)
-            'total_expenses' => $totalExpenses
+            'total_price' => $totalPrice, // Total of ALL case prices in range
+            'total_paid_price' => $totalPaidPrice, // Paid case bills (money collected toward cases)
+            'total_unpaid_price' => $totalUnpaidPrice, // cases.price - paid case bills (remaining)
+            'total_expenses' => $totalExpenses,
             // 'total_paid_expenses' => $totalPaidExpenses,
             // 'total_unpaid_expenses' => $totalUnpaidExpenses,
         ];
