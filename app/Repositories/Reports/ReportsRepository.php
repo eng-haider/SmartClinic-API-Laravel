@@ -33,6 +33,17 @@ class ReportsRepository
     ];
 
     /**
+     * SQL expression for the date a bill belongs to in reports.
+     *
+     * bill_date is the business/payment date the clinic enters (it can be
+     * backdated for case bills); created_at is only the row insert timestamp.
+     * Bill/revenue reports must bucket and filter by bill_date so a bill shows
+     * up in the period it was actually billed for — falling back to created_at
+     * for any legacy row whose bill_date was never populated.
+     */
+    private const REVENUE_DATE_EXPR = 'COALESCE(bill_date, created_at)';
+
+    /**
      * ============================
      * DASHBOARD OVERVIEW
      * ============================
@@ -236,8 +247,8 @@ class ReportsRepository
             $query->where('doctor_id', $doctorId);
         }
         
-        $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
-        
+        $this->applyDateFilter($query, $dateFrom, $dateTo, self::REVENUE_DATE_EXPR);
+
         $totalBills = (clone $query)->count();
         $paidBills = (clone $query)->where('is_paid', true)->count();
         $unpaidBills = (clone $query)->where('is_paid', false)->count();
@@ -272,7 +283,7 @@ class ReportsRepository
             $query->where('doctor_id', $doctorId);
         }
 
-        $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
+        $this->applyDateFilter($query, $dateFrom, $dateTo, self::REVENUE_DATE_EXPR);
 
         return (int) ($query->sum('price') ?? 0);
     }
@@ -290,9 +301,9 @@ class ReportsRepository
             $query->where('doctor_id', $doctorId);
         }
         
-        $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
-        
-        return $this->groupByPeriodWithSum($query, 'created_at', 'price', $period);
+        $this->applyDateFilter($query, $dateFrom, $dateTo, self::REVENUE_DATE_EXPR);
+
+        return $this->groupByPeriodWithSum($query, self::REVENUE_DATE_EXPR, 'price', $period);
     }
 
     /**
@@ -312,7 +323,7 @@ class ReportsRepository
             $query->where('doctor_id', $doctorId);
         }
 
-        $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
+        $this->applyDateFilter($query, $dateFrom, $dateTo, self::REVENUE_DATE_EXPR);
 
         $results = $query->get();
 
@@ -337,8 +348,8 @@ class ReportsRepository
             $query->where('doctor_id', $doctorId);
         }
         
-        $this->applyDateFilter($query, $dateFrom, $dateTo, 'created_at');
-        
+        $this->applyDateFilter($query, $dateFrom, $dateTo, self::REVENUE_DATE_EXPR);
+
         $paid = (clone $query)->where('is_paid', true)->count();
         $unpaid = (clone $query)->where('is_paid', false)->count();
         $total = $paid + $unpaid;
@@ -848,13 +859,21 @@ class ReportsRepository
      */
     protected function applyDateFilter($query, ?string $dateFrom, ?string $dateTo, string $column = 'created_at'): void
     {
+        // A raw SQL expression (e.g. COALESCE(bill_date, created_at)) must be
+        // compared via whereRaw so it isn't quoted as a single column identifier.
+        $isExpression = str_contains($column, '(');
+
         if ($dateFrom) {
             // Start of the day
-            $query->where($column, '>=', $dateFrom . ' 00:00:00');
+            $isExpression
+                ? $query->whereRaw("{$column} >= ?", [$dateFrom . ' 00:00:00'])
+                : $query->where($column, '>=', $dateFrom . ' 00:00:00');
         }
         if ($dateTo) {
             // End of the day (23:59:59)
-            $query->where($column, '<=', $dateTo . ' 23:59:59');
+            $isExpression
+                ? $query->whereRaw("{$column} <= ?", [$dateTo . ' 23:59:59'])
+                : $query->where($column, '<=', $dateTo . ' 23:59:59');
         }
     }
 
