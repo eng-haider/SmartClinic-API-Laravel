@@ -261,10 +261,9 @@ class BillRepository
      */
     public function getStatisticsWithFilters(array $filters, int $perPage = 15, $doctorId = null): array
     {
-        // For the cases CREATED in the range:
-        //   total_price        = sum of those case prices.
-        //   total_paid_price   = money collected toward those cases (their paid case bills).
-        //   total_unpaid_price = total_price - total_paid_price (remaining balance).
+        // total_price        = sum of case prices (cases table) in the range.
+        // total_paid_price   = paid CASE bills within the requested date range.
+        // total_unpaid_price = total_price - total_paid_price.
         $casesQuery = CaseModel::query();
 
         if ($doctorId !== null) {
@@ -279,22 +278,30 @@ class BillRepository
             $casesQuery->where('created_at', '<=', $filters['date_to']);
         }
 
-        $totalPrice = (clone $casesQuery)->sum('price') ?? 0; // Total of all case prices in range
+        $totalPrice = $casesQuery->sum('price') ?? 0; // Total of all case prices in range
 
-        // Money collected toward THOSE cases = paid case bills whose billable_id is one of
-        // the in-range cases. Tying the bills to the case set (instead of date-filtering the
-        // bills on their own) is what keeps total_unpaid_price = price - paid coherent:
-        // otherwise a payment made in-range toward a case created earlier would count as
-        // "paid" while that case's price is not in total_price, pushing unpaid negative.
-        // The bills table is polymorphic, so also restrict to case billable types (the morph
-        // map is non-enforcing; the DB trigger stores 'App\Models\Case').
+        // total_paid_price = paid CASE bills within the requested date range (money collected
+        // in that period). The bills table is polymorphic, so restrict to case billable types
+        // (the morph map is non-enforcing; the DB trigger stores 'App\Models\Case').
         $caseBillableTypes = ['Case', 'CaseModel', 'App\\Models\\Case', 'App\\Models\\CaseModel'];
 
-        $totalPaidPrice = Bill::query()
+        $paidCaseBillsQuery = Bill::query()
             ->where('is_paid', true)
-            ->whereIn('billable_type', $caseBillableTypes)
-            ->whereIn('billable_id', (clone $casesQuery)->select('id'))
-            ->sum('price') ?? 0;
+            ->whereIn('billable_type', $caseBillableTypes);
+
+        if ($doctorId !== null) {
+            $paidCaseBillsQuery->where('doctor_id', $doctorId);
+        }
+
+        if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
+            $paidCaseBillsQuery->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]);
+        } elseif (!empty($filters['date_from'])) {
+            $paidCaseBillsQuery->where('created_at', '>=', $filters['date_from']);
+        } elseif (!empty($filters['date_to'])) {
+            $paidCaseBillsQuery->where('created_at', '<=', $filters['date_to']);
+        }
+
+        $totalPaidPrice = $paidCaseBillsQuery->sum('price') ?? 0;
 
         // Get expenses with same date filter
         $expensesQuery = ClinicExpense::query();
