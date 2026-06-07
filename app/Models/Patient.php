@@ -78,6 +78,9 @@ class Patient extends Model
             if (empty($model->public_token)) {
                 $model->public_token = Str::uuid()->toString();
             }
+            if ($model->is_public_profile_enabled === null) {
+                $model->is_public_profile_enabled = true;
+            }
             if (Auth::check()) {
                 $model->creator_id = Auth::id();
                 $model->updator_id = Auth::id();

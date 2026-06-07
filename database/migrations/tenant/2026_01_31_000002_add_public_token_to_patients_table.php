@@ -15,7 +15,7 @@ return new class extends Migration
     {
         Schema::table('patients', function (Blueprint $table) {
             $table->uuid('public_token')->nullable()->unique()->after('id');
-            $table->boolean('is_public_profile_enabled')->default(false)->after('public_token');
+            $table->boolean('is_public_profile_enabled')->default(true)->after('public_token');
         });
 
         // Generate public_token for existing patients
