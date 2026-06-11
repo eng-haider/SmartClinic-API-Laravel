@@ -170,20 +170,9 @@ Route::middleware('jwt')->group(function () {
     Route::get('clinic-expenses-by-date-range', [ClinicExpenseController::class, 'byDateRange'])->name('clinic-expenses.by-date-range');
 });
 
-// Protected warehouse / inventory routes (JWT required)
-// Served under the /tenant prefix to match the frontend (e.g. /api/tenant/warehouse-items).
-Route::middleware('jwt')->prefix('tenant')->group(function () {
-    // Custom actions first so they aren't shadowed by the {warehouse_item} wildcard.
-    Route::get('warehouse-items-low-stock', [WarehouseItemController::class, 'lowStock'])->name('warehouse-items.low-stock');
-    Route::post('warehouse-items/{id}/restock', [WarehouseItemController::class, 'restock'])->name('warehouse-items.restock');
-    Route::post('warehouse-items/{id}/adjust', [WarehouseItemController::class, 'adjust'])->name('warehouse-items.adjust');
-    Route::get('warehouse-items/{id}/transactions', [WarehouseItemController::class, 'transactions'])->name('warehouse-items.transactions');
-    Route::apiResource('warehouse-items', WarehouseItemController::class);
-
-    // Default kit (bill of materials) per case category
-    Route::get('case-categories/{id}/warehouse-items', [CaseCategoryWarehouseController::class, 'index'])->name('case-categories.warehouse-items.index');
-    Route::put('case-categories/{id}/warehouse-items', [CaseCategoryWarehouseController::class, 'sync'])->name('case-categories.warehouse-items.sync');
-});
+// NOTE: Warehouse / inventory routes live in routes/tenant.php so they run inside
+// tenant DB context (InitializeTenancyByHeader). Do not add them here — the api.php
+// group has no tenancy initialization and would hit the central database.
 
 // Protected doctor routes (JWT required)
 Route::middleware('jwt')->group(function () {

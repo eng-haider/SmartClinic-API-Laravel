@@ -16,6 +16,8 @@ use App\Http\Controllers\CaseController;
 use App\Http\Controllers\CaseCategoryController;
 use App\Http\Controllers\ClinicExpenseController;
 use App\Http\Controllers\ClinicExpenseCategoryController;
+use App\Http\Controllers\WarehouseItemController;
+use App\Http\Controllers\CaseCategoryWarehouseController;
 use App\Http\Controllers\ClinicSettingController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\MedicationController;
@@ -141,6 +143,20 @@ Route::middleware([
         Route::apiResource('clinic-expenses', ClinicExpenseController::class);
         Route::get('clinic-expenses-summary', [ClinicExpenseController::class, 'summary']);
         Route::post('clinic-expenses/bulk-mark-paid', [ClinicExpenseController::class, 'markAsPaidByDateRange']);
+    });
+
+    // Warehouse / inventory routes
+    Route::middleware('jwt')->group(function () {
+        // Custom actions first so they aren't shadowed by the {warehouse_item} wildcard.
+        Route::get('warehouse-items-low-stock', [WarehouseItemController::class, 'lowStock'])->name('warehouse-items.low-stock');
+        Route::post('warehouse-items/{id}/restock', [WarehouseItemController::class, 'restock'])->name('warehouse-items.restock');
+        Route::post('warehouse-items/{id}/adjust', [WarehouseItemController::class, 'adjust'])->name('warehouse-items.adjust');
+        Route::get('warehouse-items/{id}/transactions', [WarehouseItemController::class, 'transactions'])->name('warehouse-items.transactions');
+        Route::apiResource('warehouse-items', WarehouseItemController::class);
+
+        // Default kit (bill of materials) per case category
+        Route::get('case-categories/{id}/warehouse-items', [CaseCategoryWarehouseController::class, 'index'])->name('case-categories.warehouse-items.index');
+        Route::put('case-categories/{id}/warehouse-items', [CaseCategoryWarehouseController::class, 'sync'])->name('case-categories.warehouse-items.sync');
     });
 
     // Note routes
