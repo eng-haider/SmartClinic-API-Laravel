@@ -202,7 +202,9 @@ class AuthService
 
         // Generate JWT for the TENANT user so the returned token works immediately
         // for all tenant-aware API routes without requiring a separate smart-login call.
-        $token = JWTAuth::fromUser($tenantUser);
+        // Embed tenant_id in the token so InitializeTenancyByHeader can resolve the
+        // tenant from the JWT when no X-Tenant-ID header / clinic param is sent.
+        $token = JWTAuth::claims(['tenant_id' => $tenantId])->fromUser($tenantUser);
 
         return [
             'user'        => $tenantUser,
@@ -310,8 +312,9 @@ class AuthService
             ? $tenantDb->table('permissions')->whereIn('id', $allPermissionIds)->pluck('name')->unique()->values()
             : collect();
 
-        // Generate token for tenant user
-        $token = JWTAuth::fromUser($tenantUser);
+        // Generate token for tenant user. Embed tenant_id so InitializeTenancyByHeader
+        // can resolve the tenant from the JWT without an X-Tenant-ID header.
+        $token = JWTAuth::claims(['tenant_id' => $clinic->id])->fromUser($tenantUser);
 
         return [
             'user'        => $tenantUser,
@@ -499,8 +502,11 @@ class AuthService
         // Load roles and permissions explicitly
         $user->load(['roles.permissions', 'permissions']);
 
-        // Generate token
-        $token = JWTAuth::fromUser($user);
+        // Generate token. This route runs inside an already-initialized tenant context
+        // (resolved via header to reach it), so embed that tenant id in the JWT to make
+        // the token self-describing for InitializeTenancyByHeader on later requests.
+        $claims = (function_exists('tenant') && tenant()) ? ['tenant_id' => tenant('id')] : [];
+        $token = JWTAuth::claims($claims)->fromUser($user);
 
         return [
             'user' => $user,

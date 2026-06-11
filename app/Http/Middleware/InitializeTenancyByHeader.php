@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Stancl\Tenancy\Tenancy;
 use App\Models\Tenant;
 use Symfony\Component\HttpFoundation\Response;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class InitializeTenancyByHeader
 {
@@ -29,9 +30,10 @@ class InitializeTenancyByHeader
     {
         // Get tenant ID from header or query parameter (for public links)
         // Query parameter 'clinic' is used for QR codes and public access
-        $tenantId = $request->header('X-Tenant-ID') 
+        $tenantId = $request->header('X-Tenant-ID')
                     ?? $request->header('X-Clinic-ID')
-                    ?? $request->query('clinic');
+                    ?? $request->query('clinic')
+                    ?? $this->tenantIdFromToken($request);
 
         if (!$tenantId) {
             return response()->json([
@@ -55,5 +57,30 @@ class InitializeTenancyByHeader
         $this->tenancy->initialize($tenant);
 
         return $next($request);
+    }
+
+    /**
+     * Resolve the tenant id from the JWT's custom `tenant_id` claim.
+     *
+     * This lets authenticated clients hit /api/tenant/* routes using only the
+     * Authorization bearer token (no X-Tenant-ID header needed). We decode the
+     * token's payload to read the claim — this verifies the signature but does
+     * NOT authenticate the user, so it does not require the tenant DB (which is
+     * exactly what we're trying to initialize here). Any failure is swallowed so
+     * a missing/invalid token simply falls through to the "tenant required" error.
+     */
+    protected function tenantIdFromToken(Request $request): ?string
+    {
+        if (!$request->bearerToken()) {
+            return null;
+        }
+
+        try {
+            $tenantId = JWTAuth::parseToken()->getPayload()->get('tenant_id');
+
+            return $tenantId !== null ? (string) $tenantId : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }
