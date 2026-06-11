@@ -31,6 +31,12 @@ class CaseRequest extends FormRequest
             'price' => 'nullable|integer|min:0',
             'is_paid' => 'nullable|boolean',
             'case_date' => 'nullable|date',
+
+            // Warehouse materials consumed in this case. Omit the key to fall back
+            // to the category's default kit; send [] to consume nothing.
+            'warehouse_items' => 'nullable|array',
+            'warehouse_items.*.warehouse_item_id' => 'required_with:warehouse_items|integer|exists:warehouse_items,id',
+            'warehouse_items.*.quantity' => 'required_with:warehouse_items|integer|min:1',
         ];
 
         // Merge specialty-specific rules (dental: tooth_num, root_stuffing)

@@ -62,6 +62,7 @@ class CaseModel extends Model
         'root_stuffing',
         'is_paid',
         'case_date',
+        'item_cost',
     ];
 
     /**
@@ -77,6 +78,7 @@ class CaseModel extends Model
             'case_categores_id' => 'integer',
             'status_id' => 'integer',
             'price' => 'integer',
+            'item_cost' => 'integer',
             'is_paid' => 'boolean',
             'case_date' => 'datetime',
             'created_at' => 'datetime',
@@ -131,6 +133,16 @@ class CaseModel extends Model
     public function bills()
     {
         return $this->morphMany(Bill::class, 'billable');
+    }
+
+    /**
+     * Warehouse items consumed in this case (with consumed quantity + cost snapshot).
+     */
+    public function warehouseItems()
+    {
+        return $this->belongsToMany(WarehouseItem::class, 'case_warehouse_item', 'case_id', 'warehouse_item_id')
+            ->withPivot(['quantity', 'unit_cost'])
+            ->withTimestamps();
     }
 
     /**

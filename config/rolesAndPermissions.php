@@ -110,6 +110,13 @@ return [
                 'view-conversations',
                 'send-conversation-message',
 
+                // Warehouse / Inventory
+                'view-warehouse',
+                'create-warehouse',
+                'edit-warehouse',
+                'delete-warehouse',
+                'restock-warehouse',
+
                 // System management
                 'manage-permissions',
                 'manage-roles',
@@ -221,6 +228,13 @@ return [
                 'view-conversations',
                 'send-conversation-message',
 
+                // Warehouse / Inventory
+                'view-warehouse',
+                'create-warehouse',
+                'edit-warehouse',
+                'delete-warehouse',
+                'restock-warehouse',
+
                 // Secretary Management
                 'delete-user',
             ],
@@ -310,6 +324,9 @@ return [
                 'view-all-bills',
                 'view-clinic-cases',
 
+                // Warehouse / Inventory - view only (consumption happens via cases)
+                'view-warehouse',
+
             ],
         ],
 
@@ -349,6 +366,12 @@ return [
 
                 // Doctor Management - view only
                 'view-doctors',
+
+                // Warehouse / Inventory - secretaries manage clinic supplies
+                'view-warehouse',
+                'create-warehouse',
+                'edit-warehouse',
+                'restock-warehouse',
 
                 // Images - view only
                 'view-images',

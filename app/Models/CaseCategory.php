@@ -48,6 +48,16 @@ class CaseCategory extends Model
     }
 
     /**
+     * Default warehouse items ("kit") consumed by cases of this category.
+     */
+    public function warehouseItems()
+    {
+        return $this->belongsToMany(WarehouseItem::class, 'case_category_warehouse_item', 'case_category_id', 'warehouse_item_id')
+            ->withPivot(['quantity'])
+            ->withTimestamps();
+    }
+
+    /**
      * Check if this is a dental category.
      */
     public function isDental(): bool

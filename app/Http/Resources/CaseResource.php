@@ -46,9 +46,20 @@ class CaseResource extends JsonResource
             ]),
             'notes'          => $this->notes,
             'price'          => $showPrice ? $this->price : null,
+            'item_cost'      => $showPrice ? $this->item_cost : null,
             'is_paid'        => $showPrice ? $this->is_paid : null,
             'payment_status' => $showPrice ? ($this->is_paid ? 'Paid' : 'Unpaid') : null,
             'case_date'      => $this->case_date?->format('Y-m-d H:i:s'),
+            'warehouse_items' => $this->when($this->relationLoaded('warehouseItems'), function () {
+                return $this->warehouseItems->map(fn ($item) => [
+                    'id'         => $item->id,
+                    'name'       => $item->name,
+                    'unit'       => $item->unit,
+                    'quantity'   => (int) $item->pivot->quantity,
+                    'unit_cost'  => $item->pivot->unit_cost,
+                    'total_cost' => (int) $item->pivot->quantity * (float) $item->pivot->unit_cost,
+                ])->values();
+            }),
             'bills' => $this->when($this->relationLoaded('bills'), function () {
                 $bills = $this->bills;
 
