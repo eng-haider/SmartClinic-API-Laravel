@@ -83,6 +83,7 @@ class CaseRepository
                 'status',
                 'notes',
                 'bills',
+                'warehouseItems',
                 'ophthalmologyEncounterDetails',
             ])
             ->defaultSort('-created_at');
@@ -109,8 +110,8 @@ class CaseRepository
     public function getById(int $id, ?int $doctorId = null): ?CaseModel
     {
         $query = $this->query()
-            ->with(['patient', 'doctor', 'category', 'status','bills']);
-        
+            ->with(['patient', 'doctor', 'category', 'status', 'bills', 'warehouseItems']);
+
         // Filter by doctor if provided (for doctors to see only their own cases)
         if ($doctorId !== null) {
             $query->where('doctor_id', $doctorId);
@@ -202,7 +203,7 @@ class CaseRepository
     public function getByPatientId(int $patientId, int $perPage = 15): LengthAwarePaginator
     {
         return $this->query()
-            ->with(['doctor', 'category', 'status'])
+            ->with(['doctor', 'category', 'status', 'warehouseItems'])
             ->where('patient_id', $patientId)
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
