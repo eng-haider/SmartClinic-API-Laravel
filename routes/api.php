@@ -171,7 +171,8 @@ Route::middleware('jwt')->group(function () {
 });
 
 // Protected warehouse / inventory routes (JWT required)
-Route::middleware('jwt')->group(function () {
+// Served under the /tenant prefix to match the frontend (e.g. /api/tenant/warehouse-items).
+Route::middleware('jwt')->prefix('tenant')->group(function () {
     // Custom actions first so they aren't shadowed by the {warehouse_item} wildcard.
     Route::get('warehouse-items-low-stock', [WarehouseItemController::class, 'lowStock'])->name('warehouse-items.low-stock');
     Route::post('warehouse-items/{id}/restock', [WarehouseItemController::class, 'restock'])->name('warehouse-items.restock');
