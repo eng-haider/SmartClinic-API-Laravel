@@ -16,8 +16,8 @@ class CaseCategoryWarehouseController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('permission:view-warehouse')->only(['index']);
-        $this->middleware('permission:edit-warehouse')->only(['sync']);
+        // $this->middleware('permission:view-warehouse')->only(['index']);
+        // $this->middleware('permission:edit-warehouse')->only(['sync']);
     }
 
     /**
