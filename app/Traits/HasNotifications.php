@@ -10,12 +10,77 @@ trait HasNotifications
     /**
      * Get all of the model's notifications.
      *
+     * The notifiable_type column may hold either the morph-map alias (e.g.
+     * "User", emitted by getMorphClass() once the map is registered) or the
+     * full class name (e.g. "App\Models\User", used by rows created before the
+     * map existed or by other code paths). The default morphMany only matches
+     * the current alias, which silently hides legacy rows. Widen the type
+     * constraint to match both representations so no notifications are lost.
+     *
      * @return MorphMany
      */
     public function notifications(): MorphMany
     {
-        return $this->morphMany(Notification::class, 'notifiable')
-            ->orderBy('created_at', 'desc');
+        $relation = $this->morphMany(Notification::class, 'notifiable');
+
+        $types = array_values(array_unique([
+            $this->getMorphClass(), // current alias, e.g. "User"
+            static::class,           // full class name, e.g. "App\Models\User"
+        ]));
+
+        // morphMany pins notifiable_type to a single value (the current morph
+        // alias) via an "=" where clause. When the column may also hold the
+        // full class name, replace that constraint with an "IN (...)" so both
+        // representations match instead of silently excluding one.
+        if (count($types) > 1) {
+            $this->replaceMorphTypeConstraint($relation, $types);
+        }
+
+        return $relation->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Replace the morphMany "notifiable_type = ?" constraint with an
+     * "IN (...)" over the given type values.
+     *
+     * @param MorphMany $relation
+     * @param array $types
+     * @return void
+     */
+    protected function replaceMorphTypeConstraint(MorphMany $relation, array $types): void
+    {
+        $query = $relation->getQuery()->getQuery();
+        $morphType = $relation->getQualifiedMorphType();
+
+        // Drop the auto-added "notifiable_type = <alias>" basic where + binding.
+        $removedBindings = [];
+        $query->wheres = array_values(array_filter(
+            $query->wheres,
+            function ($where) use ($morphType, &$removedBindings) {
+                $isMorphType = ($where['type'] ?? null) === 'Basic'
+                    && ($where['column'] ?? null) === $morphType;
+
+                if ($isMorphType && array_key_exists('value', $where)) {
+                    $removedBindings[] = $where['value'];
+                }
+
+                return !$isMorphType;
+            }
+        ));
+
+        // Remove the matching where-bindings so they don't shift the IN values.
+        if (!empty($removedBindings)) {
+            $bindings = $query->getRawBindings()['where'] ?? [];
+            foreach ($removedBindings as $value) {
+                $pos = array_search($value, $bindings, true);
+                if ($pos !== false) {
+                    unset($bindings[$pos]);
+                }
+            }
+            $query->setBindings(array_values($bindings), 'where');
+        }
+
+        $relation->whereIn($morphType, $types);
     }
 
     /**
