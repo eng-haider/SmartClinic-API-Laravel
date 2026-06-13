@@ -26,7 +26,7 @@ class NotificationController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = Auth::user();
 
         $filters = [
             'type' => $request->input('type'),
@@ -215,7 +215,7 @@ class NotificationController extends Controller
      */
     public function markAllAsRead(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = Auth::user();
         $count = $this->notificationService->markAllAsRead($user);
 
         return response()->json([
@@ -268,7 +268,7 @@ class NotificationController extends Controller
      */
     public function unreadCount(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = Auth::user();
         $count = $user->unreadNotificationsCount();
 
         return response()->json([
@@ -297,7 +297,7 @@ class NotificationController extends Controller
             ], 422);
         }
 
-        $user = $request->user();
+        $user = Auth::user();
         $user->setOneSignalPlayerId($request->input('player_id'));
 
         return response()->json([
@@ -314,7 +314,7 @@ class NotificationController extends Controller
      */
     public function sendTest(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = Auth::user();
 
         $notification = $this->notificationService->send(
             $user,
@@ -342,7 +342,7 @@ class NotificationController extends Controller
      */
     public function statistics(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = Auth::user();
 
         $stats = [
             'total' => $user->notifications()->count(),
