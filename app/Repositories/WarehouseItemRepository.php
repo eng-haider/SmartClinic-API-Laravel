@@ -45,6 +45,7 @@ class WarehouseItemRepository
                 'transactions',
                 'creator',
                 'updator',
+                'caseCategories',
             ])
             ->defaultSort('name');
     }
@@ -106,7 +107,7 @@ class WarehouseItemRepository
     {
         return $this->query()
             ->lowStock()
-            ->with('category')
+            ->with(['category', 'caseCategories'])
             ->orderBy('name')
             ->get();
     }

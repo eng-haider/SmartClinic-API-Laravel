@@ -35,6 +35,13 @@ class WarehouseItemResource extends JsonResource
             'creator'      => new UserResource($this->whenLoaded('creator')),
             'updator'      => new UserResource($this->whenLoaded('updator')),
             'transactions' => WarehouseTransactionResource::collection($this->whenLoaded('transactions')),
+
+            // Case types (kits) that include this item, with the per-case quantity.
+            'case_categories' => $this->whenLoaded('caseCategories', fn () => $this->caseCategories->map(fn ($category) => [
+                'id'       => $category->id,
+                'name'     => $category->name,
+                'quantity' => (int) $category->pivot->quantity,
+            ])->values()),
         ];
     }
 }
