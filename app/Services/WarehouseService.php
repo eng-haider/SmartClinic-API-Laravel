@@ -5,9 +5,11 @@ namespace App\Services;
 use App\Models\CaseCategory;
 use App\Models\CaseModel;
 use App\Models\ClinicExpense;
+use App\Models\Notification;
 use App\Models\WarehouseItem;
 use App\Models\WarehouseTransaction;
 use App\Repositories\ClinicExpenseRepository;
+use App\Services\NotificationService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -27,8 +29,10 @@ use Illuminate\Support\Facades\Schema;
  */
 class WarehouseService
 {
-    public function __construct(private ClinicExpenseRepository $clinicExpenses)
-    {
+    public function __construct(
+        private ClinicExpenseRepository $clinicExpenses,
+        private NotificationService $notifications
+    ) {
     }
 
     /**
@@ -92,7 +96,7 @@ class WarehouseService
             return;
         }
 
-        DB::transaction(function () use ($case, $items) {
+        $consumedItems = DB::transaction(function () use ($case, $items) {
             // 1. Undo whatever this case consumed before (restores stock).
             $this->reverseCaseConsumption($case);
 
@@ -103,6 +107,7 @@ class WarehouseService
 
             // 3. Apply the new consumption.
             $totalCost = 0.0;
+            $consumed = [];
             foreach ($this->normalizeItems($desired) as $row) {
                 $item = WarehouseItem::lockForUpdate()->find($row['warehouse_item_id']);
                 if (!$item) {
@@ -135,11 +140,20 @@ class WarehouseService
                 );
 
                 $totalCost += $qty * $unitCost;
+                $consumed[] = $item;
             }
 
             // 4. Roll consumed cost into the case for profit reporting.
             $case->forceFill(['item_cost' => (int) round($totalCost)])->saveQuietly();
+
+            return $consumed;
         });
+
+        // After the stock changes have committed, alert on anything that dropped
+        // to (or below) its low-stock threshold.
+        foreach ($consumedItems as $item) {
+            $this->notifyIfLowStock($item->refresh());
+        }
     }
 
     /**
@@ -179,7 +193,7 @@ class WarehouseService
      */
     public function adjust(WarehouseItem $item, int $delta, ?string $reason = null): WarehouseTransaction
     {
-        return DB::transaction(function () use ($item, $delta, $reason) {
+        $transaction = DB::transaction(function () use ($item, $delta, $reason) {
             if ($delta < 0) {
                 $this->assertSufficientStock($item, abs($delta));
             }
@@ -196,6 +210,13 @@ class WarehouseService
                 $reason
             );
         });
+
+        // A downward correction can push the item into low stock.
+        if ($delta < 0) {
+            $this->notifyIfLowStock($item->refresh());
+        }
+
+        return $transaction;
     }
 
     /**
@@ -239,6 +260,47 @@ class WarehouseService
         }
 
         return $normalized;
+    }
+
+    /**
+     * Persist a low-stock alert for all active users when an item is at or below
+     * its threshold. De-duplicated: if any user still has an unread low-stock
+     * alert for this item, no new batch is created until it is resolved (stock
+     * back above threshold or the alert read).
+     */
+    private function notifyIfLowStock(WarehouseItem $item): void
+    {
+        if (!$item->is_low) {
+            return;
+        }
+
+        // Skip while a prior low-stock alert for this item is still unread,
+        // so routine consumption doesn't spam the bell.
+        $alreadyAlerted = Notification::query()
+            ->where('type', Notification::TYPE_ALERT)
+            ->where('is_read', false)
+            ->where('data->warehouse_item_id', $item->id)
+            ->exists();
+
+        if ($alreadyAlerted) {
+            return;
+        }
+
+        $title = 'Low stock alert';
+        $body = "{$item->name} is low: {$item->quantity} {$item->unit} left (minimum {$item->min_quantity}).";
+
+        $this->notifications->sendToAllUsers($title, $body, [
+            'type'       => Notification::TYPE_ALERT,
+            'priority'   => Notification::PRIORITY_HIGH,
+            'action_url' => '/warehouse',
+            'data'       => [
+                'warehouse_item_id' => $item->id,
+                'name'              => $item->name,
+                'quantity'          => (int) $item->quantity,
+                'min_quantity'      => (int) $item->min_quantity,
+                'unit'              => $item->unit,
+            ],
+        ]);
     }
 
     /**

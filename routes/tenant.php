@@ -25,6 +25,7 @@ use App\Http\Controllers\RecipeController;
 use App\Http\Controllers\DoctorController;
 use App\Http\Controllers\SecretaryController;
 use App\Http\Controllers\NoteController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\PublicPatientController;
 use App\Http\Controllers\PatientPublicProfileController;
@@ -157,6 +158,15 @@ Route::middleware([
         // Default kit (bill of materials) per case category
         Route::get('case-categories/{id}/warehouse-items', [CaseCategoryWarehouseController::class, 'index'])->name('case-categories.warehouse-items.index');
         Route::put('case-categories/{id}/warehouse-items', [CaseCategoryWarehouseController::class, 'sync'])->name('case-categories.warehouse-items.sync');
+    });
+
+    // Notification routes
+    Route::middleware('jwt')->group(function () {
+        Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
+        Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+        Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
+        Route::delete('notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
     });
 
     // Note routes
