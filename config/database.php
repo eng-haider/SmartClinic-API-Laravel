@@ -191,6 +191,14 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => 'prefer',
+            // Supabase serves this over its transaction pooler (port 6543),
+            // which routes each statement to a potentially different backend.
+            // Server-side named prepared statements (pdo_stmt_*) break under
+            // that mode ("prepared statement ... does not exist"), so emulate
+            // prepares client-side and send plain queries instead.
+            'options' => extension_loaded('pdo_pgsql') ? [
+                PDO::ATTR_EMULATE_PREPARES => true,
+            ] : [],
         ],
 
         'sqlsrv' => [
