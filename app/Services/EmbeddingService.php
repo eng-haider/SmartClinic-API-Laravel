@@ -56,26 +56,22 @@ class EmbeddingService
         $vector = $this->generateEmbedding($content);
         $vectorString = '[' . implode(',', $vector) . ']';
 
-        // Upsert using raw query for vector column support
-        $now = now();
-
-        if ($existing) {
-            \Illuminate\Support\Facades\DB::connection('pgsql_embeddings')
-                ->table('embeddings')
-                ->where('id', $existing->id)
-                ->update([
-                    'content' => $content,
-                    'embedding' => \Illuminate\Support\Facades\DB::raw("'" . $vectorString . "'::vector"),
-                    'updated_at' => $now,
-                ]);
-        } else {
-            \Illuminate\Support\Facades\DB::connection('pgsql_embeddings')
-                ->statement(
-                    "INSERT INTO embeddings (clinic_id, table_name, record_id, content, embedding, updated_at)
-                     VALUES (?, ?, ?, ?, ?::vector, ?)",
-                    [$clinicId, $tableName, $recordId, $content, $vectorString, $now]
-                );
-        }
+        // Atomic upsert keyed on the (clinic_id, table_name, record_id) unique
+        // constraint. Concurrent jobs for the same record (e.g. a create quickly
+        // followed by an update) can otherwise both read "no existing row" during
+        // the slow OpenAI call above and then both INSERT, causing a duplicate-key
+        // violation. ON CONFLICT makes the write race-safe: whoever loses the
+        // insert falls through to the UPDATE instead of erroring.
+        \Illuminate\Support\Facades\DB::connection('pgsql_embeddings')
+            ->statement(
+                "INSERT INTO embeddings (clinic_id, table_name, record_id, content, embedding, updated_at)
+                 VALUES (?, ?, ?, ?, ?::vector, ?)
+                 ON CONFLICT (clinic_id, table_name, record_id)
+                 DO UPDATE SET content = EXCLUDED.content,
+                               embedding = EXCLUDED.embedding,
+                               updated_at = EXCLUDED.updated_at",
+                [$clinicId, $tableName, $recordId, $content, $vectorString, now()]
+            );
     }
 
     /**
