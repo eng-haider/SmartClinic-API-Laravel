@@ -23,6 +23,7 @@ class Patient extends Model
         'age',
         'doctor_id',
         'phone',
+        'phone2',
         'systemic_conditions',
         'sex',
         'address',
@@ -279,6 +280,7 @@ class Patient extends Model
         $parts = [
             "Patient: {$this->name}",
             $this->phone ? "Phone: {$this->phone}" : null,
+            $this->phone2 ? "Phone 2: {$this->phone2}" : null,
             $this->age ? "Age: {$this->age}" : null,
             "Sex: {$this->sex_label}",
             $this->address ? "Address: {$this->address}" : null,

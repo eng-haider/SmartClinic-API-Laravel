@@ -26,6 +26,7 @@ class PatientFactory extends Factory
             'doctor_id' => User::factory(),
             'clinics_id' => Clinic::factory(),
             'phone' => fake()->phoneNumber(),
+            'phone2' => fake()->optional()->phoneNumber(),
             'systemic_conditions' => fake()->optional()->randomElement([
                 'Diabetes',
                 'Hypertension',

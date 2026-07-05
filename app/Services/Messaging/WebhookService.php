@@ -134,6 +134,8 @@ class WebhookService
             // Try to find patient by phone number
             $patient = Patient::where('phone', $fromNumber)
                 ->orWhere('phone', '+' . $fromNumber)
+                ->orWhere('phone2', $fromNumber)
+                ->orWhere('phone2', '+' . $fromNumber)
                 ->first();
 
             $conversationId = null;

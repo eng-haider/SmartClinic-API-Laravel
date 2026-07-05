@@ -362,7 +362,8 @@ class CaseRepository
                   ->orWhere('tooth_num', 'like', "%{$search}%")
                   ->orWhereHas('patient', function ($patientQuery) use ($search) {
                       $patientQuery->where('name', 'like', "%{$search}%")
-                                   ->orWhere('phone', 'like', "%{$search}%");
+                                   ->orWhere('phone', 'like', "%{$search}%")
+                                   ->orWhere('phone2', 'like', "%{$search}%");
                   });
             });
         }

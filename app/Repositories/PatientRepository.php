@@ -31,6 +31,7 @@ class PatientRepository
                   'name',
                 'email',
                 'phone',
+                'phone2',
                 'gender',
                 'blood_type',
                 'city',
@@ -118,8 +119,11 @@ class PatientRepository
      */
     public function getByPhone(string $phone): ?Patient
     {
-        $query = $this->query()->where('phone', $phone);
-        
+        $query = $this->query()->where(function ($q) use ($phone) {
+            $q->where('phone', $phone)
+              ->orWhere('phone2', $phone);
+        });
+
         return $query->first();
     }
 
@@ -138,7 +142,10 @@ class PatientRepository
      */
     public function existsByPhone(string $phone, ?int $exceptId = null): bool
     {
-        $query = $this->query()->where('phone', $phone);
+        $query = $this->query()->where(function ($q) use ($phone) {
+            $q->where('phone', $phone)
+              ->orWhere('phone2', $phone);
+        });
 
         if ($exceptId) {
             $query->where('id', '!=', $exceptId);

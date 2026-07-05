@@ -26,6 +26,7 @@ class PatientRequest extends FormRequest
             'name' => 'required|string|max:255',
             'age' => 'nullable|integer|min:0|max:150',
             'phone' => 'nullable|string|max:33',
+            'phone2' => 'nullable|string|max:33',
             'systemic_conditions' => 'nullable|string|max:255',
             'sex' => 'nullable|integer|in:1,2', // 1=Male, 2=Female
             'address' => 'nullable|string|max:255',

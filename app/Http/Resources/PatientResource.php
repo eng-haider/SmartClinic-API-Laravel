@@ -21,6 +21,7 @@ class PatientResource extends JsonResource
             'doctor_id' => $this->doctor_id,
             'clinics_id' => $this->clinics_id,
             'phone' => $this->phone,
+            'phone2' => $this->phone2,
             'systemic_conditions' => $this->systemic_conditions,
             'sex' => $this->sex,
             'sex_label' => $this->sex === 1 ? 'Male' : ($this->sex === 2 ? 'Female' : null),
