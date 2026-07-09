@@ -28,6 +28,8 @@ use App\Http\Controllers\NoteController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\PublicPatientController;
+use App\Http\Controllers\PublicBookingController;
+use App\Http\Controllers\BookingRequestController;
 use App\Http\Controllers\PatientPublicProfileController;
 use App\Http\Controllers\Report\BillReportController;
 use App\Http\Controllers\Report\DashboardReportController;
@@ -66,6 +68,17 @@ Route::middleware(['api', InitializeTenancyByPatientToken::class])
         Route::get('/{token}/cases', [PublicPatientController::class, 'cases']);
         Route::get('/{token}/images', [PublicPatientController::class, 'images']);
         Route::get('/{token}/reservations', [PublicPatientController::class, 'reservations']);
+    });
+
+// ============================================
+// PUBLIC BOOKING (No auth required)
+// Clinic website booking page posts here.
+// Tenant (clinic) resolved from ?clinic=ID or X-Tenant-ID / X-Clinic-ID header.
+// ============================================
+Route::middleware(['api', InitializeTenancyByPatientToken::class])
+    ->prefix('api/tenant/public')
+    ->group(function () {
+        Route::post('/booking-requests', [PublicBookingController::class, 'store']);
     });
 
 // ============================================
@@ -115,6 +128,15 @@ Route::middleware([
     Route::middleware('jwt')->group(function () {
         Route::apiResource('reservations', ReservationController::class);
         Route::patch('reservations/{reservation}/status', [ReservationController::class, 'changeStatus']);
+    });
+
+    // Booking request routes (public website submissions awaiting staff review)
+    Route::middleware('jwt')->group(function () {
+        Route::get('booking-requests', [BookingRequestController::class, 'index']);
+        Route::get('booking-requests/{id}', [BookingRequestController::class, 'show']);
+        Route::post('booking-requests/{id}/approve', [BookingRequestController::class, 'approve']);
+        Route::post('booking-requests/{id}/reject', [BookingRequestController::class, 'reject']);
+        Route::delete('booking-requests/{id}', [BookingRequestController::class, 'destroy']);
     });
 
     // Medication library routes
