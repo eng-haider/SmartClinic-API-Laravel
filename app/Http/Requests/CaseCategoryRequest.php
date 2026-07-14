@@ -45,7 +45,7 @@ class CaseCategoryRequest extends FormRequest
             'name.string' => 'Category name must be a string',
             'name.max' => 'Category name must not exceed 255 characters',
             'category_type.required' => 'Category type is required',
-            'category_type.in' => 'Category type must be either dental or beauty',
+            'category_type.in' => 'Category type must be dental, beauty, or general',
             'order.integer' => 'Order must be an integer',
             'order.min' => 'Order must be at least 0',
             'item_cost.integer' => 'Item cost must be an integer',
