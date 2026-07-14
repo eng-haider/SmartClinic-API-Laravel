@@ -104,45 +104,59 @@ class ClinicSettingController extends Controller
 
     /**
      * Update multiple clinic settings at once.
-     * Only updates existing settings, does not create new ones.
-     * Settings without a value will be skipped.
+     * Creates the setting if it doesn't exist yet, otherwise updates it.
+     *
+     * Accepts either shape:
+     *   { "settings": [ { "key": ..., "value": ..., "type": ... }, ... ] }
+     *   [ { "key": ..., "value": ..., "type": ... }, ... ]   // bare array
      */
     public function updateBulk(Request $request): JsonResponse
     {
-        $request->validate([
-            'settings' => 'required|array',
-            'settings.*.key' => 'required|string',
-            'settings.*.value' => 'nullable',
-        ]);
+        // Support both a wrapped { "settings": [...] } payload and a bare top-level array.
+        $settings = $request->input('settings');
+        if (!is_array($settings)) {
+            $all = $request->all();
+            $settings = array_is_list($all) ? $all : [];
+        }
+
+        if (empty($settings)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No settings provided. Send an array of { key, value, type } items.',
+            ], 422);
+        }
 
         try {
             $updated = [];
             $skipped = [];
 
-            foreach ($request->input('settings') as $settingData) {
-                // Skip settings without a key or value (null, empty string, or not provided)
-                if (!array_key_exists('key', $settingData) || 
-                    $settingData['key'] === null || 
+            foreach ($settings as $settingData) {
+                // Skip malformed items or items without a key.
+                if (!is_array($settingData) ||
+                    !array_key_exists('key', $settingData) ||
+                    $settingData['key'] === null ||
                     $settingData['key'] === '' ||
                     !array_key_exists('value', $settingData)) {
+                    $skipped[] = is_array($settingData) ? ($settingData['key'] ?? null) : null;
                     continue;
                 }
-                
-                $setting = $this->clinicSettingRepository->updateValue(
+
+                $setting = $this->clinicSettingRepository->updateOrCreate(
                     $settingData['key'],
-                    $settingData['value']
+                    [
+                        'setting_value' => $settingData['value'],
+                        'setting_type' => $settingData['type'] ?? 'string',
+                    ]
                 );
 
-                if ($setting) {
-                    $updated[] = new ClinicSettingResource($setting);
-                } else {
-                    $skipped[] = $settingData['key'];
-                }
+                $updated[] = new ClinicSettingResource($setting);
             }
+
+            $skipped = array_values(array_filter($skipped));
 
             $message = count($updated) . ' settings updated successfully';
             if (!empty($skipped)) {
-                $message .= '. Skipped ' . count($skipped) . ' unknown keys: ' . implode(', ', $skipped);
+                $message .= '. Skipped ' . count($skipped) . ' invalid items: ' . implode(', ', $skipped);
             }
 
             return response()->json([
