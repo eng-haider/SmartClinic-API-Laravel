@@ -49,6 +49,20 @@ class ClinicSettingRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
+        // Accept `value`/`type` as aliases for `setting_value`/`setting_type`
+        // so this endpoint matches the field names used by bulk-update and the client.
+        if (!$this->has('setting_value') && $this->has('value')) {
+            $this->merge([
+                'setting_value' => $this->input('value'),
+            ]);
+        }
+
+        if (!$this->has('setting_type') && $this->has('type')) {
+            $this->merge([
+                'setting_type' => $this->input('type'),
+            ]);
+        }
+
         // Convert boolean strings to actual booleans
         if ($this->has('is_active') && is_string($this->is_active)) {
             $this->merge([
