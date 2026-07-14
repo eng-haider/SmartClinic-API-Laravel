@@ -26,7 +26,7 @@ class CaseCategoryRequest extends FormRequest
 
         return [
             'name' => 'required|string|max:255',
-            'category_type' => 'required|in:dental,beauty',
+            'category_type' => 'required|in:dental,beauty,general',
             'order' => 'nullable|integer|min:0',
             'item_cost' => 'nullable|integer|min:0',
             'without_detect_tooth' => 'nullable|boolean',

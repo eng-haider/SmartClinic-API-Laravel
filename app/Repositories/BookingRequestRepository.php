@@ -73,9 +73,8 @@ class BookingRequestRepository
      * failure never leaves an approved request without a reservation.
      *
      * @param array $overrides Optional staff overrides applied to the reservation
-     *                         (doctor_id, status_id, reservation_start_date,
-     *                         reservation_end_date, reservation_from_time,
-     *                         reservation_to_time, notes).
+     *                         (doctor_id, status_id, reservation_date,
+     *                         reservation_time, notes, is_waiting).
      */
     public function approve(int $id, array $overrides = []): BookingRequest
     {
@@ -92,28 +91,26 @@ class BookingRequestRepository
         return DB::transaction(function () use ($request, $overrides) {
             $patient = $this->findOrCreatePatientByPhone($request);
 
-            $startDate = $overrides['reservation_start_date']
+            $date = $overrides['reservation_date']
                 ?? $request->preferred_date->format('Y-m-d');
 
-            // reservation_from_time is required by the schema; fall back to the
-            // patient's preferred time, else midnight and mark it as waiting.
-            $fromTime = $overrides['reservation_from_time']
+            // A time is required by the schema; fall back to the patient's
+            // preferred time, else midnight and mark the reservation as waiting.
+            $time = $overrides['reservation_time']
                 ?? ($request->preferred_time ?: null);
 
-            $isWaiting = empty($fromTime);
-            $fromTime = $fromTime ?: '00:00:00';
+            $isWaiting = empty($time);
+            $time = $time ?: '00:00:00';
 
             $reservation = Reservation::create([
                 'patient_id' => $patient->id,
                 'doctor_id' => $overrides['doctor_id'] ?? null,
                 'status_id' => $overrides['status_id'] ?? $this->defaultStatusId(),
                 'notes' => $overrides['notes'] ?? $request->note,
-                'reservation_start_date' => $startDate,
-                'reservation_end_date' => $overrides['reservation_end_date'] ?? $startDate,
-                'reservation_from_time' => $this->normalizeTime($fromTime),
-                'reservation_to_time' => isset($overrides['reservation_to_time'])
-                    ? $this->normalizeTime($overrides['reservation_to_time'])
-                    : null,
+                'reservation_start_date' => $date,
+                'reservation_end_date' => $date,
+                'reservation_from_time' => $this->normalizeTime($time),
+                'reservation_to_time' => null,
                 'is_waiting' => $overrides['is_waiting'] ?? $isWaiting,
             ]);
 

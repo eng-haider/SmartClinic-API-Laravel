@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ApproveBookingRequestRequest;
 use App\Http\Resources\BookingRequestResource;
 use App\Repositories\BookingRequestRepository;
 use Illuminate\Http\JsonResponse;
@@ -77,18 +78,9 @@ class BookingRequestController extends Controller
      *
      * Optional overrides let staff adjust the reservation before it is created.
      */
-    public function approve(Request $request, int $id): JsonResponse
+    public function approve(ApproveBookingRequestRequest $request, int $id): JsonResponse
     {
-        $overrides = $request->validate([
-            'doctor_id' => 'nullable|exists:users,id',
-            'status_id' => 'nullable|exists:statuses,id',
-            'reservation_start_date' => 'nullable|date',
-            'reservation_end_date' => 'nullable|date|after_or_equal:reservation_start_date',
-            'reservation_from_time' => 'nullable|date_format:H:i,H:i:s',
-            'reservation_to_time' => 'nullable|date_format:H:i,H:i:s',
-            'notes' => 'nullable|string',
-            'is_waiting' => 'nullable|boolean',
-        ]);
+        $overrides = $request->validated();
 
         try {
             $bookingRequest = $this->bookingRequests->approve($id, array_filter($overrides, fn ($v) => $v !== null));
