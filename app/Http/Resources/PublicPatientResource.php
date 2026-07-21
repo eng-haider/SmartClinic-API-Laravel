@@ -48,6 +48,7 @@ class PublicPatientResource extends JsonResource
                             'name' => $case->category->name,
                             'name_en' => $case->category->name_en,
                             'name_ar' => $case->category->name_ar,
+                            'is_orthodontic' => (bool) $case->category->is_orthodontic,
                         ] : null,
                         'status' => $case->status ? [
                             'name_en' => $case->status->name_en,

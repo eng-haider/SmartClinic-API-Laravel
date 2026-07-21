@@ -89,6 +89,7 @@ class PublicPatientController extends Controller
                         'name' => $case->category->name,
                         'name_en' => $case->category->name_en,
                         'name_ar' => $case->category->name_ar,
+                        'is_orthodontic' => (bool) $case->category->is_orthodontic,
                     ] : null,
                     'status' => $case->status ? [
                         'id' => $case->status->id,

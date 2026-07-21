@@ -27,6 +27,7 @@ class CaseCategoryRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'category_type' => 'required|in:dental,beauty,general',
+            'is_orthodontic' => 'nullable|boolean',
             'order' => 'nullable|integer|min:0',
             'item_cost' => 'nullable|integer|min:0',
             'without_detect_tooth' => 'nullable|boolean',
@@ -46,6 +47,7 @@ class CaseCategoryRequest extends FormRequest
             'name.max' => 'Category name must not exceed 255 characters',
             'category_type.required' => 'Category type is required',
             'category_type.in' => 'Category type must be dental, beauty, or general',
+            'is_orthodontic.boolean' => 'Orthodontic flag must be true or false',
             'order.integer' => 'Order must be an integer',
             'order.min' => 'Order must be at least 0',
             'item_cost.integer' => 'Item cost must be an integer',

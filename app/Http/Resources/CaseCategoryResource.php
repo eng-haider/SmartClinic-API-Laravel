@@ -18,6 +18,7 @@ class CaseCategoryResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'category_type' => $this->category_type,
+            'is_orthodontic' => (bool) $this->is_orthodontic,
             'order' => $this->order,
             'item_cost' => $this->item_cost,
             'without_detect_tooth' => (bool) $this->without_detect_tooth,

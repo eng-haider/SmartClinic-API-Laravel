@@ -35,8 +35,9 @@ class CaseResource extends JsonResource
                 'phone' => $this->doctor?->phone ?? 'N/A',
             ]),
             'category' => $this->when($this->relationLoaded('category'), [
-                'id'   => $this->case_categores_id,
-                'name' => $this->category?->name ?? 'N/A',
+                'id'             => $this->case_categores_id,
+                'name'           => $this->category?->name ?? 'N/A',
+                'is_orthodontic' => (bool) $this->category?->is_orthodontic,
             ]),
             'status' => $this->when($this->relationLoaded('status'), [
                 'id'      => $this->status_id,

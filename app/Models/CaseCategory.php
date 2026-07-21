@@ -18,6 +18,7 @@ class CaseCategory extends Model
     protected $fillable = [
         'name',
         'category_type',
+        'is_orthodontic',
         'order',
         'item_cost',
         'without_detect_tooth',
@@ -34,6 +35,7 @@ class CaseCategory extends Model
             'order' => 'integer',
             'item_cost' => 'integer',
             'without_detect_tooth' => 'boolean',
+            'is_orthodontic' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -71,6 +73,15 @@ class CaseCategory extends Model
     public function isBeauty(): bool
     {
         return $this->category_type === 'beauty';
+    }
+
+    /**
+     * Check if this dental category is flagged as orthodontics.
+     * Used by the frontend to conditionally show orthodontics-only fields.
+     */
+    public function isOrthodontic(): bool
+    {
+        return (bool) $this->is_orthodontic;
     }
 
     /**
