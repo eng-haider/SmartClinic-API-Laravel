@@ -104,14 +104,14 @@ class Patient extends Model
 
             $patient->cases->each(function (CaseModel $case) {
                 $case->bills->each(fn ($bill) => $bill->delete());
-                $case->notes->each(fn ($note) => $note->delete());
+                $case->notes()->get()->each(fn ($note) => $note->delete());
                 $case->images->each(fn ($image) => $image->delete());
                 $case->delete();
             });
 
             $patient->reservations->each(function (Reservation $reservation) {
                 $reservation->bills->each(fn ($bill) => $bill->delete());
-                $reservation->notes->each(fn ($note) => $note->delete());
+                $reservation->notes()->get()->each(fn ($note) => $note->delete());
                 $reservation->delete();
             });
 
@@ -122,7 +122,7 @@ class Patient extends Model
 
             $patient->bills->each(fn ($bill) => $bill->delete());
             $patient->bookingRequests->each(fn ($bookingRequest) => $bookingRequest->delete());
-            $patient->notes->each(fn ($note) => $note->delete());
+            $patient->notes()->get()->each(fn ($note) => $note->delete());
             $patient->images->each(fn ($image) => $image->delete());
         });
     }
