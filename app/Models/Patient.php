@@ -94,6 +94,37 @@ class Patient extends Model
                 $model->updator_id = Auth::id();
             }
         });
+
+        // Cascade soft-delete to all of the patient's related records.
+        // Only runs for soft deletes (not forceDelete, which cascades via DB constraints/manual cleanup).
+        static::deleting(function (Patient $patient) {
+            if ($patient->isForceDeleting()) {
+                return;
+            }
+
+            $patient->cases->each(function (CaseModel $case) {
+                $case->bills->each(fn ($bill) => $bill->delete());
+                $case->notes->each(fn ($note) => $note->delete());
+                $case->images->each(fn ($image) => $image->delete());
+                $case->delete();
+            });
+
+            $patient->reservations->each(function (Reservation $reservation) {
+                $reservation->bills->each(fn ($bill) => $bill->delete());
+                $reservation->notes->each(fn ($note) => $note->delete());
+                $reservation->delete();
+            });
+
+            $patient->recipes->each(function (Recipe $recipe) {
+                $recipe->recipeItems->each(fn ($item) => $item->delete());
+                $recipe->delete();
+            });
+
+            $patient->bills->each(fn ($bill) => $bill->delete());
+            $patient->bookingRequests->each(fn ($bookingRequest) => $bookingRequest->delete());
+            $patient->notes->each(fn ($note) => $note->delete());
+            $patient->images->each(fn ($image) => $image->delete());
+        });
     }
 
     /**
@@ -158,6 +189,14 @@ class Patient extends Model
     public function images()
     {
         return $this->morphMany(Image::class, 'imageable');
+    }
+
+    /**
+     * Get all of the patient's booking requests.
+     */
+    public function bookingRequests()
+    {
+        return $this->hasMany(BookingRequest::class);
     }
 
     /**
