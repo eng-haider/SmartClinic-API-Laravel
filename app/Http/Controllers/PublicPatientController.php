@@ -33,7 +33,7 @@ class PublicPatientController extends Controller
         $patient->load([
             'doctor:id,name',
             'cases' => function ($query) {
-                $query->with(['category:id,name,name_en,name_ar', 'status:id,name_en,name_ar,color'])
+                $query->with(['category:id,name,name_en,name_ar,is_orthodontic', 'status:id,name_en,name_ar,color'])
                     ->select('id', 'patient_id', 'case_categores_id', 'status_id', 'tooth_num', 'notes', 'created_at');
             },
             'images' => function ($query) {
@@ -72,7 +72,7 @@ class PublicPatientController extends Controller
         }
 
         $cases = $patient->cases()
-            ->with(['category:id,name,name_en,name_ar', 'status:id,name_en,name_ar,color', 'doctor:id,name'])
+            ->with(['category:id,name,name_en,name_ar,is_orthodontic', 'status:id,name_en,name_ar,color', 'doctor:id,name'])
             ->select('id', 'patient_id', 'doctor_id', 'case_categores_id', 'status_id', 'tooth_num', 'notes', 'created_at')
             ->orderBy('created_at', 'desc')
             ->get();
