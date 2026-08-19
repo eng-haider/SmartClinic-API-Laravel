@@ -4,7 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
+use App\Models\ClinicSetting;
 
 class ClinicSettingResource extends JsonResource
 {
@@ -26,10 +26,12 @@ class ClinicSettingResource extends JsonResource
             $value = json_decode($value, true);
         }
 
-        // Add full URL for logo images
+        // Add full URL for logo images, and expose the value itself as a usable URL
+        // so the dashboard can render it straight from `setting_value`.
         $logoUrl = null;
         if ($this->setting_key === 'logo' && $this->setting_value) {
-            $logoUrl = Storage::url($this->setting_value);
+            $logoUrl = ClinicSetting::fileUrl($this->setting_value);
+            $value = $logoUrl;
         }
 
         return [

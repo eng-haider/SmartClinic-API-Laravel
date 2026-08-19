@@ -57,10 +57,16 @@ class ClinicSettingRepository extends BaseRepository
                 ];
             }
 
+            // The logo is stored as a disk-relative path; hand the client a URL it can
+            // actually render (the raw path stays available in setting_value_raw).
+            $value = $setting->setting_key === 'logo'
+                ? ClinicSetting::fileUrl($setting->setting_value)
+                : $setting->getValue();
+
             $grouped[$category]['settings'][] = [
                 'id' => $setting->id,
                 'setting_key' => $setting->setting_key,
-                'setting_value' => $setting->getValue(),
+                'setting_value' => $value,
                 'setting_value_raw' => $setting->setting_value,
                 'setting_type' => $setting->setting_type,
                 'description' => $setting->description,

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ClinicSettingRequest;
 use App\Http\Resources\ClinicSettingResource;
+use App\Models\ClinicSetting;
 use App\Models\SettingDefinition;
 use App\Repositories\ClinicSettingRepository;
 use App\Services\ClinicSettingService;
@@ -187,10 +188,14 @@ class ClinicSettingController extends Controller
         try {
             // Get the old logo setting to delete old file
             $oldSetting = $this->clinicSettingRepository->getByKey('logo');
-            
+
             if ($oldSetting && $oldSetting->setting_value) {
-                // Delete old logo file
-                Storage::disk('public')->delete($oldSetting->setting_value);
+                // Old value may be a bare path or a full URL - normalise before deleting.
+                $oldPath = ClinicSetting::fileStoragePath($oldSetting->setting_value);
+
+                if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                    Storage::disk('public')->delete($oldPath);
+                }
             }
 
             // Store new logo
@@ -210,7 +215,7 @@ class ClinicSettingController extends Controller
                 'success' => true,
                 'message' => 'Logo uploaded successfully',
                 'data' => [
-                    'logo_url' => Storage::url($path),
+                    'logo_url' => ClinicSetting::fileUrl($path),
                     'logo_path' => $path,
                     'setting' => new ClinicSettingResource($setting),
                 ],
@@ -240,7 +245,11 @@ class ClinicSettingController extends Controller
 
             // If it's a logo, delete the file
             if ($key === 'logo' && $setting->setting_value) {
-                Storage::disk('public')->delete($setting->setting_value);
+                $logoPath = ClinicSetting::fileStoragePath($setting->setting_value);
+
+                if ($logoPath && Storage::disk('public')->exists($logoPath)) {
+                    Storage::disk('public')->delete($logoPath);
+                }
             }
 
             $this->clinicSettingRepository->delete($setting->id);

@@ -79,6 +79,7 @@ Route::middleware(['api', InitializeTenancyByPatientToken::class])
     ->prefix('api/tenant/public')
     ->group(function () {
         Route::post('/booking-requests', [PublicBookingController::class, 'store']);
+        Route::get('/clinic-info', [PublicBookingController::class, 'clinicInfo']);
     });
 
 // ============================================
@@ -232,6 +233,8 @@ Route::middleware([
         Route::get('/{key}', [ClinicSettingController::class, 'show']);
         Route::put('/{key}', [ClinicSettingController::class, 'update']);
         Route::post('/bulk-update', [ClinicSettingController::class, 'updateBulk']);
+        Route::post('/upload-logo', [ClinicSettingController::class, 'uploadLogo']);
+        Route::delete('/{key}', [ClinicSettingController::class, 'destroy']);
     });
 
     // ============================================
