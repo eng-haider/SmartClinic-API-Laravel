@@ -3,16 +3,23 @@
 namespace App\Repositories;
 
 use App\Models\BookingRequest;
+use App\Models\Notification;
 use App\Models\Patient;
 use App\Models\Reservation;
 use App\Models\Status;
+use App\Services\NotificationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class BookingRequestRepository
 {
+    public function __construct(private NotificationService $notifications)
+    {
+    }
+
     /**
      * Get the query builder instance
      */
@@ -56,13 +63,17 @@ class BookingRequestRepository
     }
 
     /**
-     * Create a new (public) booking request in the pending state.
+     * Create a new (public) booking request in the pending state and alert staff.
      */
     public function create(array $data): BookingRequest
     {
         $data['status'] = BookingRequest::STATUS_PENDING;
 
-        return $this->query()->create($data);
+        $request = $this->query()->create($data);
+
+        $this->notifyStaffOfNewRequest($request);
+
+        return $request;
     }
 
     /**
@@ -163,6 +174,52 @@ class BookingRequestRepository
         }
 
         return (bool) $request->delete();
+    }
+
+    /**
+     * Alert every active staff member that a patient submitted a booking request.
+     *
+     * Runs on the public, unauthenticated endpoint, so it must never be able to
+     * fail the submission itself: the patient's request is already persisted by
+     * the time we get here and staff can still see it in the pending list.
+     */
+    private function notifyStaffOfNewRequest(BookingRequest $request): void
+    {
+        try {
+            $date = $request->preferred_date->format('Y-m-d');
+            $time = $request->preferred_time
+                ? substr($request->preferred_time, 0, 5)
+                : null;
+
+            $when   = $time ? "{$date} at {$time}" : $date;
+            $whenAr = $time ? "{$date} الساعة {$time}" : $date;
+
+            $title = 'New booking request';
+            $body  = "{$request->name} ({$request->phone}) requested an appointment on {$when}.";
+
+            $this->notifications->sendToAllUsers($title, $body, [
+                'type'       => Notification::TYPE_APPOINTMENT,
+                'priority'   => Notification::PRIORITY_HIGH,
+                'action_url' => "/booking-requests/{$request->id}",
+                'data'       => [
+                    'booking_request_id' => $request->id,
+                    'name'               => $request->name,
+                    'phone'              => $request->phone,
+                    'preferred_date'     => $date,
+                    'preferred_time'     => $time,
+                    'status'             => $request->status,
+                    // The clinic UI is bilingual but the notifications table has a
+                    // single title/body column, so the Arabic copy rides along here.
+                    'title_ar'           => 'طلب حجز جديد',
+                    'body_ar'            => "{$request->name} ({$request->phone}) طلب موعداً في {$whenAr}.",
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to notify staff of a new booking request', [
+                'booking_request_id' => $request->id,
+                'error'              => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
