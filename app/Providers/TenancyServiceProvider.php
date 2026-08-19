@@ -83,15 +83,20 @@ class TenancyServiceProvider extends ServiceProvider
                 },
             ],
 
-            Events\EndingTenancy::class => [],
-            Events\TenancyEnded::class => [
-                Listeners\RevertToCentralContext::class,
-
-                // Symmetric reset: don't let a tenant's cached permissions bleed
-                // into the central context or the next tenant after we revert.
+            // Symmetric reset: don't let a tenant's cached permissions bleed into
+            // the central context or the next tenant. This has to run on
+            // EndingTenancy, NOT TenancyEnded: RevertToCentralContext purges the
+            // `tenant` connection and unsets database.connections.tenant, so any
+            // cache store still bound to that connection blows up with
+            // "Database connection [tenant] not configured." Clearing here keeps
+            // the tenant DB connection alive for the duration of the flush.
+            Events\EndingTenancy::class => [
                 function () {
                     app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
                 },
+            ],
+            Events\TenancyEnded::class => [
+                Listeners\RevertToCentralContext::class,
             ],
 
             Events\BootstrappingTenancy::class => [],

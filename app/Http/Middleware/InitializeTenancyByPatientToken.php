@@ -93,14 +93,30 @@ class InitializeTenancyByPatientToken
                 }
 
                 // End tenancy so we can try the next one cleanly
-                $this->tenancy->end();
+                $this->endTenancy();
             } catch (\Throwable $e) {
                 // Skip tenants with connection issues
-                $this->tenancy->end();
+                $this->endTenancy();
                 continue;
             }
         }
 
         return null;
+    }
+
+    /**
+     * Revert to the central context without letting a broken tenant abort the scan.
+     *
+     * Tenancy::end() runs the bootstrappers' revert() and fires listeners, any of
+     * which can throw for a misconfigured tenant. If that escaped here it would
+     * 500 the whole request instead of just skipping that clinic.
+     */
+    private function endTenancy(): void
+    {
+        try {
+            $this->tenancy->end();
+        } catch (\Throwable $e) {
+            // Nothing actionable: we are already on the error path for this tenant.
+        }
     }
 }
