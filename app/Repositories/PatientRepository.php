@@ -62,7 +62,18 @@ class PatientRepository
     public function getAllWithFilters(array $filters, int $perPage = 15): LengthAwarePaginator
     {
         $query = $this->queryBuilder();
-        
+
+        // Apply search filter
+        if (!empty($filters['search'])) {
+            $search = trim($filters['search']);
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('phone2', 'like', "%{$search}%")
+                    ->orWhere('identifier', 'like', "%{$search}%");
+            });
+        }
+
         return $query->paginate($perPage);
     }
 
