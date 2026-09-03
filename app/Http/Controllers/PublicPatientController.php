@@ -4,11 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\PublicPatientResource;
 use App\Models\Patient;
+use App\Repositories\ClinicSettingRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PublicPatientController extends Controller
 {
+    public function __construct(
+        private ClinicSettingRepository $clinicSettings
+    ) {
+    }
+
     /**
      * Get patient public profile by token.
      *
@@ -50,7 +56,9 @@ class PublicPatientController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => new PublicPatientResource($patient),
+            // The visitor is not authenticated, so /clinic-settings is closed to
+            // them - the clinic's own branding has to travel with this payload.
+            'data' => new PublicPatientResource($patient, $this->clinicSettings->publicIdentity()),
         ]);
     }
 

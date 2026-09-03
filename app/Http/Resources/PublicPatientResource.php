@@ -14,6 +14,14 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class PublicPatientResource extends JsonResource
 {
     /**
+     * @param array<string, mixed> $clinic Public clinic identity (name, logo, contact)
+     */
+    public function __construct($resource, private array $clinic = [])
+    {
+        parent::__construct($resource);
+    }
+
+    /**
      * Transform the resource into an array.
      *
      * @return array<string, mixed>
@@ -29,6 +37,9 @@ class PublicPatientResource extends JsonResource
             'birth_date' => $this->birth_date?->format('Y-m-d'),
             'systemic_conditions' => $this->systemic_conditions,
             'tooth_details' => $this->tooth_details,
+
+            // Clinic branding for the public page header
+            'clinic' => $this->clinic ?: null,
             
             // Doctor information (limited)
             'doctor' => $this->whenLoaded('doctor', function () {

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreBookingRequestRequest;
-use App\Models\ClinicSetting;
 use App\Repositories\ClinicSettingRepository;
 use App\Http\Resources\BookingRequestResource;
 use App\Repositories\BookingRequestRepository;
@@ -48,21 +47,9 @@ class PublicBookingController extends Controller
      */
     public function clinicInfo(): JsonResponse
     {
-        $keys = ['clinic_name', 'logo', 'phone', 'email', 'address', 'working_hours'];
-        $settings = $this->clinicSettings->getByKeys($keys);
-
-        $value = fn (string $key) => $settings->get($key)?->getValue();
-
         return response()->json([
             'success' => true,
-            'data' => [
-                'name' => $value('clinic_name') ?: null,
-                'logo' => ClinicSetting::fileUrl($settings->get('logo')?->setting_value),
-                'phone' => $value('phone') ?: null,
-                'email' => $value('email') ?: null,
-                'address' => $value('address') ?: null,
-                'working_hours' => $value('working_hours') ?: null,
-            ],
+            'data' => $this->clinicSettings->publicIdentity(),
         ]);
     }
 }

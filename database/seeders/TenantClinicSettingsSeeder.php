@@ -250,6 +250,13 @@ class TenantClinicSettingsSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'setting_key' => 'baby_teeth_notation',
+                'setting_value' => 'fdi',
+                'setting_type' => 'string',
+                'description' => 'How baby (primary) teeth are labelled on the dental chart: fdi (51-85), universal (A-T) or palmer (A-E per quadrant)',
+                'is_active' => true,
+            ],
+            [
                 'setting_key' => 'tooth_colors',
                 'setting_value' => json_encode([
                     [

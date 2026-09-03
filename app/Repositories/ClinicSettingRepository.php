@@ -8,6 +8,16 @@ use Illuminate\Support\Collection;
 
 class ClinicSettingRepository extends BaseRepository
 {
+    /**
+     * How baby (primary) teeth are labelled on the dental chart.
+     * 'fdi' -> 51-85, 'universal' -> A-T, 'palmer' -> A-E per quadrant.
+     * Cases are always STORED with the FDI number - this only changes the label,
+     * so switching notation never touches existing data.
+     */
+    public const BABY_TEETH_NOTATION_KEY = 'baby_teeth_notation';
+    public const BABY_TEETH_NOTATIONS = ['fdi', 'universal', 'palmer'];
+    public const DEFAULT_BABY_TEETH_NOTATION = 'fdi';
+
     public function __construct(ClinicSetting $model)
     {
         parent::__construct($model);
@@ -111,7 +121,7 @@ class ClinicSettingRepository extends BaseRepository
             return null;
         }
 
-        $setting->setting_value = $this->prepareValue($value, $setting->setting_type);
+        $setting->setting_value = $this->prepareValue($this->normalizeValue($key, $value), $setting->setting_type);
         $setting->save();
 
         return $setting->fresh();
@@ -124,7 +134,10 @@ class ClinicSettingRepository extends BaseRepository
     {
         $settingData = [
             'setting_key' => $key,
-            'setting_value' => $this->prepareValue($data['setting_value'] ?? '', $data['setting_type'] ?? 'string'),
+            'setting_value' => $this->prepareValue(
+                $this->normalizeValue($key, $data['setting_value'] ?? ''),
+                $data['setting_type'] ?? 'string'
+            ),
             'setting_type' => $data['setting_type'] ?? 'string',
             'description' => $data['description'] ?? null,
             'is_active' => $data['is_active'] ?? true,
@@ -166,6 +179,22 @@ class ClinicSettingRepository extends BaseRepository
     /**
      * Prepare value based on type for storage.
      */
+    private function normalizeValue(string $key, $value)
+    {
+        // Guard the keys that only accept a known set of values, so a typo from
+        // any client cannot leave the chart with a notation nothing understands.
+        if ($key === self::BABY_TEETH_NOTATION_KEY) {
+            return in_array($value, self::BABY_TEETH_NOTATIONS, true)
+                ? $value
+                : self::DEFAULT_BABY_TEETH_NOTATION;
+        }
+
+        return $value;
+    }
+
+    /**
+     * Prepare a value for storage based on its type.
+     */
     private function prepareValue($value, string $type): string
     {
         return match ($type) {
@@ -194,6 +223,38 @@ class ClinicSettingRepository extends BaseRepository
         $query = $this->query()->whereIn('setting_key', $keys);
         
         return $query->get()->keyBy('setting_key');
+    }
+
+    /**
+     * The clinic's public identity: what an unauthenticated visitor is allowed
+     * to see about the clinic itself (booking page, public patient profile).
+     *
+     * Kept here rather than in each controller so every public surface shows
+     * the same branding.
+     */
+    public function publicIdentity(): array
+    {
+        $settings = $this->getByKeys([
+            'clinic_name', 'logo', 'phone', 'email', 'address', 'working_hours',
+            self::BABY_TEETH_NOTATION_KEY,
+        ]);
+
+        $value = fn (string $key) => $settings->get($key)?->getValue() ?: null;
+
+        return [
+            'name' => $value('clinic_name'),
+            'logo' => ClinicSetting::fileUrl($settings->get('logo')?->setting_value),
+            'phone' => $value('phone'),
+            'email' => $value('email'),
+            'address' => $value('address'),
+            'working_hours' => $value('working_hours'),
+            // The public patient profile draws the same dental chart, so it needs
+            // to know how this clinic labels baby teeth.
+            'baby_teeth_notation' => $this->normalizeValue(
+                self::BABY_TEETH_NOTATION_KEY,
+                $value(self::BABY_TEETH_NOTATION_KEY)
+            ),
+        ];
     }
 
     /**
@@ -263,7 +324,7 @@ class ClinicSettingRepository extends BaseRepository
         }
 
         // Display category
-        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors'])) {
+        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY])) {
             return 'display';
         }
 
@@ -323,6 +384,7 @@ class ClinicSettingRepository extends BaseRepository
             'show_rx_id' => 23,
             'teeth_v2' => 24,
             'tooth_colors' => 25,
+            'baby_teeth_notation' => 26,
 
             // Social (26-28)
             'facebook_url' => 26,
