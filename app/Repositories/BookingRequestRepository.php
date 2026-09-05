@@ -16,8 +16,10 @@ use Illuminate\Support\Facades\Log;
 
 class BookingRequestRepository
 {
-    public function __construct(private NotificationService $notifications)
-    {
+    public function __construct(
+        private NotificationService $notifications,
+        private PatientRepository $patients
+    ) {
     }
 
     /**
@@ -224,12 +226,14 @@ class BookingRequestRepository
 
     /**
      * Find an existing patient by phone, or create a new one from the request.
+     *
+     * The lookup ignores how the number was typed, so a returning patient who
+     * books online with "+964 770 123 4567" is linked to the record already
+     * stored as "07701234567" instead of being added to the table twice.
      */
     private function findOrCreatePatientByPhone(BookingRequest $request): Patient
     {
-        $patient = Patient::where('phone', $request->phone)
-            ->orWhere('phone2', $request->phone)
-            ->first();
+        $patient = $this->patients->findByPhoneNumber($request->phone);
 
         if ($patient) {
             return $patient;
