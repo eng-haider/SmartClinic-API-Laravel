@@ -154,7 +154,9 @@ Route::middleware([
 
     // Bill routes
     Route::middleware('jwt')->group(function () {
-        Route::get('bills/statistics/summary', [BillController::class, 'statistics']);
+        Route::get('bills/patient-balances', [BillController::class, 'patientBalances']);
+        Route::get('bills/payments', [BillController::class, 'payments']);
+        Route::get('bills/patient-balances/{patientId}/bills', [BillController::class, 'patientBillHistory'])->whereNumber('patientId');
         Route::apiResource('bills', BillController::class);
         Route::patch('bills/{id}/mark-paid', [BillController::class, 'markAsPaid']);
         Route::patch('bills/{id}/mark-unpaid', [BillController::class, 'markAsUnpaid']);
@@ -357,4 +359,3 @@ Route::middleware([
         ]);
     });
 });
-

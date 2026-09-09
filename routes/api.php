@@ -145,6 +145,9 @@ Route::middleware('jwt')->group(function () {
 
 // Protected bill routes (JWT required)
 Route::middleware('jwt')->group(function () {
+    Route::get('bills/patient-balances', [BillController::class, 'patientBalances'])->name('bills.patient-balances');
+    Route::get('bills/payments', [BillController::class, 'payments'])->name('bills.payments');
+    Route::get('bills/patient-balances/{patientId}/bills', [BillController::class, 'patientBillHistory'])->whereNumber('patientId')->name('bills.patient-bill-history');
     Route::apiResource('bills', BillController::class);
     Route::patch('bills/{id}/mark-paid', [BillController::class, 'markAsPaid'])->name('bills.mark-paid');
     Route::patch('bills/{id}/mark-unpaid', [BillController::class, 'markAsUnpaid'])->name('bills.mark-unpaid');

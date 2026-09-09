@@ -16,7 +16,7 @@ use App\Models\Tenant;
  *
  * FIX:
  *   For each tenant DB:
- *     1. Find duplicate patient pairs (matched by phone number)
+ *     1. Find duplicate patient pairs (matched by PATIENT NAME)
  *        — one record created BEFORE 2025-12-25 (the OLD record)
  *        — one record created ON OR AFTER 2025-12-25 (the NEW record)
  *     2. Transfer all related data from OLD patient → NEW patient:
@@ -48,18 +48,12 @@ class FixDuplicatePatientsSeeder extends Seeder
     private string $cutoffDate = '2025-12-25';
 
     /**
-     * FOR DIRECT DATABASE: Set a database name to connect directly to that DB.
+     * FOR LOCAL TESTING: Set a database name to connect directly to that DB.
      * Leave empty '' to use the tenant system.
+     *
+     * Example: 'mina_last' — connects directly to mina_last database (bypasses tenancy)
      */
-    private string $directDatabaseName = 'u876784197_tenant_mina';
-
-    /**
-     * Custom database credentials (optional)
-     * Leave empty to use default config credentials
-     */
-    private string $directDatabaseHost = '127.0.0.1';  // Use 127.0.0.1 for TCP/IP or Hostinger remote host
-    private string $directDatabaseUsername = 'u876784197_tenant_mina';
-    private string $directDatabasePassword = '9!iSeEys:6sO';
+    private string $directDatabaseName = 'mina_last';
 
     /**
      * Which tenant IDs to process. Leave empty [] to process ALL tenants.
@@ -91,7 +85,7 @@ class FixDuplicatePatientsSeeder extends Seeder
 
             $this->command->info('');
             $this->command->info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-            $this->command->info('✅ Database processed.');
+            $this->command->info('✅ All tenants processed.');
             if ($this->dryRun) {
                 $this->command->warn('   ⚠  DRY RUN — no data was changed.');
             }
@@ -130,6 +124,24 @@ class FixDuplicatePatientsSeeder extends Seeder
 
     // ──────────────────────────────────────────────────────────────────────────
 
+    private function processTenant(Tenant $tenant): void
+    {
+        $this->command->info("┌─ Tenant: {$tenant->id}");
+
+        try {
+            $tenant->run(function () use ($tenant) {
+                $this->fixDuplicates();
+            });
+            $this->command->info("└─ Done: {$tenant->id}");
+        } catch (\Exception $e) {
+            $this->command->error("└─ ❌ Skipped tenant {$tenant->id}: " . $e->getMessage());
+        }
+
+        $this->command->info('');
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+
     private function processDirectDatabase(): void
     {
         $connName = 'direct_fix_connection';
@@ -138,18 +150,6 @@ class FixDuplicatePatientsSeeder extends Seeder
             // Register direct connection to the specified database
             $baseConfig = config('database.connections.mysql');
             $baseConfig['database'] = $this->directDatabaseName;
-            
-            // Use custom credentials if provided
-            if (!empty($this->directDatabaseHost)) {
-                $baseConfig['host'] = $this->directDatabaseHost;
-            }
-            if (!empty($this->directDatabaseUsername)) {
-                $baseConfig['username'] = $this->directDatabaseUsername;
-            }
-            if (!empty($this->directDatabasePassword)) {
-                $baseConfig['password'] = $this->directDatabasePassword;
-            }
-            
             config(["database.connections.{$connName}" => $baseConfig]);
 
             // Test connection
@@ -164,24 +164,6 @@ class FixDuplicatePatientsSeeder extends Seeder
             $this->command->info("└─ Done: {$this->directDatabaseName}");
         } catch (\Exception $e) {
             $this->command->error("└─ ❌ Error processing {$this->directDatabaseName}: " . $e->getMessage());
-        }
-
-        $this->command->info('');
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────
-
-    private function processTenant(Tenant $tenant): void
-    {
-        $this->command->info("┌─ Tenant: {$tenant->id}");
-
-        try {
-            $tenant->run(function () use ($tenant) {
-                $this->fixDuplicates();
-            });
-            $this->command->info("└─ Done: {$tenant->id}");
-        } catch (\Exception $e) {
-            $this->command->error("└─ ❌ Skipped tenant {$tenant->id}: " . $e->getMessage());
         }
 
         $this->command->info('');

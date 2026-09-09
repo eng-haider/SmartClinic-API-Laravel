@@ -54,8 +54,8 @@ class BillResource extends JsonResource
                             'name' => $this->billable->category->name ?? 'N/A',
                             'order' => $this->billable->category->order ?? null,
                             'item_cost' => $this->billable->category->item_cost ?? null,
-                            'created_at' => $this->billable->category->created_at?->format('Y-m-d H:i:s'),
-                            'updated_at' => $this->billable->category->updated_at?->format('Y-m-d H:i:s'),
+                            'created_at' => $this->billable->category?->created_at?->format('Y-m-d H:i:s'),
+                            'updated_at' => $this->billable->category?->updated_at?->format('Y-m-d H:i:s'),
                         ] : null,
                         'status' => $this->billable->relationLoaded('status') ? [
                             'id' => $this->billable->status->id ?? null,
@@ -63,6 +63,7 @@ class BillResource extends JsonResource
                         ] : null,
                     ];
                 }
+
                 // Default minimal data
                 return [
                     'id' => $this->billable_id,

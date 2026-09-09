@@ -6,10 +6,12 @@ use App\Http\Helpers\BillsIsolationHelper;
 use App\Http\Requests\BillRequest;
 use App\Http\Resources\BillResource;
 use App\Http\Controllers\Traits\DoctorFilterTrait;
+use App\Http\Requests\BillingOverviewRequest;
+
+use App\Repositories\BillingOverviewRepository;
 use App\Repositories\BillRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class BillController extends Controller
 {
@@ -20,10 +22,50 @@ class BillController extends Controller
      */
     public function __construct(private BillRepository $billRepository)
     {
-        // $this->middleware('permission:view-all-bills')->only(['index', 'show', 'statistics']);
+        $this->middleware('permission:view-all-bills')->only(['index', 'show', 'statistics', 'patientBalances', 'payments', 'patientBillHistory']);
         $this->middleware('permission:create-bill')->only(['store']);
         $this->middleware('permission:edit-bill')->only(['update', 'markAsPaid', 'markAsUnpaid']);
         $this->middleware('permission:delete-bill')->only(['destroy']);
+    }
+
+    public function patientBalances(BillingOverviewRequest $request, BillingOverviewRepository $overview): JsonResponse
+    {
+        return $this->overviewResponse($overview->patientBalances($request->validated()));
+    }
+
+    public function payments(BillingOverviewRequest $request, BillingOverviewRepository $overview): JsonResponse
+    {
+        return $this->overviewResponse($overview->payments($request->validated()), true);
+    }
+
+    public function patientBillHistory(BillingOverviewRequest $request, int $patientId, BillingOverviewRepository $overview): JsonResponse
+    {
+        return $this->overviewResponse($overview->patientBills($patientId, $request->validated()), true);
+    }
+
+    private function overviewResponse(array $result, bool $bills = false): JsonResponse
+    {
+        $records = $result['records'];
+        $response = [
+            'success' => true,
+            'data' => $bills ? BillResource::collection($records) : $records->items(),
+            'pagination' => [
+                'total' => $records->total(),
+                'per_page' => $records->perPage(),
+                'current_page' => $records->currentPage(),
+                'last_page' => $records->lastPage(),
+                'from' => $records->firstItem(),
+                'to' => $records->lastItem(),
+            ],
+        ];
+        if (isset($result['summary'])) {
+            $response['summary'] = $result['summary'];
+        }
+        if (isset($result['patient_balance'])) {
+            $response['patient_balance'] = $result['patient_balance'];
+        }
+
+        return response()->json($response);
     }
 
     /**
