@@ -161,6 +161,7 @@ Route::middleware([
         Route::patch('bills/{id}/mark-paid', [BillController::class, 'markAsPaid']);
         Route::patch('bills/{id}/mark-unpaid', [BillController::class, 'markAsUnpaid']);
         Route::get('bills/patient/{patientId}', [BillController::class, 'byPatient']);
+        Route::get('bills/statistics/summary', [BillController::class, 'statistics'])->name('tenant.bills.statistics');
     });
 
     // Clinic expense routes
