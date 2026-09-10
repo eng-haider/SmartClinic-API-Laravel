@@ -30,7 +30,7 @@ class CentralClinicUsersSeeder extends Seeder
      * the database name, and the password comes from TENANT_DB_PASSWORD in .env
      * (see DatabaseTenancyBootstrapper).
      */
-    private string $tenantDbName = 'u876784197_tenant_27'; // <-- CHANGE THIS
+    private string $tenantDbName = 'u876784197_tenant_28'; // <-- CHANGE THIS
 
     /**
      * Clinic display name, used only when creating the tenants row.
