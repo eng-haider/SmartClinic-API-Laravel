@@ -30,7 +30,7 @@ class OldDatabaseMigrationSeeder extends Seeder
      * Set the old clinic ID to migrate data for.
      * Each clinic becomes a tenant in the new system.
      */
-    private int $oldClinicId = 105; // <-- CHANGE THIS to the clinic ID you want to migrate
+    private int $oldClinicId = 1; // <-- CHANGE THIS to the clinic ID you want to migrate
 
     /**
      * The tenant ID to use (will be generated from clinic name)
@@ -46,11 +46,23 @@ class OldDatabaseMigrationSeeder extends Seeder
      * ID mappings: old_id => new_id
      */
     private array $userIdMap = [];
+    private array $doctorIdMap = [];
     private array $patientIdMap = [];
     private array $caseCategoryIdMap = [];
     private array $statusIdMap = [];
     private array $caseIdMap = [];
     private array $expenseCategoryIdMap = [];
+
+    /**
+     * old case id => ['patient_id' => int, 'doctor_id' => ?int] (used by bills)
+     */
+    private array $caseOwnerMap = [];
+
+    /**
+     * Cached table list of the old DB, and the fallback user for orphan records.
+     */
+    private array $oldTables = [];
+    private ?int $fallbackUserId = null;
 
     /**
      * Run the database seeds.
@@ -130,6 +142,12 @@ class OldDatabaseMigrationSeeder extends Seeder
             'db_username' => config('database.connections.mysql.username'),
             'db_password' => config('database.connections.mysql.password'),
         ]);
+
+        // 4b. Create the tenant database. TenantCreated has no CreateDatabase job
+        // in this app (see TenancyServiceProvider), and deleting the tenant above
+        // drops the old database, so it has to be created here.
+        DB::statement("CREATE DATABASE IF NOT EXISTS `{$dbName}`");
+        $this->command->info("   ✓ Database ready: {$dbName}");
 
         // 5. Run tenant-scoped migration
         $this->command->info("📦 Running tenant migrations...");
@@ -261,6 +279,14 @@ class OldDatabaseMigrationSeeder extends Seeder
     {
         $this->command->info('👥 Migrating users...');
 
+        // Some dumps (e.g. smart_clinic_old) ship without the `users` table.
+        // Rebuild staff from doctors/secretaries instead.
+        if (!$this->oldTableExists('users')) {
+            $this->command->warn('   ⚠ Old DB has no `users` table, rebuilding staff from doctors/secretaries');
+            $this->migrateUsersFromStaffTables();
+            return;
+        }
+
         // Get all doctor IDs for this clinic from the old doctors table
         $oldDoctorRecords = DB::connection($this->oldDb)
             ->table('doctors')
@@ -332,6 +358,13 @@ class OldDatabaseMigrationSeeder extends Seeder
             $this->userIdMap[$oldUser->id] = $newUser->id;
             $this->command->info("   ✓ User: {$oldUser->name} | Role: {$newRole} (old:{$oldUser->id} → new:{$newUser->id})");
         }
+
+        // Map old doctors.id → new user id so patient/case doctor columns resolve
+        foreach ($oldDoctorRecords as $oldDoctorRecord) {
+            if (isset($this->userIdMap[$oldDoctorRecord->user_id])) {
+                $this->doctorIdMap[$oldDoctorRecord->id] = $this->userIdMap[$oldDoctorRecord->user_id];
+            }
+        }
     }
 
     /**
@@ -356,6 +389,127 @@ class OldDatabaseMigrationSeeder extends Seeder
     }
 
     /**
+     * Check whether a table exists in the old database.
+     */
+    private function oldTableExists(string $table): bool
+    {
+        if (empty($this->oldTables)) {
+            // getTableListing() spans every schema the user can see, so read
+            // information_schema directly and stay inside the old database.
+            $connection = DB::connection($this->oldDb);
+
+            $this->oldTables = array_map('strtolower', $connection
+                ->table('information_schema.tables')
+                ->where('table_schema', $connection->getDatabaseName())
+                ->pluck('table_name')
+                ->toArray());
+        }
+
+        return in_array(strtolower($table), $this->oldTables, true);
+    }
+
+    /**
+     * The user every orphan record falls back to (first migrated staff member).
+     */
+    private function fallbackUserId(): ?int
+    {
+        if ($this->fallbackUserId === null) {
+            $this->fallbackUserId = User::query()->orderBy('id')->value('id');
+        }
+
+        return $this->fallbackUserId;
+    }
+
+    /**
+     * Rebuild staff accounts when the old dump has no `users` table.
+     *
+     * Doctors and secretaries carry their own name + old user_id, which is enough
+     * to keep cases.user_id / patients.doctor_id lookups resolving. Passwords are
+     * not recoverable here, so everyone gets the default one and must reset.
+     *
+     * The clinic's lowest-id doctor becomes clinic_super_doctor, the rest doctors.
+     */
+    private function migrateUsersFromStaffTables(): void
+    {
+        $oldDoctors = DB::connection($this->oldDb)
+            ->table('doctors')
+            ->where('clinics_id', $this->oldClinicId)
+            ->orderBy('id')
+            ->get();
+
+        if ($oldDoctors->isEmpty()) {
+            $this->command->warn('   ⚠ No doctors found for this clinic');
+        }
+
+        $isFirst = true;
+        foreach ($oldDoctors as $oldDoctor) {
+            $role = $isFirst ? 'clinic_super_doctor' : 'doctor';
+            $isFirst = false;
+
+            $newUserId = $this->createStaffUser(
+                $oldDoctor->name,
+                'old_d' . $oldDoctor->id,
+                $oldDoctor->created_at,
+                $oldDoctor->updated_at,
+                $role
+            );
+
+            $this->doctorIdMap[$oldDoctor->id] = $newUserId;
+            if (!isset($this->userIdMap[$oldDoctor->user_id])) {
+                $this->userIdMap[$oldDoctor->user_id] = $newUserId;
+            }
+
+            $this->command->info("   ✓ Doctor: {$oldDoctor->name} | Role: {$role} (doctor:{$oldDoctor->id} → new:{$newUserId})");
+        }
+
+        if (!$this->oldTableExists('secretaries')) {
+            return;
+        }
+
+        $oldSecretaries = DB::connection($this->oldDb)
+            ->table('secretaries')
+            ->where('clinics_id', $this->oldClinicId)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($oldSecretaries as $oldSecretary) {
+            $newUserId = $this->createStaffUser(
+                $oldSecretary->name,
+                'old_s' . $oldSecretary->id,
+                $oldSecretary->created_at,
+                $oldSecretary->updated_at,
+                'secretary'
+            );
+
+            if (!isset($this->userIdMap[$oldSecretary->user_id])) {
+                $this->userIdMap[$oldSecretary->user_id] = $newUserId;
+            }
+
+            $this->command->info("   ✓ Secretary: {$oldSecretary->name} (secretary:{$oldSecretary->id} → new:{$newUserId})");
+        }
+    }
+
+    /**
+     * Insert one staff user with a placeholder phone (users.phone is unique and NOT NULL).
+     */
+    private function createStaffUser(string $name, string $phone, $createdAt, $updatedAt, string $role): int
+    {
+        $userId = DB::table('users')->insertGetId([
+            'name' => $name,
+            'email' => null,
+            'phone' => $phone,
+            'password' => Hash::make('12345678'),
+            'is_active' => true,
+            'created_at' => $createdAt,
+            'updated_at' => $updatedAt,
+        ]);
+
+        User::find($userId)->assignRole($role);
+
+        return $userId;
+    }
+
+    /**
      * Migrate patients from old DB.
      * 
      * Uses DoctorPatient table to find patients linked to doctors in this clinic.
@@ -364,6 +518,13 @@ class OldDatabaseMigrationSeeder extends Seeder
     private function migratePatients(): void
     {
         $this->command->info('🏥 Migrating patients...');
+
+        // Older dumps have no DoctorPatient pivot; patients carry clinics_id/doctor_id directly.
+        if (!$this->oldTableExists('DoctorPatient')) {
+            $this->command->warn('   ⚠ Old DB has no `DoctorPatient` table, filtering patients by patients.clinics_id');
+            $this->migratePatientsByClinicColumn();
+            return;
+        }
 
         // Get all doctor IDs for this clinic
         $clinicDoctorIds = DB::connection($this->oldDb)
@@ -441,12 +602,11 @@ class OldDatabaseMigrationSeeder extends Seeder
             }
 
             try {
-                $newPatient = Patient::withoutEvents(function () use ($oldPatient, $newDoctorId, $clinicId, $patientName, $phone) {
+                $newPatient = Patient::withoutEvents(function () use ($oldPatient, $newDoctorId, $patientName, $phone) {
                     return Patient::create([
                         'name' => $patientName,
                         'age' => $oldPatient->age,
                         'doctor_id' => $newDoctorId,
-                        'clinic_id' => $clinicId,
                         'phone' => $phone,
                         'systemic_conditions' => $oldPatient->systemic_conditions,
                         'sex' => $oldPatient->sex,
@@ -456,6 +616,9 @@ class OldDatabaseMigrationSeeder extends Seeder
                         'public_token' => Str::uuid()->toString(),
                     ]);
                 });
+
+                // clinic_id is not fillable on Patient, so it is set after create
+                $newPatient->clinic_id = $clinicId;
 
                 // Preserve original timestamps and soft delete status
                 $newPatient->created_at = $oldPatient->created_at;
@@ -471,6 +634,73 @@ class OldDatabaseMigrationSeeder extends Seeder
                 $this->command->error("   ✗ Patient: {$patientName} - Error: " . $e->getMessage());
             }
         }
+    }
+
+    /**
+     * Migrate patients using the patients.clinics_id / patients.doctor_id columns.
+     * Used when the old dump has no DoctorPatient pivot table.
+     */
+    private function migratePatientsByClinicColumn(): void
+    {
+        $query = DB::connection($this->oldDb)
+            ->table('patients')
+            ->where('clinics_id', $this->oldClinicId);
+
+        $total = (clone $query)->count();
+        $this->command->info("   Found {$total} patients for clinic {$this->oldClinicId}");
+
+        if ($total === 0) {
+            return;
+        }
+
+        $migrated = 0;
+        $failed = 0;
+
+        $query->orderBy('id')->chunk(500, function ($oldPatients) use (&$migrated, &$failed, $total) {
+            foreach ($oldPatients as $oldPatient) {
+                // patients.doctor_id may reference doctors.id or the old users.id
+                $newDoctorId = $this->doctorIdMap[$oldPatient->doctor_id]
+                    ?? $this->userIdMap[$oldPatient->doctor_id]
+                    ?? null;
+
+                try {
+                    // patients.phone is not unique in the new schema, so keep it verbatim
+                    $newPatient = Patient::withoutEvents(function () use ($oldPatient, $newDoctorId) {
+                        return Patient::create([
+                            'name' => $oldPatient->name,
+                            'age' => $oldPatient->age,
+                            'doctor_id' => $newDoctorId,
+                            'phone' => $oldPatient->phone,
+                            'systemic_conditions' => $oldPatient->systemic_conditions,
+                            'sex' => $oldPatient->sex,
+                            'address' => $oldPatient->address,
+                            'notes' => $oldPatient->notes,
+                            'birth_date' => $oldPatient->birth_date,
+                            'public_token' => Str::uuid()->toString(),
+                        ]);
+                    });
+
+                    // clinic_id is not fillable on Patient, so it is set after create
+                    $newPatient->clinic_id = $oldPatient->clinics_id;
+                    $newPatient->created_at = $oldPatient->created_at;
+                    $newPatient->updated_at = $oldPatient->updated_at;
+                    if ($oldPatient->deleted_at) {
+                        $newPatient->deleted_at = $oldPatient->deleted_at;
+                    }
+                    $newPatient->saveQuietly();
+
+                    $this->patientIdMap[$oldPatient->id] = $newPatient->id;
+                    $migrated++;
+                } catch (\Exception $e) {
+                    $failed++;
+                    $this->command->error("   ✗ Patient: {$oldPatient->name} (old:{$oldPatient->id}) - " . $e->getMessage());
+                }
+            }
+
+            $this->command->info("   … {$migrated}/{$total} patients migrated");
+        });
+
+        $this->command->info("   ✓ Migrated {$migrated} patients" . ($failed ? ", {$failed} failed" : ''));
     }
 
     /**
@@ -493,11 +723,23 @@ class OldDatabaseMigrationSeeder extends Seeder
             return;
         }
 
-        $oldCases = DB::connection($this->oldDb)
+        // CaseDoctor is tiny next to cases, so preload it instead of querying per case
+        $caseDoctorMap = [];
+        if ($this->oldTableExists('CaseDoctor')) {
+            $caseDoctorMap = DB::connection($this->oldDb)
+                ->table('CaseDoctor')
+                ->pluck('doctors_id', 'cases_id')
+                ->toArray();
+        }
+
+        $defaultDoctorId = $this->fallbackUserId();
+        $migrated = 0;
+
+        DB::connection($this->oldDb)
             ->table('cases')
             ->whereIn('patient_id', $oldPatientIds)
-            ->get();
-
+            ->orderBy('id')
+            ->chunk(500, function ($oldCases) use ($caseDoctorMap, $defaultDoctorId, &$migrated) {
         foreach ($oldCases as $oldCase) {
             // Map patient_id
             $newPatientId = $this->patientIdMap[$oldCase->patient_id] ?? null;
@@ -528,23 +770,10 @@ class OldDatabaseMigrationSeeder extends Seeder
                 }
             }
 
-            // Get doctor_id from CaseDoctor table
-            $caseDoctorRecord = DB::connection($this->oldDb)
-                ->table('CaseDoctor')
-                ->where('cases_id', $oldCase->id)
-                ->first();
-
+            // CaseDoctor.doctors_id references old doctors.id
             $newDoctorId = null;
-            if ($caseDoctorRecord) {
-                // CaseDoctor.doctors_id references old doctors.id
-                $oldDoctorRecord = DB::connection($this->oldDb)
-                    ->table('doctors')
-                    ->where('id', $caseDoctorRecord->doctors_id)
-                    ->first();
-
-                if ($oldDoctorRecord && isset($this->userIdMap[$oldDoctorRecord->user_id])) {
-                    $newDoctorId = $this->userIdMap[$oldDoctorRecord->user_id];
-                }
+            if (isset($caseDoctorMap[$oldCase->id])) {
+                $newDoctorId = $this->doctorIdMap[$caseDoctorMap[$oldCase->id]] ?? null;
             }
 
             // Fallback: use user_id from case if CaseDoctor not found
@@ -554,20 +783,26 @@ class OldDatabaseMigrationSeeder extends Seeder
 
             // Final fallback: use first user
             if (!$newDoctorId) {
-                $newDoctorId = User::first()?->id;
+                $newDoctorId = $defaultDoctorId;
             }
 
-            $newCase = CaseModel::create([
-                'patient_id' => $newPatientId,
-                'doctor_id' => $newDoctorId,
-                'case_categores_id' => $newCaseCategoryId,
-                'notes' => $oldCase->notes,
-                'status_id' => $newStatusId,
-                'price' => $oldCase->price,
-                'tooth_num' => $oldCase->tooth_num,
-                'root_stuffing' => $oldCase->root_stuffing,
-                'is_paid' => $oldCase->is_paid ?? false,
-            ]);
+            // withoutEvents, like patients and bills above: CaseModel::created queues an
+            // app()->terminating() callback per case, so a full migration would pile up
+            // thousands of them and fire CaseCreated automations once tenancy has already
+            // been torn down - messaging real patients off historical data.
+            $newCase = CaseModel::withoutEvents(function () use ($oldCase, $newPatientId, $newDoctorId, $newCaseCategoryId, $newStatusId) {
+                return CaseModel::create([
+                    'patient_id' => $newPatientId,
+                    'doctor_id' => $newDoctorId,
+                    'case_categores_id' => $newCaseCategoryId,
+                    'notes' => $oldCase->notes,
+                    'status_id' => $newStatusId,
+                    'price' => $oldCase->price,
+                    'tooth_num' => $oldCase->tooth_num,
+                    'root_stuffing' => $oldCase->root_stuffing,
+                    'is_paid' => $oldCase->is_paid ?? false,
+                ]);
+            });
 
             // Preserve original timestamps
             $newCase->created_at = $oldCase->created_at;
@@ -575,8 +810,14 @@ class OldDatabaseMigrationSeeder extends Seeder
             $newCase->saveQuietly();
 
             $this->caseIdMap[$oldCase->id] = $newCase->id;
-            $this->command->info("   ✓ Case #{$oldCase->id} → #{$newCase->id} (patient: {$newPatientId}, doctor: {$newDoctorId})");
+            $this->caseOwnerMap[$oldCase->id] = ['patient_id' => $newPatientId, 'doctor_id' => $newDoctorId];
+            $migrated++;
         }
+
+                $this->command->info("   … {$migrated} cases migrated");
+            });
+
+        $this->command->info("   ✓ Migrated {$migrated} cases");
     }
 
     /**
@@ -596,12 +837,14 @@ class OldDatabaseMigrationSeeder extends Seeder
             return;
         }
 
-        $oldSessions = DB::connection($this->oldDb)
+        $createdBy = $this->fallbackUserId();
+        $count = 0;
+
+        DB::connection($this->oldDb)
             ->table('sessions')
             ->whereIn('case_id', $oldCaseIds)
-            ->get();
-
-        $count = 0;
+            ->orderBy('id')
+            ->chunk(500, function ($oldSessions) use ($createdBy, &$count) {
         foreach ($oldSessions as $oldSession) {
             $newCaseId = $this->caseIdMap[$oldSession->case_id] ?? null;
             if (!$newCaseId) {
@@ -617,7 +860,7 @@ class OldDatabaseMigrationSeeder extends Seeder
                 'noteable_id' => $newCaseId,
                 'noteable_type' => CaseModel::class,
                 'content' => $content,
-                'created_by' => User::first()?->id,
+                'created_by' => $createdBy,
             ]);
 
             // Preserve original date
@@ -629,6 +872,7 @@ class OldDatabaseMigrationSeeder extends Seeder
 
             $count++;
         }
+            });
 
         $this->command->info("   ✓ Migrated {$count} sessions → notes");
     }
@@ -644,9 +888,12 @@ class OldDatabaseMigrationSeeder extends Seeder
         $this->command->info('💰 Migrating bills...');
 
         // Old bills reference cases via billable
-        $oldBills = DB::connection($this->oldDb)->table('bills')->get();
-
         $count = 0;
+
+        DB::connection($this->oldDb)
+            ->table('bills')
+            ->orderBy('id')
+            ->chunk(500, function ($oldBills) use (&$count) {
         foreach ($oldBills as $oldBill) {
             // Only migrate bills related to cases we migrated
             if ($oldBill->billable_type === 'App\\Models\\CaseModel' || 
@@ -658,20 +905,20 @@ class OldDatabaseMigrationSeeder extends Seeder
                     continue;
                 }
 
-                // Find the case to get patient and doctor
-                $newCase = CaseModel::find($newCaseId);
-                if (!$newCase) {
+                // Patient/doctor were recorded while migrating the case
+                $owner = $this->caseOwnerMap[$oldBill->billable_id] ?? null;
+                if (!$owner) {
                     continue;
                 }
 
-                $bill = Bill::withoutEvents(function () use ($oldBill, $newCase, $newCaseId) {
+                $bill = Bill::withoutEvents(function () use ($oldBill, $owner, $newCaseId) {
                     return Bill::create([
-                        'patient_id' => $newCase->patient_id,
+                        'patient_id' => $owner['patient_id'],
                         'billable_id' => $newCaseId,
                         'billable_type' => CaseModel::class,
                         'is_paid' => $oldBill->PaymentDate ? true : false,
                         'price' => $oldBill->price,
-                        'doctor_id' => $newCase->doctor_id,
+                        'doctor_id' => $owner['doctor_id'],
                     ]);
                 });
 
@@ -683,6 +930,9 @@ class OldDatabaseMigrationSeeder extends Seeder
                 $count++;
             }
         }
+
+                $this->command->info("   … {$count} bills migrated");
+            });
 
         $this->command->info("   ✓ Migrated {$count} bills");
     }
@@ -704,11 +954,14 @@ class OldDatabaseMigrationSeeder extends Seeder
             $newImageableId = null;
             $newImageableType = null;
 
-            // Map imageable_type and imageable_id
-            if (str_contains($oldImage->imageable_type, 'Patient')) {
+            // Map imageable_type and imageable_id. Old types are inconsistently
+            // cased ('App\\Models\\patients', 'App\\Models\\Cases'), so compare lowercased.
+            $oldImageableType = strtolower($oldImage->imageable_type);
+
+            if (str_contains($oldImageableType, 'patient')) {
                 $newImageableId = $this->patientIdMap[$oldImage->imageable_id] ?? null;
                 $newImageableType = Patient::class;
-            } elseif (str_contains($oldImage->imageable_type, 'Case')) {
+            } elseif (str_contains($oldImageableType, 'case')) {
                 $newImageableId = $this->caseIdMap[$oldImage->imageable_id] ?? null;
                 $newImageableType = CaseModel::class;
             }
@@ -749,6 +1002,11 @@ class OldDatabaseMigrationSeeder extends Seeder
     private function migrateExpenseCategories(): void
     {
         $this->command->info('📂 Migrating expense categories (conjugations_categories)...');
+
+        if (!$this->oldTableExists('conjugationsv3') || !$this->oldTableExists('conjugations_categories')) {
+            $this->command->warn('   ⚠ Old DB has no conjugations tables, skipping expense categories');
+            return;
+        }
 
         // Get category IDs that are actually used by this clinic's expenses
         $usedCategoryIds = DB::connection($this->oldDb)
@@ -825,6 +1083,11 @@ class OldDatabaseMigrationSeeder extends Seeder
     private function migrateExpenses(): void
     {
         $this->command->info('💸 Migrating expenses (conjugationsv3)...');
+
+        if (!$this->oldTableExists('conjugationsv3')) {
+            $this->command->warn('   ⚠ Old DB has no conjugationsv3 table, skipping expenses');
+            return;
+        }
 
         $oldExpenses = DB::connection($this->oldDb)
             ->table('conjugationsv3')
