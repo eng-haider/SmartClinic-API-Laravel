@@ -9,7 +9,7 @@ echo "DONE\n";
 > $t->show_image_case = 0; $t->doctor_mony = 0; $t->teeth_v2 = 0;
 > $t->send_msg = 0; $t->show_rx_id = 0; $t->api_whatsapp = 0; $t->has_ai_bot = 0;
 > $t->setAttribute('db_name',     'u876784197_tenant_28');
-> $t->setAttribute('db_username', 'u876784197_tenant_28');
+> $t->setAttribute('db_username', 'u876784197_tenant_29');
 > $t->setAttribute('db_password', "9!iSeEys:6sO");
 > $t->save();
 > echo "DONE\n";
