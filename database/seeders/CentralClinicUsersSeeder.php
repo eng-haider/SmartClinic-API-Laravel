@@ -157,17 +157,22 @@ class CentralClinicUsersSeeder extends Seeder
             return;
         }
 
+        $this->command->info('   Found ' . count($tenantUsers) . ' users in the tenant database');
+
         $created = 0;
         $updated = 0;
+        $failed = 0;
 
         foreach ($tenantUsers as $user) {
             $role = self::ROLE_MAP[$user['role_name'] ?? ''] ?? 'user';
 
-            $existing = DB::table('users')->where('phone', $user['phone'])->first();
+            // users.email is unique centrally, and '' is not NULL - several blank
+            // emails would collide with each other on the second insert.
+            $email = ($user['email'] === '' || $user['email'] === null) ? null : $user['email'];
 
             $payload = [
                 'name' => $user['name'],
-                'email' => $user['email'],
+                'email' => $email,
                 'password' => $user['password'], // already hashed, copy as-is
                 'clinic_id' => $this->tenantId,
                 'role' => $role,
@@ -175,20 +180,28 @@ class CentralClinicUsersSeeder extends Seeder
                 'updated_at' => now(),
             ];
 
-            if ($existing) {
-                DB::table('users')->where('id', $existing->id)->update($payload);
-                $updated++;
-                $this->command->warn("   ⚠ Updated existing: {$user['phone']} ({$user['name']})");
-                continue;
+            // One user must never abort the rest, so each write reports on its own.
+            try {
+                $existing = DB::table('users')->where('phone', $user['phone'])->first();
+
+                if ($existing) {
+                    DB::table('users')->where('id', $existing->id)->update($payload);
+                    $updated++;
+                    $this->command->warn("   ⚠ Updated existing: {$user['phone']} ({$user['name']})");
+                    continue;
+                }
+
+                DB::table('users')->insert($payload + [
+                    'phone' => $user['phone'],
+                    'created_at' => $user['created_at'],
+                ]);
+
+                $created++;
+                $this->command->info("   ✓ {$user['phone']} | {$role} | {$user['name']}");
+            } catch (\Throwable $e) {
+                $failed++;
+                $this->command->error("   ✗ {$user['phone']} ({$user['name']}) - " . $e->getMessage());
             }
-
-            DB::table('users')->insert($payload + [
-                'phone' => $user['phone'],
-                'created_at' => $user['created_at'],
-            ]);
-
-            $created++;
-            $this->command->info("   ✓ {$user['phone']} | {$role} | {$user['name']}");
         }
 
         $this->command->info('');
@@ -197,6 +210,10 @@ class CentralClinicUsersSeeder extends Seeder
         $this->command->info("   Clinic: {$tenant->name}");
         $this->command->info("   Users created: {$created}");
         $this->command->info("   Users updated: {$updated}");
+
+        if ($failed) {
+            $this->command->error("   Users FAILED:  {$failed}");
+        }
         $this->command->info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
 }

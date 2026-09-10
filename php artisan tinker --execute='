@@ -1,13 +1,17 @@
-php artisan tinker --execute='
-$t = new App\Models\Tenant();
-$t->id = "clinic_1";
-$t->name = "عياده تيتانيوم";
-$t->specialty = "dental";
-$t->whatsapp_message_count = 0;
-$t->show_image_case = 0; $t->doctor_mony = 0; $t->teeth_v2 = 0;
-$t->send_msg = 0; $t->show_rx_id = 0; $t->api_whatsapp = 0; $t->has_ai_bot = 0;
-$t->setAttribute("db_name", "u876784197_tenant_27");
-$t->setAttribute("db_username", "u876784197_tenant_27");
-$t->setAttribute("db_password", "9!iSeEys:6sO");
-$t->save();
-echo "✓ انضاف: ".$t->id."\n";
+echo "DONE\n";
+> EOF
+[u876784197@br-asc-web1313 Backend]$ cat > /tmp/add_tenant.php <<'EOF'
+> $t = App\Models\Tenant::find('clinic_1') ?: new App\Models\Tenant();
+> $t->id = 'clinic_1';
+> $t->name = 'عياده تيتانيوم';
+> $t->specialty = 'dental';
+> $t->whatsapp_message_count = 0;
+> $t->show_image_case = 0; $t->doctor_mony = 0; $t->teeth_v2 = 0;
+> $t->send_msg = 0; $t->show_rx_id = 0; $t->api_whatsapp = 0; $t->has_ai_bot = 0;
+> $t->setAttribute('db_name',     'u876784197_tenant_28');
+> $t->setAttribute('db_username', 'u876784197_tenant_28');
+> $t->setAttribute('db_password', "9!iSeEys:6sO");
+> $t->save();
+> echo "DONE\n";
+> EOF
+[u876784197@br-asc-web1313 Backend]$ 
