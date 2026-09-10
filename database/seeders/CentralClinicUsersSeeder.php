@@ -25,6 +25,19 @@ class CentralClinicUsersSeeder extends Seeder
     private string $tenantId = 'clinic_1'; // <-- CHANGE THIS to the tenant you want
 
     /**
+     * The tenant's MySQL database, used only when the tenants row does not exist
+     * yet and has to be created. On Hostinger the database user always matches
+     * the database name, and the password comes from TENANT_DB_PASSWORD in .env
+     * (see DatabaseTenancyBootstrapper).
+     */
+    private string $tenantDbName = 'u876784197_tenant_27'; // <-- CHANGE THIS
+
+    /**
+     * Clinic display name, used only when creating the tenants row.
+     */
+    private string $clinicName = 'عياده تيتانيوم';
+
+    /**
      * Old-system staff role => the central users.role enum.
      * The enum is enum('admin','doctor','nurse','receptionist','user').
      */
@@ -44,10 +57,53 @@ class CentralClinicUsersSeeder extends Seeder
 
         $tenant = Tenant::find($this->tenantId);
 
+        // Create the tenants row when it is missing. Without it smartLogin cannot
+        // find the tenant database at all, so this seeder is the single place that
+        // registers the clinic instead of a hand-run tinker script.
         if (!$tenant) {
-            $this->command->error("❌ Tenant '{$this->tenantId}' not found in the central database.");
-            return;
+            $this->command->warn("⚠ Tenant '{$this->tenantId}' not found, creating it...");
+
+            $dbPassword = env('TENANT_DB_PASSWORD');
+
+            if (empty($dbPassword)) {
+                $this->command->error('❌ TENANT_DB_PASSWORD is not set in .env');
+                $this->command->error('   AuthService rejects tenants with an empty database password,');
+                $this->command->error('   so add this line to .env and run again:');
+                $this->command->error('');
+                $this->command->error('   TENANT_DB_PASSWORD=your-tenant-db-password');
+                return;
+            }
+
+            $tenant = new Tenant();
+            $tenant->id = $this->tenantId;
+            $tenant->name = $this->clinicName;
+            $tenant->specialty = 'dental';
+            $tenant->whatsapp_message_count = 0;
+            $tenant->show_image_case = 0;
+            $tenant->doctor_mony = 0;
+            $tenant->teeth_v2 = 0;
+            $tenant->send_msg = 0;
+            $tenant->show_rx_id = 0;
+            $tenant->api_whatsapp = 0;
+            $tenant->has_ai_bot = 0;
+
+            // On Hostinger the database user is the database name itself
+            $tenant->setAttribute('db_name', $this->tenantDbName);
+            $tenant->setAttribute('db_username', $this->tenantDbName);
+            $tenant->setAttribute('db_password', $dbPassword);
+            $tenant->save();
+
+            $tenant = Tenant::find($this->tenantId);
+
+            if (!$tenant) {
+                $this->command->error('❌ Could not create the tenant record.');
+                return;
+            }
+
+            $this->command->info("   ✓ Tenant created → database: {$tenant->db_name}");
         }
+
+        $this->command->info("   Database: {$tenant->db_name}");
 
         // 1. The central clinics row that $centralUser->clinic resolves to.
         $this->command->info('🏥 Creating central clinic record...');

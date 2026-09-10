@@ -1,0 +1,13 @@
+php artisan tinker --execute='
+$t = new App\Models\Tenant();
+$t->id = "clinic_1";
+$t->name = "عياده تيتانيوم";
+$t->specialty = "dental";
+$t->whatsapp_message_count = 0;
+$t->show_image_case = 0; $t->doctor_mony = 0; $t->teeth_v2 = 0;
+$t->send_msg = 0; $t->show_rx_id = 0; $t->api_whatsapp = 0; $t->has_ai_bot = 0;
+$t->setAttribute("db_name", "u876784197_tenant_27");
+$t->setAttribute("db_username", "u876784197_tenant_27");
+$t->setAttribute("db_password", "9!iSeEys:6sO");
+$t->save();
+echo "✓ انضاف: ".$t->id."\n";
