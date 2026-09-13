@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Middleware\InitializeTenancyByHeader;
 use App\Http\Middleware\JwtMiddleware;
 use App\Models\User;
+use App\Repositories\BillRepository;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -183,6 +184,38 @@ class BillingOverviewTest extends TestCase
             ->assertOk()->assertJsonPath('pagination.total', 0)->assertJsonPath('summary.unpaid_amount', 0);
         $this->getJson('/api/bills/patient-balances?case_date_to=2026-08-31')
             ->assertOk()->assertJsonPath('pagination.total', 2)->assertJsonPath('summary.total_price', 1200);
+    }
+
+    public function test_statistics_total_unpaid_matches_case_period_balances(): void
+    {
+        $patient = $this->patient('Installments', '0770777');
+        $inRange = $this->caseFor($patient, 400000, 1);
+        DB::table('cases')->where('id', $inRange)->update(['created_at' => '2026-09-01 15:00:00']); // end day, afternoon
+        $this->billFor($inRange, 150000, true, '2026-07-01 10:00:00'); // paid before the range, still reduces remaining
+        $this->billFor($inRange, 50000, true, '2026-08-30 17:47:32');
+        $older = $this->caseFor($patient, 100000, 1);
+        DB::table('cases')->where('id', $older)->update(['created_at' => '2026-05-01 10:00:00']);
+        $this->billFor($older, 20010, true, '2026-08-15 09:00:00'); // collected in range for an out-of-range case
+        $overpaid = $this->patient('Overpaid', '0770888');
+        $overpaidCase = $this->caseFor($overpaid, 10000, 1);
+        DB::table('cases')->where('id', $overpaidCase)->update(['created_at' => '2026-08-10 10:00:00']);
+        $this->billFor($overpaidCase, 12000, true, '2026-08-10 10:00:00');
+        $otherDoctor = $this->caseFor($overpaid, 90000, 2);
+        DB::table('cases')->where('id', $otherDoctor)->update(['created_at' => '2026-08-10 10:00:00']);
+
+        $filters = ['date_from' => '2026-08-02', 'date_to' => '2026-09-01'];
+        $stats = app(BillRepository::class)->getStatisticsWithFilters($filters, 15, 1);
+        $this->assertSame(410000, (int) $stats['total_price']);
+        $this->assertSame(82010, (int) $stats['total_paid_price']); // collected in the period
+        $this->assertSame(200000, $stats['total_unpaid_price']); // 400000 - 200000, overpaid case clamped
+
+        $this->getJson('/api/bills/patient-balances?doctor_id=1&payment_status=unpaid&case_date_from=2026-08-02&case_date_to=2026-09-01')
+            ->assertOk()->assertJsonPath('summary.unpaid_amount', $stats['total_unpaid_price'])
+            ->assertJsonPath('pagination.total', 1)->assertJsonPath('data.0.unpaid_amount', 200000);
+
+        $allTime = app(BillRepository::class)->getStatisticsWithFilters([], 15, null);
+        $this->assertSame(369990, $allTime['total_unpaid_price']); // 200000 + 79990 (older) + 0 (overpaid) + 90000 (doctor 2)
+        $this->assertSame(0, app(BillRepository::class)->getStatisticsWithFilters(['date_from' => '2026-09-02'], 15, 1)['total_unpaid_price']);
     }
 
     public function test_oldest_payment_sort_also_keeps_patients_without_payments_last(): void
@@ -456,6 +489,16 @@ class BillingOverviewTest extends TestCase
             $table->bigInteger('price');
             $table->boolean('is_paid')->default(true);
             $table->boolean('use_credit')->default(false);
+            $table->softDeletes();
+            $table->timestamps();
+        });
+        Schema::create('clinic_expenses', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('doctor_id')->nullable();
+            $table->bigInteger('quantity')->nullable();
+            $table->date('date')->nullable();
+            $table->decimal('price', 15, 2)->default(0);
+            $table->boolean('is_paid')->default(false);
             $table->softDeletes();
             $table->timestamps();
         });

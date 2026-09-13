@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Models\Bill;
 use App\Models\CaseModel;
 use App\Models\ClinicExpense;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -262,29 +263,44 @@ class BillRepository
     public function getStatisticsWithFilters(array $filters, int $perPage = 15, $doctorId = null): array
     {
         // total_price        = sum of case prices (cases table) in the range.
-        // total_paid_price   = paid CASE bills within the requested date range.
-        // total_unpaid_price = total_price - total_paid_price.
+        // total_paid_price   = paid CASE bills within the requested date range (money collected).
+        // total_unpaid_price = remaining on the cases in range: per case, price minus every
+        //                      paid bill recorded for it (any date), clamped at zero. This is the
+        //                      same math as bills/patient-balances, so the card matches that list.
+        //                      It is NOT total_price - total_paid_price: a payment collected in
+        //                      the period may belong to a case created outside it.
+        $caseBillableTypes = ['Case', 'CaseModel', 'App\\Models\\Case', 'App\\Models\\CaseModel'];
+
+        // A plain Y-m-d date_to covers the whole end day on datetime columns (as patient-balances
+        // does); other callers may pass a full datetime, which is used as an inclusive bound.
+        $from = ! empty($filters['date_from']) ? $filters['date_from'] : null;
+        $to = ! empty($filters['date_to']) ? $filters['date_to'] : null;
+        $toExclusive = $to !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)
+            ? CarbonImmutable::parse($to)->addDay()->startOfDay()
+            : null;
+        $applyCreatedRange = function ($query, string $column) use ($from, $to, $toExclusive) {
+            if ($from !== null) {
+                $query->where($column, '>=', $from);
+            }
+            if ($toExclusive !== null) {
+                $query->where($column, '<', $toExclusive);
+            } elseif ($to !== null) {
+                $query->where($column, '<=', $to);
+            }
+        };
+
         $casesQuery = CaseModel::query();
 
         if ($doctorId !== null) {
-            $casesQuery->where('doctor_id', $doctorId);
+            $casesQuery->where('cases.doctor_id', $doctorId);
         }
+        $applyCreatedRange($casesQuery, 'cases.created_at');
 
-        if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
-            $casesQuery->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]);
-        } elseif (!empty($filters['date_from'])) {
-            $casesQuery->where('created_at', '>=', $filters['date_from']);
-        } elseif (!empty($filters['date_to'])) {
-            $casesQuery->where('created_at', '<=', $filters['date_to']);
-        }
-
-        $totalPrice = $casesQuery->sum('price') ?? 0; // Total of all case prices in range
+        $totalPrice = (clone $casesQuery)->sum('price') ?? 0; // Total of all case prices in range
 
         // total_paid_price = paid CASE bills within the requested date range (money collected
         // in that period). The bills table is polymorphic, so restrict to case billable types
         // (the morph map is non-enforcing; the DB trigger stores 'App\Models\Case').
-        $caseBillableTypes = ['Case', 'CaseModel', 'App\\Models\\Case', 'App\\Models\\CaseModel'];
-
         $paidCaseBillsQuery = Bill::query()
             ->where('is_paid', true)
             ->whereIn('billable_type', $caseBillableTypes);
@@ -292,16 +308,25 @@ class BillRepository
         if ($doctorId !== null) {
             $paidCaseBillsQuery->where('doctor_id', $doctorId);
         }
-
-        if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
-            $paidCaseBillsQuery->whereBetween('created_at', [$filters['date_from'], $filters['date_to']]);
-        } elseif (!empty($filters['date_from'])) {
-            $paidCaseBillsQuery->where('created_at', '>=', $filters['date_from']);
-        } elseif (!empty($filters['date_to'])) {
-            $paidCaseBillsQuery->where('created_at', '<=', $filters['date_to']);
-        }
+        $applyCreatedRange($paidCaseBillsQuery, 'bills.created_at');
 
         $totalPaidPrice = $paidCaseBillsQuery->sum('price') ?? 0;
+
+        // Remaining on the cases in range (lifetime payments per case, clamped per case so an
+        // overpaid case never settles another one).
+        $paymentsByCase = DB::table('bills')
+            ->select('billable_id')
+            ->selectRaw('SUM(price) AS paid_amount')
+            ->whereIn('billable_type', $caseBillableTypes)
+            ->where('is_paid', true)
+            ->whereNull('deleted_at')
+            ->groupBy('billable_id');
+
+        $totalUnpaidPrice = (int) (clone $casesQuery)->toBase()
+            ->leftJoinSub($paymentsByCase, 'payments', 'payments.billable_id', '=', 'cases.id')
+            ->selectRaw('COALESCE(SUM(CASE WHEN COALESCE(cases.price, 0) > COALESCE(payments.paid_amount, 0)
+                THEN COALESCE(cases.price, 0) - COALESCE(payments.paid_amount, 0) ELSE 0 END), 0) AS remaining')
+            ->value('remaining');
 
         // Get expenses with same date filter
         $expensesQuery = ClinicExpense::query();
@@ -322,13 +347,10 @@ class BillRepository
         // $totalPaidExpenses = (clone $expensesQuery)->where('is_paid', true)->sum(DB::raw('price * COALESCE(quantity, 1)')) ?? 0;
         // $totalUnpaidExpenses = (clone $expensesQuery)->where('is_paid', false)->sum(DB::raw('price * COALESCE(quantity, 1)')) ?? 0;
 
-        // Remaining of the case prices = total case price minus money collected.
-        $totalUnpaidPrice = $totalPrice - $totalPaidPrice;
-
         return [
             'total_price' => $totalPrice, // Total of ALL case prices in range
             'total_paid_price' => $totalPaidPrice, // Paid case bills (money collected toward cases)
-            'total_unpaid_price' => $totalUnpaidPrice, // cases.price - paid case bills (remaining)
+            'total_unpaid_price' => $totalUnpaidPrice, // Remaining on cases in range (matches patient-balances)
             'total_expenses' => $totalExpenses,
             // 'total_paid_expenses' => $totalPaidExpenses,
             // 'total_unpaid_expenses' => $totalUnpaidExpenses,
