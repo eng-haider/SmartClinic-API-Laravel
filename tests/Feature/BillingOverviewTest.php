@@ -157,6 +157,34 @@ class BillingOverviewTest extends TestCase
             ->assertJsonPath('summary.total_price', 450);
     }
 
+    public function test_case_period_scopes_cases_by_creation_date_but_keeps_lifetime_payments(): void
+    {
+        $patient = $this->patient('Mixed periods', '0770555');
+        $inRange = $this->caseFor($patient, 300, 1);
+        DB::table('cases')->where('id', $inRange)->update(['created_at' => '2026-09-30 23:59:59']);
+        $this->billFor($inRange, 50, true, '2026-01-01 10:00:00'); // paid before the range, still counts
+        $this->billFor($inRange, 20, true, '2026-09-15 10:00:00');
+        $before = $this->caseFor($patient, 1000, 1);
+        DB::table('cases')->where('id', $before)->update(['created_at' => '2026-08-31 23:59:59']);
+        $this->billFor($before, 10, true, '2026-09-10 10:00:00'); // payment in range for an out-of-range case
+        $otherDoctor = $this->caseFor($patient, 500, 2);
+        DB::table('cases')->where('id', $otherDoctor)->update(['created_at' => '2026-09-10 10:00:00']);
+        $onlyOld = $this->patient('Only old cases', '0770666');
+        $old = $this->caseFor($onlyOld, 200, 1);
+        DB::table('cases')->where('id', $old)->update(['created_at' => '2026-07-01 10:00:00']);
+
+        $this->getJson('/api/bills/patient-balances?doctor_id=1&payment_status=unpaid&case_date_from=2026-09-01&case_date_to=2026-09-30')
+            ->assertOk()->assertJsonPath('pagination.total', 1)->assertJsonPath('data.0.id', $patient)
+            ->assertJsonPath('data.0.case_count', 1)->assertJsonPath('data.0.total_price', 300)
+            ->assertJsonPath('data.0.paid_amount', 70)->assertJsonPath('data.0.unpaid_amount', 230)
+            ->assertJsonPath('summary.unpaid_amount', 230)->assertJsonPath('summary.patient_count', 1)
+            ->assertJsonMissingPath('summary.period_paid_amount');
+        $this->getJson('/api/bills/patient-balances?case_date_from=2026-10-01')
+            ->assertOk()->assertJsonPath('pagination.total', 0)->assertJsonPath('summary.unpaid_amount', 0);
+        $this->getJson('/api/bills/patient-balances?case_date_to=2026-08-31')
+            ->assertOk()->assertJsonPath('pagination.total', 2)->assertJsonPath('summary.total_price', 1200);
+    }
+
     public function test_oldest_payment_sort_also_keeps_patients_without_payments_last(): void
     {
         $unbilled = $this->patient('Unbilled', '0770000');
@@ -317,6 +345,10 @@ class BillingOverviewTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors(['date_to', 'sort']);
         $this->getJson('/api/bills/payments?date_from=2026-02-30&patient_id=0')
             ->assertUnprocessable()->assertJsonValidationErrors(['date_from', 'patient_id']);
+        $this->getJson('/api/bills/patient-balances?case_date_from=2026-09-10&case_date_to=2026-09-09')
+            ->assertUnprocessable()->assertJsonValidationErrors(['case_date_to']);
+        $this->getJson('/api/bills/patient-balances?case_date_from=2026-02-30')
+            ->assertUnprocessable()->assertJsonValidationErrors(['case_date_from']);
     }
 
     public function test_every_overview_endpoint_requires_billing_permission(): void

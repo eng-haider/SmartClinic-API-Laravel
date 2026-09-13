@@ -62,6 +62,14 @@ class BillingOverviewRepository
         if (! empty($filters['doctor_id'])) {
             $caseBalances->where('cases.doctor_id', $filters['doctor_id']);
         }
+        // Scope to cases created in a period (the Bills page statistic cards use this scope).
+        // Balances stay lifetime per case: every payment recorded for the case counts.
+        if (! empty($filters['case_date_from'])) {
+            $caseBalances->where('cases.created_at', '>=', CarbonImmutable::parse($filters['case_date_from'])->startOfDay());
+        }
+        if (! empty($filters['case_date_to'])) {
+            $caseBalances->where('cases.created_at', '<', CarbonImmutable::parse($filters['case_date_to'])->addDay()->startOfDay());
+        }
         // Internal history lookup; the public balances request does not expose this filter.
         if (! empty($filters['patient_id'])) {
             $caseBalances->where('cases.patient_id', $filters['patient_id']);
