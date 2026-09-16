@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'jwt' => \App\Http\Middleware\JwtMiddleware::class,
             'permission' => \App\Http\Middleware\AuthorizeWithPermission::class,
+            'tenant.admin' => \App\Http\Middleware\RequireTenantAdminKey::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

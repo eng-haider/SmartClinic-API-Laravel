@@ -44,10 +44,17 @@ Route::prefix('webhooks/whatsapp')->withoutMiddleware('throttle:api')->group(fun
 // TENANT MANAGEMENT ROUTES (Central Database)
 // These routes manage clinics/tenants
 // ============================================
-Route::prefix('tenants')->group(function () {
-    Route::get('/', [TenantController::class, 'index'])->name('tenants.index');
+// Public: clinic self-registration. Rate limited because each signup
+// permanently claims a database from the pool.
+Route::prefix('tenants')->middleware('throttle:5,1')->group(function () {
     Route::get('/preview', [TenantController::class, 'previewId'])->name('tenants.preview');
     Route::post('/', [TenantController::class, 'store'])->name('tenants.store');
+});
+
+// Admin only (X-Admin-Key). Everything here can read DB credentials or
+// destroy a clinic — never expose without the key.
+Route::prefix('tenants')->middleware('tenant.admin')->group(function () {
+    Route::get('/', [TenantController::class, 'index'])->name('tenants.index');
     Route::get('/{id}', [TenantController::class, 'show'])->name('tenants.show');
     Route::put('/{id}', [TenantController::class, 'update'])->name('tenants.update');
     Route::delete('/{id}', [TenantController::class, 'destroy'])->name('tenants.destroy');

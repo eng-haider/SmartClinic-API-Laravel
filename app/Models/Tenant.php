@@ -140,6 +140,11 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             'logo',
             'api_whatsapp',
             'has_ai_bot',
+            // Stored in real columns, not the `data` JSON blob — otherwise the
+            // model silently drops them and tenant connections get wrong creds.
+            'db_name',
+            'db_username',
+            'db_password',
         ];
     }
 

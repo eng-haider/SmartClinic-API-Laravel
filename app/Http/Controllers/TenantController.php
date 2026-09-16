@@ -568,7 +568,24 @@ class TenantController extends Controller
             ], 404);
         }
 
-        $seederClass = $request->input('seeder', 'DatabaseSeeder');
+        // Only seeders meant to run inside a tenant DB. Others (e.g.
+        // OldDatabaseMigrationSeeder, TenantClinicsSeeder) truncate tables or
+        // drop databases and must never be reachable over HTTP.
+        $allowedSeeders = [
+            'TenantDatabaseSeeder',
+            'TenantClinicSettingsSeeder',
+            'TenantDemoDataSeeder',
+            'RoleAndPermissionSeeder',
+        ];
+        $seederClass = $request->input('seeder', 'TenantDatabaseSeeder');
+
+        if (!in_array($seederClass, $allowedSeeders, true)) {
+            return response()->json([
+                'success'    => false,
+                'message'    => 'Seeder not allowed. Allowed: ' . implode(', ', $allowedSeeders),
+                'message_ar' => 'البذور غير مسموح بها',
+            ], 422);
+        }
 
         try {
             $tenant->run(function () use ($seederClass) {
