@@ -54,9 +54,14 @@ class BillingOverviewRepository
             // Clamp per case: overpaying one case must not settle another case.
             ->selectRaw('SUM(CASE WHEN COALESCE(cases.price, 0) > COALESCE(payments.paid_amount, 0)
                 THEN COALESCE(cases.price, 0) - COALESCE(payments.paid_amount, 0) ELSE 0 END) AS unpaid_amount')
+            // Count of this patient's cases that still carry a balance (Reports:
+            // Outstanding Balances "عدد الحالات غير المسددة").
+            ->selectRaw('SUM(CASE WHEN COALESCE(cases.price, 0) > COALESCE(payments.paid_amount, 0) THEN 1 ELSE 0 END) AS unpaid_case_count')
             ->selectRaw('SUM(COALESCE(payments.period_paid_amount, 0)) AS period_paid_amount')
             ->selectRaw('SUM(COALESCE(payments.period_payment_count, 0)) AS period_payment_count')
             ->selectRaw('MAX(payments.period_last_payment_at) AS last_payment_at')
+            // Last visit = most recent case opened for the patient (Reports: "آخر زيارة").
+            ->selectRaw('MAX(cases.created_at) AS last_visit_at')
             ->groupBy('cases.patient_id');
 
         if (! empty($filters['doctor_id'])) {
@@ -79,14 +84,21 @@ class BillingOverviewRepository
             ->joinSub($caseBalances, 'balances', 'balances.patient_id', '=', 'patients.id')
             ->whereNull('patients.deleted_at')
             ->select('patients.id', 'patients.name', 'patients.phone', 'balances.case_count',
-                'balances.total_price', 'balances.paid_amount', 'balances.unpaid_amount', 'balances.last_payment_at',
-                'balances.period_paid_amount', 'balances.period_payment_count');
+                'balances.unpaid_case_count', 'balances.total_price', 'balances.paid_amount', 'balances.unpaid_amount',
+                'balances.last_payment_at', 'balances.last_visit_at', 'balances.period_paid_amount', 'balances.period_payment_count');
 
         $this->applySearch($query, $filters);
         if (($filters['payment_status'] ?? null) === 'paid') {
             $query->where('balances.unpaid_amount', '=', 0);
         } elseif (($filters['payment_status'] ?? null) === 'unpaid') {
             $query->where('balances.unpaid_amount', '>', 0);
+        }
+        // Reports: "Outstanding Balances" amount-range filter (e.g. 100,000 - 500,000).
+        if (! empty($filters['balance_min'])) {
+            $query->where('balances.unpaid_amount', '>=', (float) $filters['balance_min']);
+        }
+        if (! empty($filters['balance_max'])) {
+            $query->where('balances.unpaid_amount', '<=', (float) $filters['balance_max']);
         }
 
         if (! empty($filters['date_from']) || ! empty($filters['date_to'])) {
@@ -120,12 +132,14 @@ class BillingOverviewRepository
             'name' => $patient->name,
             'phone' => $patient->phone,
             'case_count' => (int) $patient->case_count,
+            'unpaid_case_count' => (int) $patient->unpaid_case_count,
             'total_price' => (int) $patient->total_price,
             'paid_amount' => (int) $patient->paid_amount,
             ...($hasPeriod ? ['period_paid_amount' => (int) $patient->period_paid_amount] : []),
             'unpaid_amount' => (int) $patient->unpaid_amount,
             // The schema has no paid_at. This is the recorded bill creation date.
             'last_payment_at' => $patient->last_payment_at,
+            'last_visit_at' => $patient->last_visit_at,
             'payment_status' => (int) $patient->unpaid_amount === 0 ? 'paid' : 'unpaid',
         ]);
 
@@ -177,10 +191,12 @@ class BillingOverviewRepository
                 'name' => $patient->name,
                 'phone' => $patient->phone,
                 'case_count' => 0,
+                'unpaid_case_count' => 0,
                 'total_price' => 0,
                 'paid_amount' => 0,
                 'unpaid_amount' => 0,
                 'last_payment_at' => null,
+                'last_visit_at' => null,
                 'payment_status' => 'paid',
             ],
         ];

@@ -14,8 +14,7 @@ class ReservationReportController extends Controller
     use DoctorFilterTrait;
     public function __construct(private ReportsRepository $reportsRepository)
     {
-        // Permissions can be added here if needed
-        // $this->middleware('permission:view-reports')->only(['summary', 'byStatus', 'byDoctor', 'trend']);
+        $this->middleware('permission:view-reports')->only(['summary', 'byStatus', 'byDoctor', 'trend']);
     }
 
     /**

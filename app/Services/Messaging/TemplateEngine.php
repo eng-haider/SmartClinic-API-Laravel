@@ -56,6 +56,7 @@ class TemplateEngine
         $vars = [
             'patient_name' => $patient->name ?? '',
             'patient_phone' => $patient->phone ?? '',
+            'profile_url' => $this->profileUrl($patient),
         ];
 
         if ($case) {
@@ -84,9 +85,23 @@ class TemplateEngine
             'case_notes' => 'ملاحظات العلاج',
             'doctor_name' => 'د. علي',
             'clinic_name' => 'عيادة الصحة',
+            'profile_url' => rtrim(config('app.frontend_url'), '/') . '/public/patient/example',
             'notes' => 'ملاحظات إضافية',
         ];
 
         return $this->render($templateKey, $sampleVars);
+    }
+
+    /**
+     * Public patient-profile link in the clinic web app (same path the
+     * frontend builds for its "share profile" template).
+     */
+    private function profileUrl(?Patient $patient): string
+    {
+        if (!$patient?->public_token) {
+            return '';
+        }
+
+        return rtrim(config('app.frontend_url'), '/') . '/public/patient/' . $patient->public_token;
     }
 }

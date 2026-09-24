@@ -37,6 +37,14 @@ use App\Http\Controllers\Report\PatientReportController;
 use App\Http\Controllers\Report\CaseReportController;
 use App\Http\Controllers\Report\ReservationReportController;
 use App\Http\Controllers\Report\FinancialReportController;
+use App\Http\Controllers\Report\OverviewReportController;
+use App\Http\Controllers\Report\DoctorReportController;
+use App\Http\Controllers\Report\PatientAccountReportController;
+use App\Http\Controllers\Report\CaseCategoryReportController;
+use App\Http\Controllers\Report\RevenueReportController;
+use App\Http\Controllers\Report\ExpenseReportController;
+use App\Http\Controllers\Report\AppointmentReportController;
+use App\Http\Controllers\Report\OutstandingBalanceReportController;
 use App\Http\Controllers\AIController;
 use App\Http\Controllers\AutomationRuleController;
 use App\Http\Controllers\AutomationTargetController;
@@ -285,7 +293,40 @@ Route::middleware([
     // REPORTS & ANALYTICS ROUTES (JWT required)
     // ============================================
     Route::middleware('jwt')->prefix('reports')->group(function () {
-        
+
+        // Reports Module: overview (KPIs + clinic summary for the selected period)
+        Route::get('overview', [OverviewReportController::class, 'index']);
+
+        // Reports Module: doctors report (list + drill-down)
+        Route::prefix('doctors')->group(function () {
+            Route::get('/', [DoctorReportController::class, 'index']);
+            Route::get('/{doctor}', [DoctorReportController::class, 'show'])->whereNumber('doctor');
+        });
+
+        // Reports Module: patient accounts report (list + drill-down)
+        Route::prefix('patient-accounts')->group(function () {
+            Route::get('/', [PatientAccountReportController::class, 'index']);
+            Route::get('/{patient}', [PatientAccountReportController::class, 'show'])->whereNumber('patient');
+        });
+
+        // Reports Module: cases grouped by category (list + drill-down)
+        Route::prefix('case-categories')->group(function () {
+            Route::get('/', [CaseCategoryReportController::class, 'index']);
+            Route::get('/{category}', [CaseCategoryReportController::class, 'show'])->whereNumber('category');
+        });
+
+        // Reports Module: revenue & payments table
+        Route::get('revenue/payments', [RevenueReportController::class, 'payments']);
+
+        // Reports Module: expenses table
+        Route::get('expenses/list', [ExpenseReportController::class, 'index']);
+
+        // Reports Module: appointments table
+        Route::get('appointments/list', [AppointmentReportController::class, 'index']);
+
+        // Reports Module: outstanding balances table
+        Route::get('outstanding-balances', [OutstandingBalanceReportController::class, 'index']);
+
         // Dashboard Overview
         Route::get('dashboard/overview', [DashboardReportController::class, 'overview']);
         Route::get('dashboard/today', [DashboardReportController::class, 'today']);

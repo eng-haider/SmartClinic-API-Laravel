@@ -15,8 +15,7 @@ class CaseReportController extends Controller
 
     public function __construct(private ReportsRepository $reportsRepository)
     {
-        // Permissions can be added here if needed
-        // $this->middleware('permission:view-reports')->only(['summary', 'byCategory', 'byStatus', 'byDoctor', 'trend']);
+        $this->middleware('permission:view-reports')->only(['summary', 'byCategory', 'byStatus', 'byDoctor', 'trend']);
     }
 
     /**

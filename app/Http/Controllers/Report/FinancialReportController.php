@@ -14,8 +14,11 @@ class FinancialReportController extends Controller
     use DoctorFilterTrait;
     public function __construct(private ReportsRepository $reportsRepository)
     {
-        // Permissions can be added here if needed
-        // $this->middleware('permission:view-reports')->only([...]);
+        $this->middleware('permission:view-reports')->only([
+            'billsSummary', 'revenueByDoctor', 'revenueTrend', 'billsByPaymentStatus',
+            'expensesSummary', 'expensesByCategory', 'expensesTrend',
+            'profitLoss', 'profitLossTrend', 'doctorPerformance',
+        ]);
     }
 
     /**

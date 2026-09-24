@@ -15,7 +15,7 @@ class BillReportController extends Controller
 
     public function __construct(private BillRepository $billRepository)
     {
-        // permission middleware can be added here if needed
+        $this->middleware('permission:view-reports')->only(['index']);
     }
 
     /**
