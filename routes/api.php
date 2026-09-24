@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AppVersionController;
 use App\Http\Controllers\BillController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\CaseController;
@@ -87,6 +88,11 @@ Route::post('auth/demo-register', [\App\Http\Controllers\DemoRegisterController:
 Route::post('auth/check-credentials', [AuthController::class, 'checkCredentials']); // ← خطوة 1: التحقق
 Route::post('auth/login', [AuthController::class, 'login']); // ← قديم (بدون tenant)
 Route::post('auth/smart-login', [AuthController::class, 'smartLogin']); // ← الدخول الذكي
+
+// Public mobile app release metadata. The APK itself can live on the public
+// disk, a CDN, or any HTTPS URL stored in the central app_versions table.
+Route::get('public/app-versions/latest', [AppVersionController::class, 'latest'])
+    ->middleware('throttle:60,1');
 
 // Protected auth routes (JWT required)
 Route::middleware('jwt')->group(function () {
@@ -311,4 +317,3 @@ Route::middleware('jwt')->prefix('reports')->group(function () {
     // Legacy bill report (kept for backward compatibility)
     Route::get('bills', [BillReportController::class, 'index'])->name('reports.bills.legacy');
 });
-
