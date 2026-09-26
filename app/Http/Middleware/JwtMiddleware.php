@@ -27,6 +27,14 @@ class JwtMiddleware
                 'message' => 'Token invalid or expired',
                 'error' => $e->getMessage(),
             ], 401);
+        } catch (\PDOException | \Illuminate\Database\QueryException $e) {
+            // Database unreachable — not an auth problem. Return 503 so clients retry instead of logging out.
+            report($e);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Service temporarily unavailable, please retry',
+            ], 503);
         } catch (\Exception $e) {
 
             return response()->json([
