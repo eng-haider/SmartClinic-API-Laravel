@@ -36,29 +36,24 @@ class BillFactory extends Factory
             'doctor_id' => User::factory(),
             'creator_id' => $creator,
             'updator_id' => fake()->boolean(70) ? $creator : User::factory(),
-            'is_paid' => fake()->boolean(40),
             'use_credit' => fake()->boolean(15),
         ];
     }
 
     /**
-     * Indicate that the bill is paid.
+     * Indicate that the bill is paid (no-op: bills are always paid).
      */
     public function paid(): static
     {
-        return $this->state(fn (array $attributes) => [
-            'is_paid' => true,
-        ]);
+        return $this->state(fn (array $attributes) => []);
     }
 
     /**
-     * Indicate that the bill is unpaid.
+     * Indicate that the bill is unpaid (no-op: bills are always paid).
      */
     public function unpaid(): static
     {
-        return $this->state(fn (array $attributes) => [
-            'is_paid' => false,
-        ]);
+        return $this->state(fn (array $attributes) => []);
     }
 
     /**

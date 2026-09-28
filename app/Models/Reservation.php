@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasEmbeddings;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -9,7 +10,7 @@ use Illuminate\Support\Facades\Auth;
 
 class Reservation extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasEmbeddings;
 
     /**
      * The attributes that are mass assignable.
@@ -20,6 +21,8 @@ class Reservation extends Model
         'patient_id',
         'doctor_id',
         'status_id',
+        'reservation_type_id',
+        'reservation_type_note',
         'notes',
         'reservation_start_date',
         'reservation_end_date',
@@ -41,6 +44,7 @@ class Reservation extends Model
             'patient_id' => 'integer',
             'doctor_id' => 'integer',
             'status_id' => 'integer',
+            'reservation_type_id' => 'integer',
             'creator_id' => 'integer',
             'updator_id' => 'integer',
             'reservation_start_date' => 'date',
@@ -96,6 +100,14 @@ class Reservation extends Model
     public function status()
     {
         return $this->belongsTo(Status::class);
+    }
+
+    /**
+     * Get the type of the reservation.
+     */
+    public function reservationType()
+    {
+        return $this->belongsTo(ReservationType::class);
     }
 
     /**
@@ -197,5 +209,27 @@ class Reservation extends Model
         return $query->whereDate('reservation_start_date', '<=', now()->toDateString())
                      ->whereDate('reservation_end_date', '>=', now()->toDateString())
                      ->orderBy('reservation_from_time');
+    }
+
+    /**
+     * Convert reservation data to embedding content string.
+     */
+    public function toEmbeddingContent(): string
+    {
+        $parts = [
+            "Appointment/Reservation",
+            $this->patient ? "Patient: {$this->patient->name}" : null,
+            $this->doctor ? "Doctor: {$this->doctor->name}" : null,
+            $this->reservation_start_date ? "Date: {$this->reservation_start_date->format('Y-m-d')}" : null,
+            $this->reservation_from_time ? "From: {$this->reservation_from_time}" : null,
+            $this->reservation_to_time ? "To: {$this->reservation_to_time}" : null,
+            $this->status ? "Status: {$this->status->name}" : null,
+            $this->reservationType ? "Type: {$this->reservationType->name}" : null,
+            $this->reservation_type_note ? "Type Note: {$this->reservation_type_note}" : null,
+            $this->is_waiting ? "Waiting: Yes" : "Waiting: No",
+            $this->getAttribute('notes') ? "Notes: {$this->getAttribute('notes')}" : null,
+        ];
+
+        return implode('. ', array_filter($parts));
     }
 }

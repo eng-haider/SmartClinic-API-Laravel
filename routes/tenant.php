@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 use App\Http\Middleware\InitializeTenancyByHeader;
+use App\Http\Middleware\InitializeTenancyByPatientToken;
 
 // Controllers
 use App\Http\Controllers\AuthController;
@@ -15,14 +16,20 @@ use App\Http\Controllers\CaseController;
 use App\Http\Controllers\CaseCategoryController;
 use App\Http\Controllers\ClinicExpenseController;
 use App\Http\Controllers\ClinicExpenseCategoryController;
+use App\Http\Controllers\WarehouseItemController;
+use App\Http\Controllers\CaseCategoryWarehouseController;
 use App\Http\Controllers\ClinicSettingController;
 use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\MedicationController;
 use App\Http\Controllers\RecipeController;
 use App\Http\Controllers\DoctorController;
 use App\Http\Controllers\SecretaryController;
 use App\Http\Controllers\NoteController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\PublicPatientController;
+use App\Http\Controllers\PublicBookingController;
+use App\Http\Controllers\BookingRequestController;
 use App\Http\Controllers\PatientPublicProfileController;
 use App\Http\Controllers\Report\BillReportController;
 use App\Http\Controllers\Report\DashboardReportController;
@@ -30,6 +37,20 @@ use App\Http\Controllers\Report\PatientReportController;
 use App\Http\Controllers\Report\CaseReportController;
 use App\Http\Controllers\Report\ReservationReportController;
 use App\Http\Controllers\Report\FinancialReportController;
+use App\Http\Controllers\Report\OverviewReportController;
+use App\Http\Controllers\Report\DoctorReportController;
+use App\Http\Controllers\Report\PatientAccountReportController;
+use App\Http\Controllers\Report\CaseCategoryReportController;
+use App\Http\Controllers\Report\RevenueReportController;
+use App\Http\Controllers\Report\ExpenseReportController;
+use App\Http\Controllers\Report\AppointmentReportController;
+use App\Http\Controllers\Report\OutstandingBalanceReportController;
+use App\Http\Controllers\AIController;
+use App\Http\Controllers\AutomationRuleController;
+use App\Http\Controllers\AutomationTargetController;
+use App\Http\Controllers\MessageTemplateController;
+use App\Http\Controllers\MessagingSettingController;
+use App\Http\Controllers\ConversationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -42,6 +63,32 @@ use App\Http\Controllers\Report\FinancialReportController;
 | Feel free to customize them however you want. Good luck!
 |
 */
+
+// ============================================
+// PUBLIC PATIENT ROUTES (No auth required)
+// Tenant resolved automatically from patient token
+// Also supports: ?clinic=ID or X-Tenant-ID header
+// ============================================
+Route::middleware(['api', InitializeTenancyByPatientToken::class])
+    ->prefix('api/tenant/public/patients')
+    ->group(function () {
+        Route::get('/{token}', [PublicPatientController::class, 'show']);
+        Route::get('/{token}/cases', [PublicPatientController::class, 'cases']);
+        Route::get('/{token}/images', [PublicPatientController::class, 'images']);
+        Route::get('/{token}/reservations', [PublicPatientController::class, 'reservations']);
+    });
+
+// ============================================
+// PUBLIC BOOKING (No auth required)
+// Clinic website booking page posts here.
+// Tenant (clinic) resolved from ?clinic=ID or X-Tenant-ID / X-Clinic-ID header.
+// ============================================
+Route::middleware(['api', InitializeTenancyByPatientToken::class])
+    ->prefix('api/tenant/public')
+    ->group(function () {
+        Route::post('/booking-requests', [PublicBookingController::class, 'store']);
+        Route::get('/clinic-info', [PublicBookingController::class, 'clinicInfo']);
+    });
 
 // ============================================
 // TENANT API ROUTES (Initialized by Header)
@@ -92,6 +139,22 @@ Route::middleware([
         Route::patch('reservations/{reservation}/status', [ReservationController::class, 'changeStatus']);
     });
 
+    // Booking request routes (public website submissions awaiting staff review)
+    Route::middleware('jwt')->group(function () {
+        Route::get('booking-requests', [BookingRequestController::class, 'index']);
+        Route::get('booking-requests/{id}', [BookingRequestController::class, 'show']);
+        Route::post('booking-requests/{id}/approve', [BookingRequestController::class, 'approve']);
+        Route::post('booking-requests/{id}/reject', [BookingRequestController::class, 'reject']);
+        Route::delete('booking-requests/{id}', [BookingRequestController::class, 'destroy']);
+    });
+
+    // Medication library routes
+    Route::middleware('jwt')->group(function () {
+        Route::get('medications', [MedicationController::class, 'index']);
+        Route::post('medications', [MedicationController::class, 'store']);
+        Route::delete('medications/{id}', [MedicationController::class, 'destroy']);
+    });
+
     // Recipe routes
     Route::middleware('jwt')->group(function () {
         Route::apiResource('recipes', RecipeController::class);
@@ -106,12 +169,38 @@ Route::middleware([
         Route::patch('bills/{id}/mark-paid', [BillController::class, 'markAsPaid']);
         Route::patch('bills/{id}/mark-unpaid', [BillController::class, 'markAsUnpaid']);
         Route::get('bills/patient/{patientId}', [BillController::class, 'byPatient']);
+        Route::get('bills/statistics/summary', [BillController::class, 'statistics'])->name('tenant.bills.statistics');
     });
 
     // Clinic expense routes
     Route::middleware('jwt')->group(function () {
         Route::apiResource('clinic-expense-categories', ClinicExpenseCategoryController::class);
         Route::apiResource('clinic-expenses', ClinicExpenseController::class);
+        Route::get('clinic-expenses-summary', [ClinicExpenseController::class, 'summary']);
+        Route::post('clinic-expenses/bulk-mark-paid', [ClinicExpenseController::class, 'markAsPaidByDateRange']);
+    });
+
+    // Warehouse / inventory routes
+    Route::middleware('jwt')->group(function () {
+        // Custom actions first so they aren't shadowed by the {warehouse_item} wildcard.
+        Route::get('warehouse-items-low-stock', [WarehouseItemController::class, 'lowStock'])->name('warehouse-items.low-stock');
+        Route::post('warehouse-items/{id}/restock', [WarehouseItemController::class, 'restock'])->name('warehouse-items.restock');
+        Route::post('warehouse-items/{id}/adjust', [WarehouseItemController::class, 'adjust'])->name('warehouse-items.adjust');
+        Route::get('warehouse-items/{id}/transactions', [WarehouseItemController::class, 'transactions'])->name('warehouse-items.transactions');
+        Route::apiResource('warehouse-items', WarehouseItemController::class);
+
+        // Default kit (bill of materials) per case category
+        Route::get('case-categories/{id}/warehouse-items', [CaseCategoryWarehouseController::class, 'index'])->name('case-categories.warehouse-items.index');
+        Route::put('case-categories/{id}/warehouse-items', [CaseCategoryWarehouseController::class, 'sync'])->name('case-categories.warehouse-items.sync');
+    });
+
+    // Notification routes
+    Route::middleware('jwt')->group(function () {
+        Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
+        Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+        Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
+        Route::delete('notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
     });
 
     // Note routes
@@ -122,6 +211,12 @@ Route::middleware([
 
     // Image routes
     Route::middleware('jwt')->group(function () {
+        // Custom routes must come BEFORE apiResource
+        Route::get('images/by-imageable', [ImageController::class, 'getByImageable'])->name('images.by-imageable');
+        Route::get('images/statistics/summary', [ImageController::class, 'statistics'])->name('images.statistics');
+        Route::patch('images/{id}/order', [ImageController::class, 'updateOrder'])->name('images.update-order');
+        
+        // Standard CRUD operations
         Route::apiResource('images', ImageController::class);
     });
 
@@ -149,13 +244,89 @@ Route::middleware([
         Route::get('/{key}', [ClinicSettingController::class, 'show']);
         Route::put('/{key}', [ClinicSettingController::class, 'update']);
         Route::post('/bulk-update', [ClinicSettingController::class, 'updateBulk']);
+        Route::post('/upload-logo', [ClinicSettingController::class, 'uploadLogo']);
+        Route::delete('/{key}', [ClinicSettingController::class, 'destroy']);
+    });
+
+    // ============================================
+    // AI CHATBOT ROUTES (JWT required)
+    // Uses pgvector RAG for context-aware answers
+    // ============================================
+    Route::middleware('jwt')->prefix('ai')->group(function () {
+        Route::post('chat', [AIController::class, 'chat']);
+        Route::post('analyze-xray', [AIController::class, 'analyzeXray']);
+        Route::post('sync-embeddings', [AIController::class, 'syncEmbeddings']);
+        Route::post('sync-medical-knowledge', [AIController::class, 'syncMedicalKnowledge']);
+        Route::get('capabilities', [AIController::class, 'getCapabilities']);
+    });
+
+    // ============================================
+    // MESSAGING & AUTOMATION ROUTES (JWT required)
+    // ============================================
+    Route::middleware('jwt')->prefix('messaging')->group(function () {
+        // Messaging Settings
+        Route::get('settings', [MessagingSettingController::class, 'index']);
+        Route::post('settings', [MessagingSettingController::class, 'upsert']);
+        Route::post('settings/test-connection', [MessagingSettingController::class, 'testConnection']);
+        Route::get('settings/webhook-info', [MessagingSettingController::class, 'webhookInfo']);
+
+        // Message Templates
+        Route::apiResource('templates', MessageTemplateController::class);
+        Route::get('templates/{id}/preview', [MessageTemplateController::class, 'preview']);
+
+        // Automation Rules
+        Route::apiResource('automation-rules', AutomationRuleController::class);
+        Route::post('automation-rules/{id}/trigger', [AutomationRuleController::class, 'trigger']);
+
+        // Automation Targets
+        Route::get('automation-targets', [AutomationTargetController::class, 'index']);
+        Route::get('automation-targets/{id}', [AutomationTargetController::class, 'show']);
+        Route::post('automation-targets/{id}/cancel', [AutomationTargetController::class, 'cancel']);
+
+        // Conversations
+        Route::get('conversations', [ConversationController::class, 'index']);
+        Route::get('conversations/{id}', [ConversationController::class, 'show']);
+        Route::post('conversations/{id}/send', [ConversationController::class, 'sendMessage']);
     });
 
     // ============================================
     // REPORTS & ANALYTICS ROUTES (JWT required)
     // ============================================
     Route::middleware('jwt')->prefix('reports')->group(function () {
-        
+
+        // Reports Module: overview (KPIs + clinic summary for the selected period)
+        Route::get('overview', [OverviewReportController::class, 'index']);
+
+        // Reports Module: doctors report (list + drill-down)
+        Route::prefix('doctors')->group(function () {
+            Route::get('/', [DoctorReportController::class, 'index']);
+            Route::get('/{doctor}', [DoctorReportController::class, 'show'])->whereNumber('doctor');
+        });
+
+        // Reports Module: patient accounts report (list + drill-down)
+        Route::prefix('patient-accounts')->group(function () {
+            Route::get('/', [PatientAccountReportController::class, 'index']);
+            Route::get('/{patient}', [PatientAccountReportController::class, 'show'])->whereNumber('patient');
+        });
+
+        // Reports Module: cases grouped by category (list + drill-down)
+        Route::prefix('case-categories')->group(function () {
+            Route::get('/', [CaseCategoryReportController::class, 'index']);
+            Route::get('/{category}', [CaseCategoryReportController::class, 'show'])->whereNumber('category');
+        });
+
+        // Reports Module: revenue & payments table
+        Route::get('revenue/payments', [RevenueReportController::class, 'payments']);
+
+        // Reports Module: expenses table
+        Route::get('expenses/list', [ExpenseReportController::class, 'index']);
+
+        // Reports Module: appointments table
+        Route::get('appointments/list', [AppointmentReportController::class, 'index']);
+
+        // Reports Module: outstanding balances table
+        Route::get('outstanding-balances', [OutstandingBalanceReportController::class, 'index']);
+
         // Dashboard Overview
         Route::get('dashboard/overview', [DashboardReportController::class, 'overview']);
         Route::get('dashboard/today', [DashboardReportController::class, 'today']);

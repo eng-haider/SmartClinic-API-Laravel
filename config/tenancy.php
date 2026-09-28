@@ -12,6 +12,13 @@ return [
     'domain_model' => Domain::class,
 
     /**
+     * Static secret required (X-Admin-Key header) on the central tenant
+     * management endpoints: list, show, update, delete, migrate, seed.
+     * Leave empty to disable those endpoints entirely.
+     */
+    'admin_key' => env('TENANT_ADMIN_KEY'),
+
+    /**
      * The list of domains hosting your central app.
      *
      * Only relevant if you're using the domain or subdomain identification middleware.
@@ -19,6 +26,8 @@ return [
     'central_domains' => [
         '127.0.0.1',
         'localhost',
+        'api.smartclinic.software',
+        'smartclinic.software',
     ],
 
     /**

@@ -8,6 +8,16 @@ use Illuminate\Support\Collection;
 
 class ClinicSettingRepository extends BaseRepository
 {
+    /**
+     * How baby (primary) teeth are labelled on the dental chart.
+     * 'fdi' -> 51-85, 'universal' -> A-T, 'palmer' -> A-E per quadrant.
+     * Cases are always STORED with the FDI number - this only changes the label,
+     * so switching notation never touches existing data.
+     */
+    public const BABY_TEETH_NOTATION_KEY = 'baby_teeth_notation';
+    public const BABY_TEETH_NOTATIONS = ['fdi', 'universal', 'palmer'];
+    public const DEFAULT_BABY_TEETH_NOTATION = 'fdi';
+
     public function __construct(ClinicSetting $model)
     {
         parent::__construct($model);
@@ -18,21 +28,24 @@ class ClinicSettingRepository extends BaseRepository
      */
     public function getAllByClinic(): Collection
     {
-        $query = $this->query()->with('definition');
+        // Don't eager load 'definition' - it's in central DB, not tenant DB
+        $query = $this->query();
         
         return $query->orderBy('setting_key')->get();
     }
 
     /**
      * Get all settings grouped by category.
+     * Groups settings by inferring category from setting key prefix.
      */
     public function getAllByClinicGrouped(): array
     {
-        $query = $this->query()->with('definition');
+        // Don't eager load 'definition' - it's in central DB, not tenant DB
+        $query = $this->query();
         
         $settings = $query->get();
 
-        // Group by category from definition
+        // Group by category (inferred from setting key or default)
         $grouped = [];
         $categories = SettingDefinition::categories();
 
@@ -44,7 +57,8 @@ class ClinicSettingRepository extends BaseRepository
         }
 
         foreach ($settings as $setting) {
-            $category = $setting->definition?->category ?? 'general';
+            // Infer category from setting key
+            $category = $this->inferCategory($setting->setting_key);
             
             if (!isset($grouped[$category])) {
                 $grouped[$category] = [
@@ -53,15 +67,21 @@ class ClinicSettingRepository extends BaseRepository
                 ];
             }
 
+            // The logo is stored as a disk-relative path; hand the client a URL it can
+            // actually render (the raw path stays available in setting_value_raw).
+            $value = $setting->setting_key === 'logo'
+                ? ClinicSetting::fileUrl($setting->setting_value)
+                : $setting->getValue();
+
             $grouped[$category]['settings'][] = [
                 'id' => $setting->id,
                 'setting_key' => $setting->setting_key,
-                'setting_value' => $setting->getValue(),
+                'setting_value' => $value,
                 'setting_value_raw' => $setting->setting_value,
                 'setting_type' => $setting->setting_type,
                 'description' => $setting->description,
-                'is_required' => $setting->definition?->is_required ?? false,
-                'display_order' => $setting->definition?->display_order ?? 0,
+                'is_required' => false, // Default since we don't have definition
+                'display_order' => $this->getDisplayOrder($setting->setting_key),
                 'is_active' => $setting->is_active,
                 'updated_at' => $setting->updated_at?->format('Y-m-d H:i:s'),
             ];
@@ -83,7 +103,8 @@ class ClinicSettingRepository extends BaseRepository
      */
     public function getByKey( string $key): ?ClinicSetting
     {
-        $query = $this->query()->where('setting_key', $key)->with('definition');
+        // Don't eager load 'definition' - it's in central DB, not tenant DB
+        $query = $this->query()->where('setting_key', $key);
         
         return $query->first();
     }
@@ -100,7 +121,7 @@ class ClinicSettingRepository extends BaseRepository
             return null;
         }
 
-        $setting->setting_value = $this->prepareValue($value, $setting->setting_type);
+        $setting->setting_value = $this->prepareValue($this->normalizeValue($key, $value), $setting->setting_type);
         $setting->save();
 
         return $setting->fresh();
@@ -109,24 +130,20 @@ class ClinicSettingRepository extends BaseRepository
     /**
      * Update or create a clinic setting.
      */
-    public function updateOrCreate( string $key, array $data): ClinicSetting
+    public function updateOrCreate(string $key, array $data): ClinicSetting
     {
         $settingData = [
             'setting_key' => $key,
-            'setting_value' => $this->prepareValue($data['setting_value'] ?? '', $data['setting_type'] ?? 'string'),
+            'setting_value' => $this->prepareValue(
+                $this->normalizeValue($key, $data['setting_value'] ?? ''),
+                $data['setting_type'] ?? 'string'
+            ),
             'setting_type' => $data['setting_type'] ?? 'string',
             'description' => $data['description'] ?? null,
             'is_active' => $data['is_active'] ?? true,
         ];
-        
-        if ($clinicId !== null) {
-            $settingData['clinic_id'] = $clinicId;
-        }
 
         $whereConditions = ['setting_key' => $key];
-        if ($clinicId !== null) {
-            $whereConditions['clinic_id'] = $clinicId;
-        }
 
         return $this->model->updateOrCreate($whereConditions, $settingData);
     }
@@ -162,13 +179,29 @@ class ClinicSettingRepository extends BaseRepository
     /**
      * Prepare value based on type for storage.
      */
+    private function normalizeValue(string $key, $value)
+    {
+        // Guard the keys that only accept a known set of values, so a typo from
+        // any client cannot leave the chart with a notation nothing understands.
+        if ($key === self::BABY_TEETH_NOTATION_KEY) {
+            return in_array($value, self::BABY_TEETH_NOTATIONS, true)
+                ? $value
+                : self::DEFAULT_BABY_TEETH_NOTATION;
+        }
+
+        return $value;
+    }
+
+    /**
+     * Prepare a value for storage based on its type.
+     */
     private function prepareValue($value, string $type): string
     {
         return match ($type) {
             'boolean' => $value ? '1' : '0',
             'integer' => (string) (int) $value,
-            'json' => is_array($value) ? json_encode($value) : $value,
-            default => (string) $value,
+            'json' => is_string($value) ? $value : json_encode($value),
+            default => is_array($value) ? json_encode($value) : (string) $value,
         };
     }
 
@@ -193,14 +226,46 @@ class ClinicSettingRepository extends BaseRepository
     }
 
     /**
-     * Bulk update settings.
+     * The clinic's public identity: what an unauthenticated visitor is allowed
+     * to see about the clinic itself (booking page, public patient profile).
+     *
+     * Kept here rather than in each controller so every public surface shows
+     * the same branding.
      */
-    public function bulkUpdate( array $settings): Collection
+    public function publicIdentity(): array
+    {
+        $settings = $this->getByKeys([
+            'clinic_name', 'logo', 'phone', 'email', 'address', 'working_hours',
+            self::BABY_TEETH_NOTATION_KEY,
+        ]);
+
+        $value = fn (string $key) => $settings->get($key)?->getValue() ?: null;
+
+        return [
+            'name' => $value('clinic_name'),
+            'logo' => ClinicSetting::fileUrl($settings->get('logo')?->setting_value),
+            'phone' => $value('phone'),
+            'email' => $value('email'),
+            'address' => $value('address'),
+            'working_hours' => $value('working_hours'),
+            // The public patient profile draws the same dental chart, so it needs
+            // to know how this clinic labels baby teeth.
+            'baby_teeth_notation' => $this->normalizeValue(
+                self::BABY_TEETH_NOTATION_KEY,
+                $value(self::BABY_TEETH_NOTATION_KEY)
+            ),
+        ];
+    }
+
+    /**
+     * Bulk update clinic settings.
+     */
+    public function bulkUpdate(array $settings): Collection
     {
         $results = collect();
 
         foreach ($settings as $key => $value) {
-            $setting = $this->updateOrCreate($clinicId, $key, [
+            $setting = $this->updateOrCreate($key, [
                 'setting_value' => $value,
                 'setting_type' => $this->inferType($value),
             ]);
@@ -220,6 +285,7 @@ class ClinicSettingRepository extends BaseRepository
             return 'boolean';
         }
         
+        
         if (is_int($value)) {
             return 'integer';
         }
@@ -230,4 +296,106 @@ class ClinicSettingRepository extends BaseRepository
         
         return 'string';
     }
+
+    /**
+     * Infer category from setting key.
+     * Maps setting keys to their categories without relying on central DB.
+     */
+    private function inferCategory(string $key): string
+    {
+        // General category
+        if (in_array($key, ['clinic_name', 'logo', 'phone', 'email', 'address', 'clinic_reg_num', 'timezone', 'language', 'currency'])) {
+            return 'general';
+        }
+
+        // Appointment category
+        if (in_array($key, ['appointment_duration', 'working_hours', 'enable_online_booking', 'max_appointments_per_day'])) {
+            return 'appointment';
+        }
+
+        // Notification category
+        if (in_array($key, ['enable_sms', 'enable_email', 'enable_whatsapp', 'whatsapp_number', 'reminder_before_hours'])) {
+            return 'notification';
+        }
+
+        // Financial category
+        if (in_array($key, ['tax_rate', 'enable_invoicing', 'default_payment_method', 'doctor_bills_isolation'])) {
+            return 'financial';
+        }
+
+        // Display category
+        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY])) {
+            return 'display';
+        }
+
+        // Social category
+        if (in_array($key, ['facebook_url', 'instagram_url', 'twitter_url'])) {
+            return 'social';
+        }
+
+        // Medical category
+        if (in_array($key, ['specializations'])) {
+            return 'medical';
+        }
+
+        // Default to general
+        return 'general';
+    }
+
+    /**
+     * Get display order for a setting key.
+     * Provides ordering without relying on central DB.
+     */
+    private function getDisplayOrder(string $key): int
+    {
+        $order = [
+            // General (1-9)
+            'clinic_name' => 1,
+            'logo' => 2,
+            'phone' => 3,
+            'email' => 4,
+            'address' => 5,
+            'clinic_reg_num' => 6,
+            'timezone' => 7,
+            'language' => 8,
+            'currency' => 9,
+
+            // Appointment (10-13)
+            'appointment_duration' => 10,
+            'working_hours' => 11,
+            'enable_online_booking' => 12,
+            'max_appointments_per_day' => 13,
+
+            // Notification (14-18)
+            'enable_sms' => 14,
+            'enable_email' => 15,
+            'enable_whatsapp' => 16,
+            'whatsapp_number' => 17,
+            'reminder_before_hours' => 18,
+
+            // Financial (19-22)
+            'tax_rate' => 19,
+            'enable_invoicing' => 20,
+            'default_payment_method' => 21,
+            'doctor_bills_isolation' => 22,
+
+            // Display (22-25)
+            'show_image_case' => 22,
+            'show_rx_id' => 23,
+            'teeth_v2' => 24,
+            'tooth_colors' => 25,
+            'baby_teeth_notation' => 26,
+
+            // Social (26-28)
+            'facebook_url' => 26,
+            'instagram_url' => 27,
+            'twitter_url' => 28,
+
+            // Medical (29)
+            'specializations' => 29,
+        ];
+
+        return $order[$key] ?? 999; // Unknown settings go to the end
+    }
 }
+

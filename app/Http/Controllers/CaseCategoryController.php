@@ -34,7 +34,7 @@ class CaseCategoryController extends Controller
             'include',
         ]);
 
-        $perPage = $request->input('per_page', 15);
+        $perPage = $request->input('per_page', 1500);
         
         // Get clinic_id based on user role
         $clinicId = $this->getClinicIdByRole();

@@ -25,6 +25,7 @@ class CaseCategoryRepository
         return QueryBuilder::for(CaseCategory::class)
             ->allowedFilters([
                 'name',
+                'category_type',
                 'clinic_id',
             ])
             ->allowedSorts([

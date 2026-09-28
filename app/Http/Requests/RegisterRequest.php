@@ -26,9 +26,10 @@ class RegisterRequest extends FormRequest
             'password' => 'required|string|min:8|confirmed',
             
             // Clinic information (required for clinic_super_doctor registration)
-            'clinic_name' => 'required|string|max:255',
-            'clinic_address' => 'required|string|max:500',
-            'clinic_phone' => 'nullable|string|max:50',
+            'clinic_name'    => 'required|string|max:255',
+            'clinic_address' => 'nullable|string|max:500',
+            'clinic_phone'   => 'nullable|string|max:50',
+            'specialty'      => 'required|string|max:100',
             // 'clinic_email' => 'nullable|email|max:255',
         ];
     }

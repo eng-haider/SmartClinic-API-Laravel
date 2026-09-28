@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasEmbeddings;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,7 +11,7 @@ use Illuminate\Support\Str;
 
 class Patient extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasEmbeddings;
 
     /**
      * The attributes that are mass assignable.
@@ -22,6 +23,7 @@ class Patient extends Model
         'age',
         'doctor_id',
         'phone',
+        'phone2',
         'systemic_conditions',
         'sex',
         'address',
@@ -77,6 +79,9 @@ class Patient extends Model
             if (empty($model->public_token)) {
                 $model->public_token = Str::uuid()->toString();
             }
+            if ($model->is_public_profile_enabled === null) {
+                $model->is_public_profile_enabled = true;
+            }
             if (Auth::check()) {
                 $model->creator_id = Auth::id();
                 $model->updator_id = Auth::id();
@@ -88,6 +93,37 @@ class Patient extends Model
             if (Auth::check()) {
                 $model->updator_id = Auth::id();
             }
+        });
+
+        // Cascade soft-delete to all of the patient's related records.
+        // Only runs for soft deletes (not forceDelete, which cascades via DB constraints/manual cleanup).
+        static::deleting(function (Patient $patient) {
+            if ($patient->isForceDeleting()) {
+                return;
+            }
+
+            $patient->cases->each(function (CaseModel $case) {
+                $case->bills->each(fn ($bill) => $bill->delete());
+                $case->notes()->get()->each(fn ($note) => $note->delete());
+                $case->images->each(fn ($image) => $image->delete());
+                $case->delete();
+            });
+
+            $patient->reservations->each(function (Reservation $reservation) {
+                $reservation->bills->each(fn ($bill) => $bill->delete());
+                $reservation->notes()->get()->each(fn ($note) => $note->delete());
+                $reservation->delete();
+            });
+
+            $patient->recipes->each(function (Recipe $recipe) {
+                $recipe->recipeItems->each(fn ($item) => $item->delete());
+                $recipe->delete();
+            });
+
+            $patient->bills->each(fn ($bill) => $bill->delete());
+            $patient->bookingRequests->each(fn ($bookingRequest) => $bookingRequest->delete());
+            $patient->notes()->get()->each(fn ($note) => $note->delete());
+            $patient->images->each(fn ($image) => $image->delete());
         });
     }
 
@@ -156,6 +192,14 @@ class Patient extends Model
     }
 
     /**
+     * Get all of the patient's booking requests.
+     */
+    public function bookingRequests()
+    {
+        return $this->hasMany(BookingRequest::class);
+    }
+
+    /**
      * Get the patient's gender label.
      */
     public function getSexLabelAttribute(): string
@@ -220,11 +264,16 @@ class Patient extends Model
     /**
      * Get the public profile URL.
      *
+     * Includes ?clinic={tenant_id} so the API can resolve the tenant
+     * without requiring the caller to pass a header.
+     *
      * @return string
      */
     public function getPublicProfileUrlAttribute(): string
     {
-        return config('app.url') . '/api/public/patients/' . $this->public_token;
+        $tenantId = tenant('id');
+        $base = config('app.url') . '/api/tenant/public/patients/' . $this->public_token;
+        return $tenantId ? $base . '?clinic=' . $tenantId : $base;
     }
 
     /**
@@ -233,5 +282,52 @@ class Patient extends Model
     public function scopePublicEnabled($query)
     {
         return $query->where('is_public_profile_enabled', true);
+    }
+
+    /**
+     * Scope a query to only include patients with unpaid cases.
+     *
+     * Free cases (price = 0) are treated as paid, so they never make a patient
+     * show up as having unpaid cases. Mirrors scopeAllCasesPaid().
+     */
+    public function scopeHasUnpaidCases($query)
+    {
+        return $query->whereHas('cases', function ($q) {
+            $q->where('price', '!=', 0)
+              ->where('is_paid', false);
+        });
+    }
+
+    /**
+     * Scope a query to only include patients with all cases paid.
+     */
+    public function scopeAllCasesPaid($query)
+    {
+        return $query->whereDoesntHave('cases', function ($q) {
+            $q->where('price', '!=', 0)
+              ->where('is_paid', false);
+        })->whereHas('cases', function ($q) {
+            $q->where('price', '!=', 0);
+        });
+    }
+
+    /**
+     * Convert patient data to embedding content string.
+     */
+    public function toEmbeddingContent(): string
+    {
+        $parts = [
+            "Patient: {$this->name}",
+            $this->phone ? "Phone: {$this->phone}" : null,
+            $this->phone2 ? "Phone 2: {$this->phone2}" : null,
+            $this->age ? "Age: {$this->age}" : null,
+            "Sex: {$this->sex_label}",
+            $this->address ? "Address: {$this->address}" : null,
+            $this->systemic_conditions ? "Systemic Conditions: {$this->systemic_conditions}" : null,
+            $this->note ? "Notes: {$this->note}" : null,
+            $this->doctor ? "Doctor: {$this->doctor->name}" : null,
+        ];
+
+        return implode('. ', array_filter($parts));
     }
 }

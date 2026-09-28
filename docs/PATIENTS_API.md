@@ -214,6 +214,7 @@ Authorization: Bearer {token}
   "name": "John Doe",
   "age": 30,
   "phone": "01001234567",
+  "phone2": "01009876543",
   "sex": 1,
   "address": "123 Main St, Cairo",
   "birth_date": "1994-01-15",
@@ -233,6 +234,7 @@ Authorization: Bearer {token}
 | name | string | Yes | Patient's full name |
 | age | integer | No | Patient's age |
 | phone | string | Yes | Unique phone number |
+| phone2 | string | No | Additional phone number |
 | sex | integer | Yes | 1 = Male, 2 = Female |
 | address | string | No | Patient's address |
 | birth_date | date | No | Format: YYYY-MM-DD |

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Services\SpecialtyManager;
+
 use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
@@ -54,6 +56,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     protected $fillable = [
         'id',
         'name',
+        'specialty',
         'address',
         'rx_img',
         'whatsapp_template_sid',
@@ -66,6 +69,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'show_rx_id',
         'logo',
         'api_whatsapp',
+        'has_ai_bot',
         'data',
         // Hostinger database credentials (one user per database)
         'db_name',
@@ -126,6 +130,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             'send_msg' => 'boolean',
             'show_rx_id' => 'boolean',
             'api_whatsapp' => 'boolean',
+            'has_ai_bot' => 'boolean',
             'data' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
@@ -141,6 +146,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         return [
             'id',
             'name',
+            'specialty',
             'address',
             'rx_img',
             'whatsapp_template_sid',
@@ -153,6 +159,59 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             'show_rx_id',
             'logo',
             'api_whatsapp',
+            'has_ai_bot',
+            // Stored in real columns, not the `data` JSON blob — otherwise the
+            // model silently drops them and tenant connections get wrong creds.
+            'db_name',
+            'db_username',
+            'db_password',
         ];
+    }
+
+    // ========================================
+    // Specialty & Feature Methods
+    // ========================================
+
+    /**
+     * Check if this tenant is a dental clinic.
+     */
+    public function isDental(): bool
+    {
+        return ($this->specialty ?? 'dental') === 'dental';
+    }
+
+    /**
+     * Get the tenant's specialty (defaults to 'dental').
+     */
+    public function getSpecialty(): string
+    {
+        return $this->specialty ?? 'dental';
+    }
+
+    /**
+     * Get the tenant's feature flags.
+     */
+    public function features()
+    {
+        return $this->hasMany(TenantFeature::class, 'tenant_id');
+    }
+
+    /**
+     * Check if a specific feature is enabled for this tenant.
+     * Falls back to specialty handler defaults if not set in DB.
+     */
+    public function hasFeature(string $featureKey): bool
+    {
+        $feature = $this->features()
+            ->where('feature_key', $featureKey)
+            ->first();
+
+        if ($feature) {
+            return $feature->is_enabled;
+        }
+
+        // Fall back to specialty handler defaults
+        $defaults = SpecialtyManager::handler($this->getSpecialty())->defaultFeatures();
+        return $defaults[$featureKey] ?? false;
     }
 }

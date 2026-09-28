@@ -25,6 +25,11 @@ class RecipeRequest extends FormRequest
             'patient_id' => ['nullable', 'integer', 'exists:patients,id'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'doctors_id' => ['required', 'integer', 'exists:users,id'],
+            'recipe_items' => ['nullable', 'array'],
+            'recipe_items.*.medication_name' => ['required_with:recipe_items', 'string', 'max:255'],
+            'recipe_items.*.dosage' => ['nullable', 'string', 'max:255'],
+            'recipe_items.*.frequency' => ['nullable', 'string', 'max:255'],
+            'recipe_items.*.duration' => ['nullable', 'string', 'max:255'],
         ];
 
         return $rules;

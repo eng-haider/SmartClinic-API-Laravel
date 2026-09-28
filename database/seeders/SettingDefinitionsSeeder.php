@@ -250,6 +250,15 @@ class SettingDefinitionsSeeder extends Seeder
                 'display_order' => 4,
                 'is_required' => false,
             ],
+            [
+                'setting_key' => 'baby_teeth_notation',
+                'setting_type' => 'string',
+                'default_value' => 'fdi',
+                'description' => 'Baby teeth labels on the dental chart (fdi, universal or palmer)',
+                'category' => 'display',
+                'display_order' => 5,
+                'is_required' => false,
+            ],
 
             // ========================
             // SOCIAL CATEGORY

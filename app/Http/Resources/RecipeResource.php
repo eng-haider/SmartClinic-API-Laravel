@@ -25,6 +25,15 @@ class RecipeResource extends JsonResource
             // Relationships
             'patient' => new PatientResource($this->whenLoaded('patient')),
             'doctor' => new UserResource($this->whenLoaded('doctor')),
+            'recipe_items' => $this->whenLoaded('recipeItems', function () {
+                return $this->recipeItems->map(fn ($item) => [
+                    'id'              => $item->id,
+                    'medication_name' => $item->name,
+                    'dosage'          => $item->dosage,
+                    'frequency'       => $item->frequency,
+                    'duration'        => $item->duration,
+                ]);
+            }),
         ];
     }
 }

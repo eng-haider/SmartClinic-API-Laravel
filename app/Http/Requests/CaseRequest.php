@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\SpecialtyManager;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 
@@ -17,20 +18,30 @@ class CaseRequest extends FormRequest
 
     /**
      * Get the validation rules that apply to the request.
+     * Dynamically merges specialty-specific rules via SpecialtyManager.
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'patient_id' => 'required|exists:patients,id',
             'doctor_id' => 'nullable|exists:users,id',
-            'case_categores_id' => 'required|exists:case_categories,id',
+            'case_categores_id' => 'nullable|exists:case_categories,id',
             'status_id' => 'nullable|exists:statuses,id',
             'notes' => 'nullable|string|max:5000',
             'price' => 'nullable|integer|min:0',
-            'tooth_num' => 'nullable|string|max:500',
-            'root_stuffing' => 'nullable|string|max:500',
             'is_paid' => 'nullable|boolean',
+            'case_date' => 'nullable|date',
+
+            // Warehouse materials consumed in this case. Omit the key to fall back
+            // to the category's default kit; send [] to consume nothing.
+            'warehouse_items' => 'nullable|array',
+            'warehouse_items.*.warehouse_item_id' => 'required_with:warehouse_items|integer|exists:warehouse_items,id',
+            'warehouse_items.*.quantity' => 'required_with:warehouse_items|integer|min:1',
         ];
+
+        // Merge specialty-specific rules (dental: tooth_num, root_stuffing)
+        // (ophthalmology: eye_side, visual_acuity, iop, etc.)
+        return array_merge($rules, SpecialtyManager::handler()->validationRules());
     }
 
     /**
@@ -46,9 +57,11 @@ class CaseRequest extends FormRequest
 
         // Always set doctor_id from authenticated user
         // Set default status_id to 2 if not provided
+        // Set default case_date to current datetime if not provided
         $this->merge([
             'doctor_id' => $user->id,
             'status_id' => $this->status_id ?? 2,
+            'case_date' => $this->case_date ?? now()->toDateTimeString(),
         ]);
     }
 
@@ -67,6 +80,7 @@ class CaseRequest extends FormRequest
             'status_id.exists' => 'Selected status does not exist',
             'price.integer' => 'Price must be a number',
             'price.min' => 'Price must be at least 0',
+            'case_date.date' => 'Case date must be a valid date',
         ];
     }
 
@@ -80,6 +94,7 @@ class CaseRequest extends FormRequest
             'doctor_id' => 'doctor',
             'case_categores_id' => 'case category',
             'status_id' => 'status',
+            'case_date' => 'case date',
         ];
     }
 }

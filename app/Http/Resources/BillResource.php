@@ -71,10 +71,12 @@ class BillResource extends JsonResource
                 ];
             }),
             'price' => $this->price,
-            'is_paid' => $this->is_paid,
-            'payment_status' => $this->payment_status,
+            'is_paid' => true,
+            'payment_status' => 'Paid',
             'use_credit' => $this->use_credit,
             'credit_usage' => $this->credit_usage,
+            'bill_date' => $this->bill_date?->format('Y-m-d H:i:s'),
+            'bill_at' => $this->bill_date?->format('Y-m-d H:i:s'),
             'creator' => $this->creator ? [
                 'id' => $this->creator_id,
                 'name' => $this->creator?->name ?? 'N/A',

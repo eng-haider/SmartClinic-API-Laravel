@@ -1,0 +1,237 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Tenant;
+use App\Models\User;
+use App\Http\Resources\UserResource;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Tymon\JWTAuth\Facades\JWTAuth;
+
+class DemoRegisterController extends Controller
+{
+    /**
+     * The fixed tenant ID used for demo accounts.
+     */
+    private const DEMO_TENANT_ID = 'tenant_test';
+
+    /**
+     * Register a new demo user into the pre-created tenant_test database.
+     *
+     * POST /api/auth/demo-register
+     */
+    public function register(Request $request): JsonResponse
+    {
+        // --- Validation ---
+        $validated = $request->validate([
+            'user_name'                  => ['required', 'string', 'max:255'],
+            'user_phone'                 => ['required', 'string', 'max:20'],
+            'user_password'              => ['required', 'string', 'min:6'],
+        ]);
+
+        try {
+            // --- 1. Find or bootstrap the tenant_test tenant record ---
+            $tenant = Tenant::find(self::DEMO_TENANT_ID);
+
+            if (!$tenant) {
+                $tenant = $this->createDemoTenantRecord();
+            }
+
+            // --- 2. Point the tenant connection to the tenant_test DB ---
+            $this->configureTenantConnection($tenant);
+
+            // --- 3. Check phone uniqueness inside tenant DB ---
+            $phoneExists = DB::connection('tenant')
+                ->table('users')
+                ->where('phone', $validated['user_phone'])
+                ->exists();
+
+            if ($phoneExists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Phone number already registered in the demo clinic.',
+                ], 422);
+            }
+
+            // --- 4. Seed roles/permissions if the tenant DB is fresh ---
+            $this->seedIfNeeded();
+
+            // --- 5. Create the user directly on the 'tenant' connection ---
+            // We do NOT call tenancy()->initialize() because it re-applies the
+            // TENANCY_DB_PREFIX, turning 'u876784197_tenant_test' into
+            // 'u876784197_tenantu876784197_tenant_test'. Instead we use the
+            // 'tenant' connection we already configured manually.
+            $hashedPassword = Hash::make($validated['user_password']);
+
+            $user = User::on('tenant')->create([
+                'name'      => $validated['user_name'],
+                'phone'     => $validated['user_phone'],
+                'password'  => $hashedPassword,
+                'is_active' => true,
+                'role'      => 'admin', // role column = 2 (admin enum value)
+            ]);
+
+            // --- 6. Assign super_admin role on the tenant connection ---
+            // setConnection ensures Spatie permission queries also use 'tenant'.
+            $user->setConnection('tenant');
+            $user->assignRole('clinic_super_doctor');
+
+            // --- 7. Create matching record in central (main) database ---
+            // Central DB uses a separate users table that drives smartLogin().
+            $centralConnection = config('tenancy.database.central_connection');
+            $centralUserExists = User::on($centralConnection)
+                ->where('phone', $validated['user_phone'])
+                ->exists();
+
+            if (!$centralUserExists) {
+                $centralUser = new User();
+                $centralUser->setConnection($centralConnection);
+                $centralUser->name      = $validated['user_name'];
+                $centralUser->phone     = $validated['user_phone'];
+                $centralUser->password  = $hashedPassword;
+                $centralUser->is_active = true;
+                $centralUser->save();
+
+                // clinic_id links this central user to the tenant_test tenant
+                $centralUser->clinic_id = '_test';
+                $centralUser->save();
+
+                // Assign role in central DB as well (needed for smartLogin)
+                $centralUser->assignRole('clinic_super_doctor');
+
+                Log::info('Central DB user created for demo', [
+                    'central_user_id' => $centralUser->id,
+                    'clinic_id'       => self::DEMO_TENANT_ID,
+                ]);
+            }
+
+            // --- 8. Reload with roles for the response ---
+            $user->load(['roles.permissions', 'permissions']);
+
+            // --- 9. Generate JWT token ---
+            $token = JWTAuth::fromUser($user);
+
+            Log::info('Demo user registered', [
+                'user_id' => $user->id,
+                'phone'   => $user->phone,
+                'tenant'  => self::DEMO_TENANT_ID,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Demo account created successfully.',
+                'message_ar' => 'تم إنشاء الحساب التجريبي بنجاح',
+                'data'    => [
+                    'user'        => new UserResource($user),
+                    'token'       => $token,
+                    'tenant_id'   => self::DEMO_TENANT_ID,
+                    'clinic_name' => 'Demo Clinic',
+                ],
+            ], 201);
+
+        } catch (\Exception $e) {
+            Log::error('Demo registration failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Registration failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Create the tenant_test record in the central DB.
+     * The actual MySQL database must already exist on the server.
+     * Credentials are read from env: DEMO_DB_NAME, DEMO_DB_USERNAME, DEMO_DB_PASSWORD
+     */
+    private function createDemoTenantRecord(): Tenant
+    {
+        $dbName = env('DEMO_DB_NAME',     'tenant_test');
+        $dbUser = env('DEMO_DB_USERNAME', config('database.connections.mysql.username'));
+        $dbPass = env('DEMO_DB_PASSWORD', config('database.connections.mysql.password'));
+
+        $tenant = new Tenant();
+        $tenant->id          = self::DEMO_TENANT_ID;
+        $tenant->name        = 'Demo Clinic';
+        $tenant->address     = 'Demo Clinic Address';
+        $tenant->db_name     = $dbName;
+        $tenant->db_username = $dbUser;
+        $tenant->db_password = $dbPass;
+        $tenant->saveQuietly();
+
+        Log::info('Created tenant_test tenant record', [
+            'db_name'     => $dbName,
+            'db_username' => $dbUser,
+        ]);
+
+        return $tenant->fresh();
+    }
+
+    /**
+     * Configure the 'tenant' DB connection to point at tenant_test.
+     * Uses credentials stored in the tenant record (data JSON column).
+     */
+    private function configureTenantConnection(Tenant $tenant): void
+    {
+        $centralConfig = config('database.connections.' . config('tenancy.database.central_connection'));
+
+        // Read credentials from the tenant record's data JSON column
+        $dbName = $tenant->db_name     ?? self::DEMO_TENANT_ID;
+        $dbUser = $tenant->db_username ?? $centralConfig['username'];
+        $dbPass = $tenant->db_password ?? $centralConfig['password'];
+
+        config([
+            'database.connections.tenant.host'     => $centralConfig['host'],
+            'database.connections.tenant.port'     => $centralConfig['port'],
+            'database.connections.tenant.database' => $dbName,
+            'database.connections.tenant.username' => $dbUser,
+            'database.connections.tenant.password' => $dbPass,
+        ]);
+
+        DB::purge('tenant');
+    }
+
+    /**
+     * Seed roles/permissions into the tenant DB if it is empty (first run).
+     */
+    private function seedIfNeeded(): void
+    {
+        try {
+            $roleCount = DB::connection('tenant')->table('roles')->count();
+
+            if ($roleCount === 0) {
+                Log::info('Seeding roles & permissions into tenant_test');
+
+                \Illuminate\Support\Facades\Artisan::call('db:seed', [
+                    '--class' => 'TenantDatabaseSeeder',
+                    '--force' => true,
+                ]);
+
+                Log::info('tenant_test seeded successfully');
+            }
+        } catch (\Exception $e) {
+            // If the roles table doesn't exist yet, run migrations first
+            Log::warning('Roles table missing in tenant_test, running migrations', [
+                'error' => $e->getMessage(),
+            ]);
+
+            \Illuminate\Support\Facades\Artisan::call('migrate', [
+                '--database' => 'tenant',
+                '--path'     => 'database/migrations/tenant',
+                '--force'    => true,
+            ]);
+
+            \Illuminate\Support\Facades\Artisan::call('db:seed', [
+                '--class' => 'TenantDatabaseSeeder',
+                '--force' => true,
+            ]);
+        }
+    }
+}

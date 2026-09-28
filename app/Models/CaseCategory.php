@@ -17,6 +17,8 @@ class CaseCategory extends Model
      */
     protected $fillable = [
         'name',
+        'category_type',
+        'is_orthodontic',
         'order',
         'item_cost',
         'without_detect_tooth',
@@ -33,6 +35,7 @@ class CaseCategory extends Model
             'order' => 'integer',
             'item_cost' => 'integer',
             'without_detect_tooth' => 'boolean',
+            'is_orthodontic' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -44,5 +47,65 @@ class CaseCategory extends Model
     public function cases()
     {
         return $this->hasMany(CaseModel::class, 'case_categores_id');
+    }
+
+    /**
+     * Default warehouse items ("kit") consumed by cases of this category.
+     */
+    public function warehouseItems()
+    {
+        return $this->belongsToMany(WarehouseItem::class, 'case_category_warehouse_item', 'case_category_id', 'warehouse_item_id')
+            ->withPivot(['quantity'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Check if this is a dental category.
+     */
+    public function isDental(): bool
+    {
+        return $this->category_type === 'dental';
+    }
+
+    /**
+     * Check if this is a beauty category.
+     */
+    public function isBeauty(): bool
+    {
+        return $this->category_type === 'beauty';
+    }
+
+    /**
+     * Check if this dental category is flagged as orthodontics.
+     * Used by the frontend to conditionally show orthodontics-only fields.
+     */
+    public function isOrthodontic(): bool
+    {
+        return (bool) $this->is_orthodontic;
+    }
+
+    /**
+     * Check if this category requires tooth detection.
+     * Only dental categories can require tooth detection.
+     */
+    public function requiresToothDetection(): bool
+    {
+        return $this->isDental() && !$this->without_detect_tooth;
+    }
+
+    /**
+     * Scope a query to only include dental categories.
+     */
+    public function scopeDental($query)
+    {
+        return $query->where('category_type', 'dental');
+    }
+
+    /**
+     * Scope a query to only include beauty categories.
+     */
+    public function scopeBeauty($query)
+    {
+        return $query->where('category_type', 'beauty');
     }
 }

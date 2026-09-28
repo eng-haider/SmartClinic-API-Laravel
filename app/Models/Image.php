@@ -60,9 +60,16 @@ class Image extends Model
      */
     public function getUrlAttribute(): string
     {
+        // Try to get the current tenant ID from the tenancy context
+        if (function_exists('tenant') && tenant()) {
+            $tenantId = tenant()->id;
+            // Build API route URL for tenant-specific file serving
+            return rtrim(config('app.url'), '/') . '/file/tenant/' . $tenantId . '/' . $this->path;
+        }
+        
+        // Fallback for non-tenant context (central database)
         $storageUrl = Storage::disk($this->disk)->url($this->path);
         
-        // If the URL is relative, prepend the app URL
         if (!str_starts_with($storageUrl, 'http')) {
             return rtrim(config('app.url'), '/') . '/' . ltrim($storageUrl, '/');
         }

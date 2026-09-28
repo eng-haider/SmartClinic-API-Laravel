@@ -90,6 +90,33 @@ return [
                 // Reports
                 'view-reports',
 
+                // Messaging & Automation
+                'view-messaging-settings',
+                'edit-messaging-settings',
+                'test-messaging-connection',
+                'view-messaging-webhook-info',
+                'view-message-templates',
+                'create-message-template',
+                'edit-message-template',
+                'delete-message-template',
+                'preview-message-template',
+                'view-automation-rules',
+                'create-automation-rule',
+                'edit-automation-rule',
+                'delete-automation-rule',
+                'trigger-automation-rule',
+                'view-automation-targets',
+                'cancel-automation-target',
+                'view-conversations',
+                'send-conversation-message',
+
+                // Warehouse / Inventory
+                'view-warehouse',
+                'create-warehouse',
+                'edit-warehouse',
+                'delete-warehouse',
+                'restock-warehouse',
+
                 // System management
                 'manage-permissions',
                 'manage-roles',
@@ -181,6 +208,33 @@ return [
                 // Reports
                 'view-reports',
 
+                // Messaging & Automation
+                'view-messaging-settings',
+                'edit-messaging-settings',
+                'test-messaging-connection',
+                'view-messaging-webhook-info',
+                'view-message-templates',
+                'create-message-template',
+                'edit-message-template',
+                'delete-message-template',
+                'preview-message-template',
+                'view-automation-rules',
+                'create-automation-rule',
+                'edit-automation-rule',
+                'delete-automation-rule',
+                'trigger-automation-rule',
+                'view-automation-targets',
+                'cancel-automation-target',
+                'view-conversations',
+                'send-conversation-message',
+
+                // Warehouse / Inventory
+                'view-warehouse',
+                'create-warehouse',
+                'edit-warehouse',
+                'delete-warehouse',
+                'restock-warehouse',
+
                 // Secretary Management
                 'delete-user',
             ],
@@ -253,6 +307,26 @@ return [
 
                 // Reports
                 'view-reports',
+
+                // Messaging & Automation
+                'view-messaging-settings',
+                'test-messaging-connection',
+                'view-messaging-webhook-info',
+                'view-message-templates',
+                'preview-message-template',
+                'view-automation-rules',
+                'trigger-automation-rule',
+                'view-automation-targets',
+                'view-conversations',
+                'send-conversation-message',
+
+                'view-clinic-reservations',
+                'view-all-bills',
+                'view-clinic-cases',
+
+                // Warehouse / Inventory - view only (consumption happens via cases)
+                'view-warehouse',
+
             ],
         ],
 
@@ -293,11 +367,26 @@ return [
                 // Doctor Management - view only
                 'view-doctors',
 
+                // Warehouse / Inventory - secretaries manage clinic supplies
+                'view-warehouse',
+                'create-warehouse',
+                'edit-warehouse',
+                'restock-warehouse',
+
                 // Images - view only
                 'view-images',
 
                 // Reports
                 'view-reports',
+
+                // Messaging & Automation
+                'view-message-templates',
+                'preview-message-template',
+                'view-automation-rules',
+                'trigger-automation-rule',
+                'view-automation-targets',
+                'view-conversations',
+                'send-conversation-message',
             ],
         ],
     ],

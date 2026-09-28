@@ -195,8 +195,17 @@ return [
          * You may optionally indicate a specific cache driver to use for permission and
          * role caching using any of the `store` drivers listed in the cache.php config
          * file. Using 'default' here means to use the `default` set in cache.php.
+         *
+         * This MUST stay an in-memory store in this app. PermissionRegistrar is a
+         * singleton that resolves its cache repository exactly once per request and
+         * then holds on to it. With the `database` store that repository captures the
+         * DB connection that happened to be default at that moment - the `tenant`
+         * connection - and keeps using it after tenancy ends and the connection has
+         * been purged, which throws "Database connection [tenant] not configured."
+         * The `array` store also keeps one clinic's cached permission map from being
+         * read by another clinic, since every tenant shares the same cache key.
          */
 
-        'store' => 'default',
+        'store' => env('PERMISSION_CACHE_STORE', 'array'),
     ],
 ];

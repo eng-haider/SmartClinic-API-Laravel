@@ -21,6 +21,9 @@ class TenantDatabaseSeeder extends Seeder
             TenantRolesAndPermissionsSeeder::class,
             TenantStatusesSeeder::class,
             TenantCaseCategoriesSeeder::class,
+            TenantClinicSettingsSeeder::class, // Initialize clinic settings
+            ReservationTypeSeeder::class,       // Initialize reservation types
+            MessageTemplatesSeeder::class,      // Default WhatsApp message templates
         ]);
     }
 }

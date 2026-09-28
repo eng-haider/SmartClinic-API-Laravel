@@ -5,10 +5,14 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\Clinic;
 use App\Models\ClinicSetting;
+use App\Models\Tenant;
+use App\Models\DatabasePool;
 use App\Repositories\UserRepository;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthService
@@ -23,69 +27,196 @@ class AuthService
     }
 
     /**
-     * Register a new user
+     * Register a new clinic with full database pool setup (migrate + seed).
      */
     public function register(array $data): array
     {
-        // Check if email exists
-        if (!empty($data['email']) && $this->userRepository->emailExists($data['email'])) {
-            throw new \Exception('Email already registered');
-        }
+        $centralConnection = config('tenancy.database.central_connection');
 
         // Check if phone exists
         if (!empty($data['phone']) && $this->userRepository->phoneExists($data['phone'])) {
             throw new \Exception('Phone already registered');
         }
 
-        DB::beginTransaction();
-        
+        if (!empty($data['email']) && $this->userRepository->emailExists($data['email'])) {
+            throw new \Exception('Email already registered');
+        }
+
+        // Check pool availability
+        if (DatabasePool::availableCount() === 0) {
+            throw new \Exception('Service temporarily unavailable: no database slots available. Contact administrator.');
+        }
+
+        // Generate unique tenant ID from clinic name
+        $baseId   = '_' . preg_replace('/[^a-z0-9]+/', '_', strtolower($data['clinic_name']));
+        $tenantId = $baseId;
+        $counter  = 1;
+        while (Tenant::where('id', $tenantId)->exists()) {
+            $tenantId = $baseId . '_' . $counter++;
+        }
+
+        // Claim a database from the pool (atomic)
+        $poolSlot         = DatabasePool::claim($tenantId);
+        $databaseName     = $poolSlot->db_name;
+        $databaseUsername = $poolSlot->db_username;
+        $databasePassword = $poolSlot->db_password;
+
+        // ── Step 1: Create central records ────────────────────────────────
+        $tenant      = null;
+        $centralUser = null;
+
+        DB::connection($centralConnection)->beginTransaction();
         try {
-            // Create clinic first
-            $clinic = Clinic::create([
-                'name' => $data['clinic_name'],
-                'address' => $data['clinic_address'],
-                'phone' => $data['clinic_phone'] ?? null,
-                'email' => $data['clinic_email'] ?? null,
+            $tenant = Tenant::create([
+                'id'          => $tenantId,
+                'name'        => $data['clinic_name'],
+                'specialty'   => $data['specialty'],
+                'address'     => $data['clinic_address'] ?? null,
+                'has_ai_bot'  => false,
+                'db_name'     => $databaseName,
+                'db_username' => $databaseUsername,
+                'db_password' => $databasePassword,
             ]);
 
-            // Create default settings for the clinic from setting definitions
-            $this->clinicSettingService->createDefaultSettingsForClinic($clinic);
+            DB::connection($centralConnection)->table('clinics')->insert([
+                'id'         => $tenantId,
+                'name'       => $data['clinic_name'],
+                'specialty'  => $data['specialty'],
+                'address'    => $data['clinic_address'] ?? null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $clinic = Clinic::on($centralConnection)->findOrFail($tenantId);
 
-            // Hash password
-            $userData = [
-                'name' => $data['name'],
-                'phone' => $data['phone'],
-                'email' => $data['email'] ?? null,
-                'password' => Hash::make($data['password']),
-                'clinic_id' => $clinic->id,
-            ];
+            $centralUser = User::on($centralConnection)->create([
+                'name'      => $data['name'],
+                'phone'     => $data['phone'],
+                'email'     => $data['email'] ?? null,
+                'password'  => Hash::make($data['password']),
+                'is_active' => true,
+            ]);
+            $centralUser->clinic_id = $tenantId;
+            $centralUser->save();
 
-            // Always set role to clinic_super_doctor for registration
-            $roleName = 'clinic_super_doctor';
-
-            $user = $this->userRepository->create($userData);
-
-            // Assign role using Spatie
-            $user->assignRole($roleName);
-
-            // Refresh user to load relationships
-            $user->load('roles', 'clinic');
-
-            // Generate token
-            $token = JWTAuth::fromUser($user);
-
-            DB::commit();
-
-            return [
-                'user' => $user,
-                'clinic' => $clinic,
-                'token' => $token,
-                'message' => 'User and clinic registered successfully',
-            ];
+            DB::connection($centralConnection)->commit();
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection($centralConnection)->rollBack();
+            $poolSlot->update(['status' => 'available', 'tenant_id' => null, 'claimed_at' => null]);
             throw $e;
         }
+
+        // ── Step 2: Setup tenant database (migrate + seed + user) ─────────
+        try {
+            $centralConfig = config('database.connections.' . $centralConnection);
+
+            config([
+                'database.connections.tenant.host'     => $centralConfig['host'],
+                'database.connections.tenant.port'     => $centralConfig['port'],
+                'database.connections.tenant.database' => $databaseName,
+                'database.connections.tenant.username' => $databaseUsername,
+                'database.connections.tenant.password' => $databasePassword,
+            ]);
+            DB::purge('tenant');
+            DB::connection('tenant')->getPdo();
+
+            $originalDefault = config('database.default');
+            config(['database.default' => 'tenant']);
+
+            try {
+                Artisan::call('migrate', [
+                    '--database' => 'tenant',
+                    '--path'     => 'database/migrations/tenant',
+                    '--force'    => true,
+                ]);
+
+                app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
+                Artisan::call('db:seed', [
+                    '--class' => 'TenantDatabaseSeeder',
+                    '--force' => true,
+                ]);
+            } finally {
+                config(['database.default' => $originalDefault]);
+                DB::purge('tenant');
+            }
+
+            // Create user in tenant DB
+            $tenantUser = User::on('tenant')->create([
+                'name'      => $data['name'],
+                'phone'     => $data['phone'],
+                'email'     => $data['email'] ?? null,
+                'password'  => Hash::make($data['password']),
+                'is_active' => true,
+            ]);
+
+            $roleId = DB::connection('tenant')->table('roles')
+                ->where('name', 'clinic_super_doctor')
+                ->value('id') ?? 1;
+
+            DB::connection('tenant')->table('model_has_roles')->insert([
+                'role_id'    => $roleId,
+                'model_type' => (new User)->getMorphClass(), // 'User' via morph map
+                'model_id'   => $tenantUser->id,
+            ]);
+        } catch (\Exception $e) {
+            // Rollback central records and release pool slot
+            try {
+                $tenant->forceDelete();
+                DB::connection($centralConnection)->table('clinics')->where('id', $tenantId)->delete();
+                $centralUser->forceDelete();
+                $poolSlot->update(['status' => 'available', 'tenant_id' => null, 'claimed_at' => null]);
+            } catch (\Exception $cleanupError) {
+                // Log but don't rethrow cleanup errors
+            }
+            throw $e;
+        }
+
+        // Query roles & permissions for the tenant user directly from the tenant DB
+        // (same approach as smartLogin — avoids any Spatie ORM / connection-default issues)
+        $tenantDb  = DB::connection('tenant');
+        $morphType = (new User)->getMorphClass();
+
+        $roleIds = $tenantDb->table('model_has_roles')
+            ->whereIn('model_type', [$morphType, 'App\\Models\\User'])
+            ->where('model_id', $tenantUser->id)
+            ->pluck('role_id');
+
+        $roles = $tenantDb->table('roles')
+            ->whereIn('id', $roleIds)
+            ->pluck('name');
+
+        $permissionIdsFromRoles = $tenantDb->table('role_has_permissions')
+            ->whereIn('role_id', $roleIds)
+            ->pluck('permission_id');
+
+        $permissionIdsFromUser = $tenantDb->table('model_has_permissions')
+            ->whereIn('model_type', [$morphType, 'App\\Models\\User'])
+            ->where('model_id', $tenantUser->id)
+            ->pluck('permission_id');
+
+        $allPermissionIds = $permissionIdsFromRoles->merge($permissionIdsFromUser)->unique();
+
+        $permissions = $allPermissionIds->isNotEmpty()
+            ? $tenantDb->table('permissions')->whereIn('id', $allPermissionIds)->pluck('name')->unique()->values()
+            : collect();
+
+        // Generate JWT for the TENANT user so the returned token works immediately
+        // for all tenant-aware API routes without requiring a separate smart-login call.
+        // Embed tenant_id in the token so InitializeTenancyByHeader can resolve the
+        // tenant from the JWT when no X-Tenant-ID header / clinic param is sent.
+        $token = JWTAuth::claims(['tenant_id' => $tenantId])->fromUser($tenantUser);
+
+        return [
+            'user'        => $tenantUser,
+            'roles'       => $roles,
+            'permissions' => $permissions,
+            'token'       => $token,
+            'tenant_id'   => $tenantId,
+            'clinic_name' => $data['clinic_name'],
+            'has_ai_bot'  => false,
+            'specialty'   => $data['specialty'],
+            'message'     => 'Clinic registered successfully.',
+        ];
     }
 
     /**
@@ -109,14 +240,14 @@ class AuthService
 
         // Get user's clinic
         $clinic = $centralUser->clinic;
-        
+
         if (!$clinic) {
             throw new \Exception('User is not associated with any clinic');
         }
 
         // Step 2: Ensure tenant exists, create if not
         $tenant = \App\Models\Tenant::find($clinic->id);
-        
+
         if (!$tenant) {
             // Auto-create tenant record
             $tenant = $this->createTenantForClinic($clinic);
@@ -125,11 +256,21 @@ class AuthService
         // Step 3: Ensure tenant database is setup
         $this->ensureTenantDatabaseExists($tenant, $centralUser, $password);
 
-        // Step 4: Initialize tenant context
-        tenancy()->initialize($tenant);
+        // Step 4: Re-configure the tenant connection using pool credentials
+        // (ensureTenantDatabaseExists already sets this, but tenancy()->initialize()
+        //  would override it with wrong credentials — so we skip it and query directly)
+        $centralConfig = config('database.connections.' . $centralConnection);
+        config([
+            'database.connections.tenant.host'     => $centralConfig['host'],
+            'database.connections.tenant.port'     => $centralConfig['port'],
+            'database.connections.tenant.database' => $tenant->db_name,
+            'database.connections.tenant.username' => $tenant->db_username,
+            'database.connections.tenant.password' => $tenant->db_password,
+        ]);
+        DB::purge('tenant');
 
         // Step 5: Get user from tenant database with roles and permissions
-        $tenantUser = User::where('phone', $phone)->first();
+        $tenantUser = User::on('tenant')->where('phone', $phone)->first();
 
         if (!$tenantUser) {
             throw new \Exception('User not found in tenant database');
@@ -139,183 +280,171 @@ class AuthService
             throw new \Exception('User account is inactive in tenant database');
         }
 
-        // Ensure user has the clinic_super_doctor role (auto-assign if missing)
-        if (!$tenantUser->hasRole('clinic_super_doctor', 'web')) {
-            try {
-                $tenantUser->assignRole('clinic_super_doctor');
-                \Illuminate\Support\Facades\Log::info('Auto-assigned clinic_super_doctor role to user', [
-                    'user_id' => $tenantUser->id,
-                    'phone' => $phone,
-                ]);
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error('Failed to auto-assign role', [
-                    'user_id' => $tenantUser->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
+        // Query roles and permissions directly from the tenant DB.
+        // Using explicit DB::connection('tenant') bypasses Spatie's ORM connection
+        // resolution entirely — no risk of querying the empty central DB.
+        // Check both 'User' (morph alias) and 'App\Models\User' (full class) for compatibility
+        // with tenants created before and after the morph map was applied.
+        $tenantDb  = DB::connection('tenant');
+        $morphType = (new User)->getMorphClass(); // resolves to 'User' via morph map
 
-        // Load roles and permissions explicitly
-        $tenantUser->load(['roles.permissions', 'permissions']);
-        
-        // Debug: Log what we got
-        \Illuminate\Support\Facades\Log::info('Tenant user loaded', [
-            'user_id' => $tenantUser->id,
-            'roles_count' => $tenantUser->roles->count(),
-            'permissions_count' => $tenantUser->permissions->count(),
-            'all_permissions_count' => $tenantUser->getAllPermissions()->count(),
-        ]);
+        $roleIds = $tenantDb->table('model_has_roles')
+            ->whereIn('model_type', [$morphType, 'App\\Models\\User'])
+            ->where('model_id', $tenantUser->id)
+            ->pluck('role_id');
 
-        // Generate token for tenant user
-        $token = JWTAuth::fromUser($tenantUser);
+        $roles = $tenantDb->table('roles')
+            ->whereIn('id', $roleIds)
+            ->pluck('name');
+
+        $permissionIdsFromRoles = $tenantDb->table('role_has_permissions')
+            ->whereIn('role_id', $roleIds)
+            ->pluck('permission_id');
+
+        $permissionIdsFromUser = $tenantDb->table('model_has_permissions')
+            ->whereIn('model_type', [$morphType, 'App\\Models\\User'])
+            ->where('model_id', $tenantUser->id)
+            ->pluck('permission_id');
+
+        $allPermissionIds = $permissionIdsFromRoles->merge($permissionIdsFromUser)->unique();
+
+        $permissions = $allPermissionIds->isNotEmpty()
+            ? $tenantDb->table('permissions')->whereIn('id', $allPermissionIds)->pluck('name')->unique()->values()
+            : collect();
+
+        // Generate token for tenant user. Embed tenant_id so InitializeTenancyByHeader
+        // can resolve the tenant from the JWT without an X-Tenant-ID header.
+        $token = JWTAuth::claims(['tenant_id' => $clinic->id])->fromUser($tenantUser);
 
         return [
-            'user' => $tenantUser,
-            'token' => $token,
-            'tenant_id' => $clinic->id,
+            'user'        => $tenantUser,
+            'roles'       => $roles,
+            'permissions' => $permissions,
+            'token'       => $token,
+            'tenant_id'   => $clinic->id,
             'clinic_name' => $clinic->name,
-            'message' => 'Login successful',
+            'has_ai_bot'  => $clinic->has_ai_bot,
+            'specialty'   => $clinic->specialty ?? 'dental',
+            'message'     => 'Login successful',
         ];
     }
 
     /**
-     * Create tenant record for existing clinic
+     * Create tenant record for existing clinic using a pool database slot.
      */
     private function createTenantForClinic(Clinic $clinic): \App\Models\Tenant
     {
+        if (DatabasePool::availableCount() === 0) {
+            throw new \Exception('No available databases in the pool. Contact the administrator.');
+        }
+
+        $poolSlot = DatabasePool::claim($clinic->id);
+
         $tenant = new \App\Models\Tenant();
         $tenant->setAttribute('id', $clinic->id);
-        $tenant->exists = false;
-        
-        // Copy clinic data to tenant
         $tenant->setAttribute('name', $clinic->name);
         $tenant->setAttribute('address', $clinic->address);
         $tenant->setAttribute('logo', $clinic->logo);
-        
-        // Store database credentials for Hostinger
-        $databaseName = config('tenancy.database.prefix') . $clinic->id;
-        $tenant->setAttribute('db_name', $databaseName);
-        $tenant->setAttribute('db_username', $databaseName);
-        $tenant->setAttribute('db_password', env('TENANT_DB_PASSWORD'));
-        
+        $tenant->setAttribute('db_name', $poolSlot->db_name);
+        $tenant->setAttribute('db_username', $poolSlot->db_username);
+        $tenant->setAttribute('db_password', $poolSlot->db_password);
+        $tenant->exists = false;
         $tenant->saveQuietly();
         $tenant->refresh();
-        
-        \Illuminate\Support\Facades\Log::info('Auto-created tenant record', [
+
+        \Illuminate\Support\Facades\Log::info('Auto-created tenant record from pool', [
             'tenant_id' => $tenant->id,
-            'db_name' => $databaseName
+            'db_name'   => $poolSlot->db_name,
         ]);
-        
+
         return $tenant;
     }
 
     /**
-     * Ensure tenant database exists and is properly setup
+     * Ensure tenant database exists and is properly setup.
+     * Always reads credentials from the Tenant model (stored from the pool at signup).
      */
     private function ensureTenantDatabaseExists(\App\Models\Tenant $tenant, User $centralUser, string $password): void
     {
-        $databaseName = $tenant->db_name ?? (config('tenancy.database.prefix') . $tenant->id);
-        $tenantUsername = $tenant->db_username ?? $databaseName;
-        $tenantPassword = $tenant->db_password ?? env('TENANT_DB_PASSWORD');
-        
+        // Always use pool credentials stored on the tenant — never construct from tenant ID
+        $databaseName     = $tenant->db_name;
+        $databaseUsername = $tenant->db_username;
+        $databasePassword = $tenant->db_password;
+
+        if (empty($databaseName) || empty($databaseUsername) || empty($databasePassword)) {
+            throw new \Exception('Tenant database credentials are not configured. Please contact the administrator.');
+        }
+
         $centralConfig = config('database.connections.' . config('tenancy.database.central_connection'));
-        
-        // Configure the tenant connection
+
         config([
+            'database.connections.tenant.host'     => $centralConfig['host'],
+            'database.connections.tenant.port'     => $centralConfig['port'],
             'database.connections.tenant.database' => $databaseName,
-            'database.connections.tenant.username' => $tenantUsername,
-            'database.connections.tenant.password' => $tenantPassword,
-            'database.connections.tenant.host' => $centralConfig['host'],
-            'database.connections.tenant.port' => $centralConfig['port'],
+            'database.connections.tenant.username' => $databaseUsername,
+            'database.connections.tenant.password' => $databasePassword,
         ]);
-        
-        // Purge and reconnect
         DB::purge('tenant');
-        
-        // Test connection
+
         try {
             DB::connection('tenant')->getPdo();
-            
-            // Check if database is already setup (has users table with data)
-            try {
-                $userCount = DB::connection('tenant')->table('users')->count();
-                if ($userCount > 0) {
-                    \Illuminate\Support\Facades\Log::info('Tenant database already setup', [
-                        'database' => $databaseName,
-                        'user_count' => $userCount
-                    ]);
-                    return; // Database already setup
-                }
-            } catch (\Exception $e) {
-                // Table doesn't exist, need to run migrations
+        } catch (\Exception $e) {
+            throw new \Exception("Cannot connect to tenant database '{$databaseName}'. Error: " . $e->getMessage());
+        }
+
+        // Check if already setup
+        try {
+            $userCount = DB::connection('tenant')->table('users')->count();
+            if ($userCount > 0) {
+                \Illuminate\Support\Facades\Log::info('Tenant database already setup', ['database' => $databaseName]);
+                return;
             }
-            
-            // Database exists but not setup - run migrations and seeders
-            \Illuminate\Support\Facades\Log::info('Setting up tenant database', [
-                'database' => $databaseName
-            ]);
-            
-            // Run migrations
+        } catch (\Exception $e) {
+            // Table doesn't exist yet — need to migrate
+        }
+
+        \Illuminate\Support\Facades\Log::info('Setting up tenant database', ['database' => $databaseName]);
+
+        $originalDefault = config('database.default');
+        config(['database.default' => 'tenant']);
+
+        try {
             \Illuminate\Support\Facades\Artisan::call('migrate', [
                 '--database' => 'tenant',
-                '--path' => 'database/migrations/tenant',
-                '--force' => true,
+                '--path'     => 'database/migrations/tenant',
+                '--force'    => true,
             ]);
-            
-            // Run seeders
+
+            app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
             \Illuminate\Support\Facades\Artisan::call('db:seed', [
-                '--database' => 'tenant',
-                '--class' => 'RoleAndPermissionSeeder',
-                '--force' => true,
-            ]);
-            
-            \Illuminate\Support\Facades\Artisan::call('db:seed', [
-                '--database' => 'tenant',
                 '--class' => 'TenantDatabaseSeeder',
                 '--force' => true,
             ]);
-            
-            // Create user in tenant database
-            $createdUser = User::on('tenant')->create([
-                'name' => $centralUser->name,
-                'phone' => $centralUser->phone,
-                'email' => $centralUser->email ?? null,
-                'password' => Hash::make($password),
-                'is_active' => true,
-            ]);
-            
-            // Assign role - need to refresh connection context first
+        } finally {
+            config(['database.default' => $originalDefault]);
             DB::purge('tenant');
-            $tenantUser = User::on('tenant')->where('phone', $centralUser->phone)->first();
-            if ($tenantUser) {
-                try {
-                    $tenantUser->assignRole('clinic_super_doctor');
-                    \Illuminate\Support\Facades\Log::info('Role assigned to tenant user', [
-                        'user_id' => $tenantUser->id,
-                        'role' => 'clinic_super_doctor'
-                    ]);
-                } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error('Failed to assign role', [
-                        'user_id' => $tenantUser->id,
-                        'error' => $e->getMessage()
-                    ]);
-                }
-            }
-            
-            \Illuminate\Support\Facades\Log::info('Tenant database setup completed', [
-                'database' => $databaseName
-            ]);
-            
-        } catch (\Exception $e) {
-            throw new \Exception(
-                "Database '{$databaseName}' does not exist. " .
-                "Please create it in your hosting panel (e.g., hPanel on Hostinger): " .
-                "(1) Create database: {$databaseName}. " .
-                "(2) Create user: {$tenantUsername}. " .
-                "(3) Set password to match TENANT_DB_PASSWORD in .env. " .
-                "Original error: " . $e->getMessage()
-            );
         }
+
+        // Create the user in the tenant DB
+        $tenantUser = User::on('tenant')->create([
+            'name'      => $centralUser->name,
+            'phone'     => $centralUser->phone,
+            'email'     => $centralUser->email ?? null,
+            'password'  => Hash::make($password),
+            'is_active' => true,
+        ]);
+
+        $roleId = DB::connection('tenant')->table('roles')
+            ->where('name', 'clinic_super_doctor')->value('id') ?? 1;
+
+        DB::connection('tenant')->table('model_has_roles')->insert([
+            'role_id'    => $roleId,
+            'model_type' => (new User)->getMorphClass(), // 'User' via morph map
+            'model_id'   => $tenantUser->id,
+        ]);
+
+        \Illuminate\Support\Facades\Log::info('Tenant database setup completed', ['database' => $databaseName]);
     }
 
     /**
@@ -338,7 +467,7 @@ class AuthService
 
         // Get user's clinic
         $clinic = $user->clinic;
-        
+
         if (!$clinic) {
             throw new \Exception('User is not associated with any clinic');
         }
@@ -347,6 +476,8 @@ class AuthService
         return [
             'tenant_id' => $clinic->id,
             'clinic_name' => $clinic->name,
+            'has_ai_bot' => $clinic->has_ai_bot,
+            'specialty' => $clinic->specialty ?? 'dental',
             'user_name' => $user->name,
             'message' => 'Credentials verified. Please proceed with tenant login.',
         ];
@@ -371,8 +502,11 @@ class AuthService
         // Load roles and permissions explicitly
         $user->load(['roles.permissions', 'permissions']);
 
-        // Generate token
-        $token = JWTAuth::fromUser($user);
+        // Generate token. This route runs inside an already-initialized tenant context
+        // (resolved via header to reach it), so embed that tenant id in the JWT to make
+        // the token self-describing for InitializeTenancyByHeader on later requests.
+        $claims = (function_exists('tenant') && tenant()) ? ['tenant_id' => tenant('id')] : [];
+        $token = JWTAuth::claims($claims)->fromUser($user);
 
         return [
             'user' => $user,

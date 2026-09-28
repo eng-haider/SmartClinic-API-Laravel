@@ -1,12 +1,15 @@
 <?php
 namespace App\Models;
+use App\Events\CaseCreated;
+use App\Events\CaseCompleted;
+use App\Traits\HasEmbeddings;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CaseModel extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasEmbeddings;
 
     /**
      * The table associated with the model.
@@ -14,6 +17,34 @@ class CaseModel extends Model
      * @var string
      */
     protected $table = 'cases';
+
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        // Dispatch events AFTER the HTTP response is sent so automation
+        // rule lookups + target inserts don't block the POST/PATCH.
+        static::created(function (CaseModel $case) {
+            app()->terminating(function () use ($case) {
+                CaseCreated::dispatch($case);
+            });
+        });
+
+        static::updated(function (CaseModel $case) {
+            // wasChanged() must be evaluated here — model state is reset later.
+            if ($case->wasChanged('status_id') && $case->status_id === self::COMPLETED_STATUS_ID) {
+                app()->terminating(function () use ($case) {
+                    CaseCompleted::dispatch($case);
+                });
+            }
+        });
+    }
+
+    /**
+     * Status ID that represents "completed". Override via clinic settings if needed.
+     */
+    public const COMPLETED_STATUS_ID = 3;
 
     /**
      * The attributes that are mass assignable.
@@ -30,6 +61,8 @@ class CaseModel extends Model
         'tooth_num',
         'root_stuffing',
         'is_paid',
+        'case_date',
+        'item_cost',
     ];
 
     /**
@@ -45,7 +78,9 @@ class CaseModel extends Model
             'case_categores_id' => 'integer',
             'status_id' => 'integer',
             'price' => 'integer',
+            'item_cost' => 'integer',
             'is_paid' => 'boolean',
+            'case_date' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
@@ -98,6 +133,32 @@ class CaseModel extends Model
     public function bills()
     {
         return $this->morphMany(Bill::class, 'billable');
+    }
+
+    /**
+     * Warehouse items consumed in this case (with consumed quantity + cost snapshot).
+     */
+    public function warehouseItems()
+    {
+        return $this->belongsToMany(WarehouseItem::class, 'case_warehouse_item', 'case_id', 'warehouse_item_id')
+            ->withPivot(['quantity', 'unit_cost'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Get the ophthalmology encounter details for the case (collection, for API include).
+     */
+    public function ophthalmologyEncounterDetails()
+    {
+        return $this->hasMany(OphthalmologyEncounterDetail::class, 'case_id');
+    }
+
+    /**
+     * Get the single ophthalmology encounter detail for the case (for resource output).
+     */
+    public function ophthalmologyDetails()
+    {
+        return $this->hasOne(OphthalmologyEncounterDetail::class, 'case_id');
     }
 
     /**
@@ -155,5 +216,27 @@ class CaseModel extends Model
     public function images()
     {
         return $this->morphMany(Image::class, 'imageable');
+    }
+
+    /**
+     * Convert case data to embedding content string.
+     */
+    public function toEmbeddingContent(): string
+    {
+        $parts = [
+            "Dental/Medical Case",
+            $this->patient ? "Patient: {$this->patient->name}" : null,
+            $this->doctor ? "Doctor: {$this->doctor->name}" : null,
+            $this->category ? "Category: {$this->category->name}" : null,
+            $this->tooth_num ? "Tooth Number: {$this->tooth_num}" : null,
+            $this->price ? "Price: {$this->price}" : null,
+            $this->status ? "Status: {$this->status->name}" : null,
+            "Paid: " . ($this->is_paid ? 'Yes' : 'No'),
+            $this->case_date ? "Case Date: {$this->case_date->format('Y-m-d')}" : null,
+            $this->getAttribute('notes') ? "Notes: {$this->getAttribute('notes')}" : null,
+            $this->root_stuffing ? "Root Stuffing: {$this->root_stuffing}" : null,
+        ];
+
+        return implode('. ', array_filter($parts));
     }
 }

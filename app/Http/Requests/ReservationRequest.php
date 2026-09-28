@@ -26,6 +26,8 @@ class ReservationRequest extends FormRequest
             'patient_id' => 'required|exists:patients,id',
             'doctor_id' => 'nullable|exists:users,id',
             'status_id' => 'nullable|exists:statuses,id',
+            'reservation_type_id' => 'nullable|exists:reservation_types,id',
+            'reservation_type_note' => 'nullable|string|max:500',
             'notes' => 'nullable|string',
             'reservation_start_date' => 'required|date',
             'reservation_end_date' => 'nullable|date|after_or_equal:reservation_start_date',

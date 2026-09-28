@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Report;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\DoctorFilterTrait;
 use App\Repositories\Reports\ReportsRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,10 +11,10 @@ use Illuminate\Support\Facades\Auth;
 
 class PatientReportController extends Controller
 {
+    use DoctorFilterTrait;
     public function __construct(private ReportsRepository $reportsRepository)
     {
-        // Permissions can be added here if needed
-        // $this->middleware('permission:view-reports')->only(['summary', 'bySource', 'byDoctor', 'trend', 'ageDistribution']);
+        $this->middleware('permission:view-reports')->only(['summary', 'bySource', 'byDoctor', 'trend', 'ageDistribution']);
     }
 
     /**

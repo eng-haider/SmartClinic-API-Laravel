@@ -52,13 +52,12 @@ class SecretaryRepository
      */
     public function findInClinic(int $id): ?User
     {
-        $query = User::on('mysql')->where('id', $id)
+        return User::where('id', $id)
             ->whereHas('roles', function ($query) {
                 $query->where('name', 'secretary');
             })
-            ->with(['permissions', 'roles']);
-
-        return $query->first();
+            ->with(['permissions', 'roles'])
+            ->first();
     }
 
     /**
@@ -68,17 +67,15 @@ class SecretaryRepository
      */
     public function create(array $data): User
     {
-        // Get clinic_id from authenticated user
-        $authUser = Auth::user();
+        $hashedPassword = Hash::make($data['password']);
      
-        
-     
+        // Remove clinic_id from data for tenant databases (they don't have this column)
+        // clinic_id is only used in central database
         $secretary = User::create([
             'name' => $data['name'],
             'phone' => $data['phone'],
             // 'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-          
+            'password' => $hashedPassword,
             'is_active' => $data['is_active'] ?? true,
         ]);
 
@@ -97,6 +94,65 @@ class SecretaryRepository
         // Assign custom permissions if provided
         if (!empty($data['permissions'])) {
             $secretary->givePermissionTo($data['permissions']);
+        }
+
+        // Also create user in central database for smart login (if in tenant context)
+        try {
+            // Use tenant() helper to get current clinic ID reliably
+            $clinicId = function_exists('tenant') && tenant() ? tenant()->id : null;
+
+            if (!$clinicId) {
+                // Fallback: try from authenticated user's clinic_id attribute
+                $authUser = Auth::user();
+                $clinicId = $authUser ? \Illuminate\Support\Facades\DB::connection(config('tenancy.database.central_connection'))
+                    ->table('users')
+                    ->where('phone', $authUser->phone)
+                    ->value('clinic_id') : null;
+            }
+
+            if ($clinicId) {
+                $centralConnection = config('tenancy.database.central_connection');
+
+                // Check if user already exists in central database
+                $existingCentralUser = User::on($centralConnection)
+                    ->where('phone', $secretary->phone)
+                    ->first();
+
+                if (!$existingCentralUser) {
+                    // Create user in central database for smart login
+                    $centralUser = new User();
+                    $centralUser->setConnection($centralConnection);
+                    $centralUser->name      = $secretary->name;
+                    $centralUser->phone     = $secretary->phone;
+                    $centralUser->email     = $secretary->email ?? null;
+                    $centralUser->password  = $hashedPassword;
+                    $centralUser->is_active = $secretary->is_active ?? true;
+                    $centralUser->clinic_id = $clinicId;
+                    $centralUser->save();
+
+                    Log::info('Secretary created in central database for smart login', [
+                        'tenant_user_id' => $secretary->id,
+                        'central_user_id' => $centralUser->id,
+                        'clinic_id'       => $clinicId,
+                        'phone'           => $secretary->phone,
+                    ]);
+                } else {
+                    Log::info('Secretary already exists in central database, skipping creation', [
+                        'phone'      => $secretary->phone,
+                        'central_id' => $existingCentralUser->id,
+                    ]);
+                }
+            } else {
+                Log::warning('Could not determine clinic_id for central DB sync, skipping', [
+                    'phone' => $secretary->phone,
+                ]);
+            }
+        } catch (\Exception $e) {
+            // Log but don't fail the operation if central DB creation fails
+            Log::warning('Failed to create secretary in central database', [
+                'phone' => $secretary->phone,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         return $secretary->fresh(['permissions', 'roles']);

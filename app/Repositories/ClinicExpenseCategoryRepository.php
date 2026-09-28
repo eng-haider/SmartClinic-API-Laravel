@@ -25,7 +25,6 @@ class ClinicExpenseCategoryRepository
         return QueryBuilder::for(ClinicExpenseCategory::class)
             ->allowedFilters([
                 'name',
-                'clinic_id',
                 'is_active',
             ])
             ->allowedSorts([
@@ -106,9 +105,9 @@ class ClinicExpenseCategoryRepository
     }
 
     /**
-     * Check if category exists for clinic
+     * Check if category exists
      */
-    public function existsForClinic(int $id): bool
+    public function exists(int $id): bool
     {
         return $this->query()
             ->where('id', $id)

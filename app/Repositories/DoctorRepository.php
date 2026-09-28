@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Spatie\QueryBuilder\QueryBuilder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class DoctorRepository
 {
@@ -65,7 +68,7 @@ class DoctorRepository
             });
         }
         
-        return $query->paginate($perPage);
+        return $query->orderBy('created_at', 'desc')->paginate($perPage);
     }
 
     /**
@@ -85,10 +88,16 @@ class DoctorRepository
     {
         // Hash password if provided
         if (isset($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
+            $hashedPassword = Hash::make($data['password']);
+            $data['password'] = $hashedPassword;
         }
 
-        $doctor = User::create($data);
+        // Remove clinic_id from data for tenant databases (they don't have this column)
+        // clinic_id is only used in central database
+        $userData = collect($data)->except(['clinic_id'])->toArray();
+
+        // Create user in tenant database
+        $doctor = User::create($userData);
 
         // Assign doctor role if role is specified
         if (isset($data['role'])) {
@@ -96,6 +105,65 @@ class DoctorRepository
         } else {
             // Default to 'doctor' role
             $doctor->assignRole('doctor');
+        }
+
+        // Also create user in central database for smart login (if in tenant context)
+        try {
+            // Use tenant() helper to get current clinic ID reliably
+            $clinicId = function_exists('tenant') && tenant() ? tenant()->id : null;
+
+            if (!$clinicId) {
+                // Fallback: try from authenticated user's clinic_id attribute
+                $authUser = Auth::user();
+                $clinicId = $authUser ? DB::connection(config('tenancy.database.central_connection'))
+                    ->table('users')
+                    ->where('phone', $authUser->phone)
+                    ->value('clinic_id') : null;
+            }
+
+            if ($clinicId) {
+                $centralConnection = config('tenancy.database.central_connection');
+
+                // Check if user already exists in central database
+                $existingCentralUser = User::on($centralConnection)
+                    ->where('phone', $doctor->phone)
+                    ->first();
+
+                if (!$existingCentralUser) {
+                    // Create user in central database for smart login
+                    $centralUser = new User();
+                    $centralUser->setConnection($centralConnection);
+                    $centralUser->name      = $doctor->name;
+                    $centralUser->phone     = $doctor->phone;
+                    $centralUser->email     = $doctor->email ?? null;
+                    $centralUser->password  = $doctor->password; // Already hashed
+                    $centralUser->is_active = $doctor->is_active ?? true;
+                    $centralUser->clinic_id = $clinicId;
+                    $centralUser->save();
+
+                    Log::info('Doctor created in central database for smart login', [
+                        'tenant_user_id' => $doctor->id,
+                        'central_user_id' => $centralUser->id,
+                        'clinic_id'       => $clinicId,
+                        'phone'           => $doctor->phone,
+                    ]);
+                } else {
+                    Log::info('Doctor already exists in central database, skipping creation', [
+                        'phone'      => $doctor->phone,
+                        'central_id' => $existingCentralUser->id,
+                    ]);
+                }
+            } else {
+                Log::warning('Could not determine clinic_id for central DB sync, skipping', [
+                    'phone' => $doctor->phone,
+                ]);
+            }
+        } catch (\Exception $e) {
+            // Log but don't fail the operation if central DB creation fails
+            Log::warning('Failed to create doctor in central database', [
+                'phone' => $doctor->phone,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         return $doctor->fresh();

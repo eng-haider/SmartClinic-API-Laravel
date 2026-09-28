@@ -4,11 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\PublicPatientResource;
 use App\Models\Patient;
+use App\Repositories\ClinicSettingRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PublicPatientController extends Controller
 {
+    public function __construct(
+        private ClinicSettingRepository $clinicSettings
+    ) {
+    }
+
     /**
      * Get patient public profile by token.
      *
@@ -32,9 +38,8 @@ class PublicPatientController extends Controller
         // Load relationships for public display
         $patient->load([
             'doctor:id,name',
-            'clinic:id,name,address,whatsapp_phone',
             'cases' => function ($query) {
-                $query->with(['category:id,name,name_en,name_ar', 'status:id,name_en,name_ar,color'])
+                $query->with(['category:id,name,name_en,name_ar,is_orthodontic', 'status:id,name_en,name_ar,color'])
                     ->select('id', 'patient_id', 'case_categores_id', 'status_id', 'tooth_num', 'notes', 'created_at');
             },
             'images' => function ($query) {
@@ -51,7 +56,9 @@ class PublicPatientController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => new PublicPatientResource($patient),
+            // The visitor is not authenticated, so /clinic-settings is closed to
+            // them - the clinic's own branding has to travel with this payload.
+            'data' => new PublicPatientResource($patient, $this->clinicSettings->publicIdentity()),
         ]);
     }
 
@@ -73,7 +80,7 @@ class PublicPatientController extends Controller
         }
 
         $cases = $patient->cases()
-            ->with(['category:id,name,name_en,name_ar', 'status:id,name_en,name_ar,color', 'doctor:id,name'])
+            ->with(['category:id,name,name_en,name_ar,is_orthodontic', 'status:id,name_en,name_ar,color', 'doctor:id,name'])
             ->select('id', 'patient_id', 'doctor_id', 'case_categores_id', 'status_id', 'tooth_num', 'notes', 'created_at')
             ->orderBy('created_at', 'desc')
             ->get();
@@ -90,6 +97,7 @@ class PublicPatientController extends Controller
                         'name' => $case->category->name,
                         'name_en' => $case->category->name_en,
                         'name_ar' => $case->category->name_ar,
+                        'is_orthodontic' => (bool) $case->category->is_orthodontic,
                     ] : null,
                     'status' => $case->status ? [
                         'id' => $case->status->id,

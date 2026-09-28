@@ -48,6 +48,7 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                PDO::ATTR_PERSISTENT => (bool) env('DB_PERSISTENT', false),
             ]) : [],
         ],
 
@@ -78,6 +79,7 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                PDO::ATTR_PERSISTENT => (bool) env('DB_PERSISTENT', false),
             ]) : [],
         ],
 
@@ -110,6 +112,7 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                PDO::ATTR_PERSISTENT => (bool) env('DB_PERSISTENT', false),
             ]) : [],
         ],
 
@@ -130,6 +133,7 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                PDO::ATTR_PERSISTENT => (bool) env('DB_PERSISTENT', false),
             ]) : [],
         ],
 
@@ -151,6 +155,7 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                PDO::ATTR_PERSISTENT => (bool) env('DB_PERSISTENT', false),
             ]) : [],
         ],
 
@@ -167,6 +172,38 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => 'prefer',
+        ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | pgvector Embeddings Database Connection
+        |--------------------------------------------------------------------------
+        |
+        | Dedicated PostgreSQL connection for AI embeddings with pgvector.
+        | This is separate from the MySQL tenant databases.
+        | Requires: PostgreSQL with pgvector extension enabled.
+        |
+        */
+        'pgsql_embeddings' => [
+            'driver' => 'pgsql',
+            'host' => env('PGVECTOR_HOST', '127.0.0.1'),
+            'port' => env('PGVECTOR_PORT', '5432'),
+            'database' => env('PGVECTOR_DATABASE', 'smartclinic_embeddings'),
+            'username' => env('PGVECTOR_USERNAME', 'postgres'),
+            'password' => env('PGVECTOR_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => 'prefer',
+            // Supabase serves this over its transaction pooler (port 6543),
+            // which routes each statement to a potentially different backend.
+            // Server-side named prepared statements (pdo_stmt_*) break under
+            // that mode ("prepared statement ... does not exist"), so emulate
+            // prepares client-side and send plain queries instead.
+            'options' => extension_loaded('pdo_pgsql') ? [
+                PDO::ATTR_EMULATE_PREPARES => true,
+            ] : [],
         ],
 
         'sqlsrv' => [

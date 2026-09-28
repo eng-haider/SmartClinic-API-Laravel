@@ -20,18 +20,18 @@ class BillRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'patient_id' => 'required|exists:patients,id',
+            'patient_id' => 'nullable|exists:patients,id',
             'billable_id' => 'nullable|integer',
             'billable_type' => 'nullable|string|max:255',
             'price' => 'required|integer|min:0',
             // 'is_paid' => 'nullable|boolean',
             // 'use_credit' => 'nullable|boolean',
             'doctor_id' => 'nullable|exists:users,id',
+            'bill_date' => 'nullable|date',
         ];
 
-        // Make patient_id optional on update
+        // Make price optional on update
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
-            $rules['patient_id'] = 'sometimes|exists:patients,id';
             $rules['price'] = 'sometimes|integer|min:0';
         }
 
@@ -47,12 +47,16 @@ class BillRequest extends FormRequest
 
         // Set clinic_id from authenticated user
         if (auth()->check()) {
-            $data['clinics_id'] = auth()->user()->clinic_id ?? auth()->user()->clinics_id ?? null;
-            
+          
             // Set doctor_id if not provided
-            if (!$this->has('doctor_id')) {
-                $data['doctor_id'] = auth()->id();
-            }
+             $data['doctor_id'] = auth()->id();
+        }
+
+        // Set default bill_date to current datetime only when creating
+        if ($this->isMethod('POST')) {
+            $data['bill_date'] = $this->bill_date ?? now()->toDateTimeString();
+        } elseif ($this->has('bill_date')) {
+            $data['bill_date'] = $this->bill_date;
         }
 
         if (!empty($data)) {
@@ -69,7 +73,7 @@ class BillRequest extends FormRequest
 
         // Add clinics_id and doctor_id to validated data
         if (auth()->check()) {
-            $validated['clinics_id'] = auth()->user()->clinic_id ?? auth()->user()->clinics_id ?? null;
+            
             
             if (!isset($validated['doctor_id'])) {
                 $validated['doctor_id'] = auth()->id();

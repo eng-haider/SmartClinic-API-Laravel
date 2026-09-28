@@ -35,7 +35,13 @@ class BillingOverviewRequest extends FormRequest
         if ($this->filled('date_from')) {
             $rules['date_to'][] = 'after_or_equal:date_from';
         }
-        if (! $isBalances) {
+        if ($isBalances) {
+            $rules['case_date_from'] = ['nullable', 'date_format:Y-m-d'];
+            $rules['case_date_to'] = ['nullable', 'date_format:Y-m-d'];
+            if ($this->filled('case_date_from')) {
+                $rules['case_date_to'][] = 'after_or_equal:case_date_from';
+            }
+        } else {
             $rules['patient_id'] = ['nullable', 'integer', 'min:1'];
         }
 

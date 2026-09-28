@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\HasEmbeddings;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Bill extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasEmbeddings;
 
     /**
      * The "booted" method of the model.
@@ -30,6 +31,17 @@ class Bill extends Model
                 $bill->updator_id = auth()->id();
             }
         });
+
+        // Sync is_paid on ClinicExpense when a bill instalment is added or removed
+        $syncExpense = function ($bill) {
+            if ($bill->billable_type === \App\Models\ClinicExpense::class && $bill->billable_id) {
+                $expense = \App\Models\ClinicExpense::find($bill->billable_id);
+                $expense?->syncIsPaid();
+            }
+        };
+
+        static::saved($syncExpense);
+        static::deleted($syncExpense);
     }
 
     /**
@@ -41,12 +53,12 @@ class Bill extends Model
         'patient_id',
         'billable_id',
         'billable_type',
-        'is_paid',
         'price',
         'doctor_id',
         'creator_id',
         'updator_id',
         'use_credit',
+        'bill_date',
     ];
 
     /**
@@ -63,8 +75,8 @@ class Bill extends Model
             'creator_id' => 'integer',
             'updator_id' => 'integer',
             'price' => 'integer',
-            'is_paid' => 'boolean',
             'use_credit' => 'boolean',
+            'bill_date' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
@@ -76,7 +88,10 @@ class Bill extends Model
      */
     public function billable()
     {
-        return $this->morphTo();
+        return $this->morphTo()->morphWith([
+            \App\Models\CaseModel::class    => ['patient', 'doctor', 'category', 'status'],
+            \App\Models\ClinicExpense::class => ['category', 'doctor'],
+        ]);
     }
 
     /**
@@ -121,18 +136,20 @@ class Bill extends Model
 
     /**
      * Scope a query to only include paid bills.
+     * Bills are always considered paid, so this returns all bills.
      */
     public function scopePaid($query)
     {
-        return $query->where('is_paid', true);
+        return $query;
     }
 
     /**
      * Scope a query to only include unpaid bills.
+     * Bills are always paid, so this returns nothing.
      */
     public function scopeUnpaid($query)
     {
-        return $query->where('is_paid', false);
+        return $query->whereRaw('1 = 0');
     }
 
     /**
@@ -157,6 +174,22 @@ class Bill extends Model
     public function scopeByPatient($query, int $patientId)
     {
         return $query->where('patient_id', $patientId);
+    }
+
+    /**
+     * Scope a query to filter bills from a specific date.
+     */
+    public function scopeDateFrom($query, $date)
+    {
+        return $query->where('created_at', '>=', $date);
+    }
+
+    /**
+     * Scope a query to filter bills until a specific date.
+     */
+    public function scopeDateTo($query, $date)
+    {
+        return $query->where('created_at', '<=', $date);
     }
 
     /**
@@ -200,27 +233,28 @@ class Bill extends Model
     }
 
     /**
-     * Mark bill as paid.
+     * Mark bill as paid (no-op: bills are always paid).
      */
     public function markAsPaid(): bool
     {
-        return $this->update(['is_paid' => true]);
+        return true;
     }
 
     /**
-     * Mark bill as unpaid.
+     * Mark bill as unpaid (no-op: bills are always paid).
      */
     public function markAsUnpaid(): bool
     {
-        return $this->update(['is_paid' => false]);
+        return true;
     }
 
     /**
      * Get payment status label.
+     * Bills are always considered paid.
      */
     public function getPaymentStatusAttribute(): string
     {
-        return $this->is_paid ? 'Paid' : 'Unpaid';
+        return 'Paid';
     }
 
     /**
@@ -229,5 +263,30 @@ class Bill extends Model
     public function getCreditUsageAttribute(): string
     {
         return $this->use_credit ? 'Credit Used' : 'No Credit';
+    }
+
+    /**
+     * Convert bill data to embedding content string.
+     */
+    public function toEmbeddingContent(): string
+    {
+        // Map billable type to human-readable name
+        $billableType = match ($this->billable_type) {
+            'App\Models\Case', 'App\Models\CaseModel' => 'Case',
+            'App\Models\Reservation' => 'Reservation',
+            default => $this->billable_type ?? 'Unknown',
+        };
+
+        $parts = [
+            "Payment Received (from auditor)",
+            $this->patient ? "Patient: {$this->patient->name}" : null,
+            $this->doctor ? "Doctor: {$this->doctor->name}" : null,
+            "Price: {$this->price}",
+            "Billable Type: {$billableType}",
+            $this->bill_date ? "Bill Date: {$this->bill_date->format('Y-m-d')}" : null,
+            $this->use_credit ? "Credit Used: Yes" : null,
+        ];
+
+        return implode('. ', array_filter($parts));
     }
 }

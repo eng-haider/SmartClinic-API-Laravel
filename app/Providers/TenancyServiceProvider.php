@@ -68,9 +68,33 @@ class TenancyServiceProvider extends ServiceProvider
             Events\InitializingTenancy::class => [],
             Events\TenancyInitialized::class => [
                 Listeners\BootstrapTenancy::class,
+
+                // Spatie caches every tenant's permissions under one global key
+                // (spatie.permission.cache). The database cache store follows
+                // whichever DB connection is active when it is first resolved in
+                // the request, so a request can end up reading ANOTHER clinic's
+                // cached permission->role map and return a wrong, intermittent 403
+                // on permission-guarded routes. Forgetting the cache on every
+                // tenant switch forces hasPermissionTo() to reload from THIS
+                // tenant's own permissions/roles tables. Runs after
+                // BootstrapTenancy so the tenant DB connection is already active.
+                function () {
+                    app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+                },
             ],
 
-            Events\EndingTenancy::class => [],
+            // Symmetric reset: don't let a tenant's cached permissions bleed into
+            // the central context or the next tenant. This has to run on
+            // EndingTenancy, NOT TenancyEnded: RevertToCentralContext purges the
+            // `tenant` connection and unsets database.connections.tenant, so any
+            // cache store still bound to that connection blows up with
+            // "Database connection [tenant] not configured." Clearing here keeps
+            // the tenant DB connection alive for the duration of the flush.
+            Events\EndingTenancy::class => [
+                function () {
+                    app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+                },
+            ],
             Events\TenancyEnded::class => [
                 Listeners\RevertToCentralContext::class,
             ],

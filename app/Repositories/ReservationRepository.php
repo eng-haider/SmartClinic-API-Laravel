@@ -63,6 +63,7 @@ class ReservationRepository
                 'patient',
                 'doctor',
                 'status',
+                'reservationType',
             ])
             ->defaultSort('-reservation_start_date');
     }
@@ -97,7 +98,7 @@ class ReservationRepository
     public function getById(int $id, ?int $doctorId = null): ?Reservation
     {
         $query = $this->query()
-            ->with(['patient', 'doctor', 'status']);
+            ->with(['patient', 'doctor', 'status', 'reservationType']);
         
         // Filter by doctor if provided (for doctors to see only their own reservations)
         if ($doctorId !== null) {
@@ -120,7 +121,8 @@ class ReservationRepository
      */
     public function update(int $id, array $data): Reservation
     {
-        $reservation = $this->getById($id);
+        // Don't eager-load relationships just to update — avoids 4 extra queries.
+        $reservation = $this->query()->find($id);
 
         if (!$reservation) {
             throw new \Exception("Reservation with ID {$id} not found");
@@ -128,7 +130,7 @@ class ReservationRepository
 
         $reservation->update($data);
 
-        return $reservation->fresh();
+        return $reservation;
     }
 
     /**
@@ -136,7 +138,7 @@ class ReservationRepository
      */
     public function changeStatus(int $id, int $statusId): Reservation
     {
-        $reservation = $this->getById($id);
+        $reservation = $this->query()->find($id);
 
         if (!$reservation) {
             throw new \Exception("Reservation with ID {$id} not found");
@@ -144,7 +146,7 @@ class ReservationRepository
 
         $reservation->update(['status_id' => $statusId]);
 
-        return $reservation->fresh(['patient', 'doctor', 'status']);
+        return $reservation->load(['patient', 'doctor', 'status', 'reservationType']);
     }
 
     /**
@@ -152,7 +154,7 @@ class ReservationRepository
      */
     public function delete(int $id): bool
     {
-        $reservation = $this->getById($id);
+        $reservation = $this->query()->find($id);
 
         if (!$reservation) {
             throw new \Exception("Reservation with ID {$id} not found");

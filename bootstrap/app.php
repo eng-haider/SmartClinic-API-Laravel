@@ -12,12 +12,27 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // CORS - run first on every request (handles OPTIONS preflight)
+        $middleware->prepend(\App\Http\Middleware\CorsMiddleware::class);
+
+        // Enable CORS for API routes
+        $middleware->api(prepend: [
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
+        
         // Register route middleware
         $middleware->alias([
             'jwt' => \App\Http\Middleware\JwtMiddleware::class,
             'permission' => \App\Http\Middleware\AuthorizeWithPermission::class,
+            'tenant.admin' => \App\Http\Middleware\RequireTenantAdminKey::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Add CORS headers to all error responses
+        $exceptions->respond(function ($response) {
+            $response->headers->set('Access-Control-Allow-Origin', '*');
+            $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+            $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Tenant-ID, X-Clinic-ID, Accept, Origin');
+            return $response;
+        });
     })->create();

@@ -1,12 +1,15 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AppVersionController;
 use App\Http\Controllers\BillController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\CaseController;
 use App\Http\Controllers\CaseCategoryController;
 use App\Http\Controllers\ClinicExpenseController;
 use App\Http\Controllers\ClinicExpenseCategoryController;
+use App\Http\Controllers\WarehouseItemController;
+use App\Http\Controllers\CaseCategoryWarehouseController;
 use App\Http\Controllers\ClinicSettingController;
 use App\Http\Controllers\SettingDefinitionController;
 use App\Http\Controllers\ReservationController;
@@ -24,16 +27,35 @@ use App\Http\Controllers\Report\PatientReportController;
 use App\Http\Controllers\Report\CaseReportController;
 use App\Http\Controllers\Report\ReservationReportController;
 use App\Http\Controllers\Report\FinancialReportController;
+use App\Http\Controllers\DemoRegisterController;
+use App\Http\Controllers\AIController;
+use App\Http\Controllers\DemoAIController;
+use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
+
+// ============================================
+// WHATSAPP WEBHOOK ROUTES (No auth - called by Meta)
+// ============================================
+Route::prefix('webhooks/whatsapp')->withoutMiddleware('throttle:api')->group(function () {
+    Route::get('/', [WebhookController::class, 'verify']);
+    Route::post('/', [WebhookController::class, 'handle']);
+});
 
 // ============================================
 // TENANT MANAGEMENT ROUTES (Central Database)
 // These routes manage clinics/tenants
 // ============================================
-Route::prefix('tenants')->group(function () {
-    Route::get('/', [TenantController::class, 'index'])->name('tenants.index');
+// Public: clinic self-registration. Rate limited because each signup
+// permanently claims a database from the pool.
+Route::prefix('tenants')->middleware('throttle:5,1')->group(function () {
     Route::get('/preview', [TenantController::class, 'previewId'])->name('tenants.preview');
     Route::post('/', [TenantController::class, 'store'])->name('tenants.store');
+});
+
+// Admin only (X-Admin-Key). Everything here can read DB credentials or
+// destroy a clinic — never expose without the key.
+Route::prefix('tenants')->middleware('tenant.admin')->group(function () {
+    Route::get('/', [TenantController::class, 'index'])->name('tenants.index');
     Route::get('/{id}', [TenantController::class, 'show'])->name('tenants.show');
     Route::put('/{id}', [TenantController::class, 'update'])->name('tenants.update');
     Route::delete('/{id}', [TenantController::class, 'destroy'])->name('tenants.destroy');
@@ -47,12 +69,14 @@ Route::prefix('tenants')->group(function () {
 // PUBLIC PATIENT PROFILE ROUTES (No authentication required)
 // These routes are accessed via QR code scanning
 // ============================================
-Route::prefix('public/patients')->group(function () {
-    Route::get('/{token}', [PublicPatientController::class, 'show'])->name('public.patients.show');
-    Route::get('/{token}/cases', [PublicPatientController::class, 'cases'])->name('public.patients.cases');
-    Route::get('/{token}/images', [PublicPatientController::class, 'images'])->name('public.patients.images');
-    Route::get('/{token}/reservations', [PublicPatientController::class, 'reservations'])->name('public.patients.reservations');
-});
+Route::prefix('public/patients')
+    ->withoutMiddleware(\App\Http\Middleware\InitializeTenancyByHeader::class)
+    ->group(function () {
+        Route::get('/{token}', [PublicPatientController::class, 'show'])->name('public.patients.show');
+        Route::get('/{token}/cases', [PublicPatientController::class, 'cases'])->name('public.patients.cases');
+        Route::get('/{token}/images', [PublicPatientController::class, 'images'])->name('public.patients.images');
+        Route::get('/{token}/reservations', [PublicPatientController::class, 'reservations'])->name('public.patients.reservations');
+    });
 
 // ============================================
 // PUBLIC AUTH ROUTES (No authentication required)
@@ -60,16 +84,39 @@ Route::prefix('public/patients')->group(function () {
 // Step 2: Login with X-Tenant-ID to get token
 // ============================================
 Route::post('auth/register', [AuthController::class, 'register']);
+Route::post('auth/demo-register', [\App\Http\Controllers\DemoRegisterController::class, 'register']); // ← Demo account registration
 Route::post('auth/check-credentials', [AuthController::class, 'checkCredentials']); // ← خطوة 1: التحقق
 Route::post('auth/login', [AuthController::class, 'login']); // ← قديم (بدون tenant)
 Route::post('auth/smart-login', [AuthController::class, 'smartLogin']); // ← الدخول الذكي
 
+// Public mobile app release metadata. The APK itself can live on the public
+// disk, a CDN, or any HTTPS URL stored in the central app_versions table.
+Route::get('public/app-versions/latest', [AppVersionController::class, 'latest'])
+    ->middleware('throttle:60,1');
+
 // Protected auth routes (JWT required)
 Route::middleware('jwt')->group(function () {
     Route::get('auth/me', [AuthController::class, 'me']);
+    Route::get('auth/permissions', [AuthController::class, 'permissions']);
     Route::post('auth/logout', [AuthController::class, 'logout']);
     Route::post('auth/refresh', [AuthController::class, 'refresh']);
     Route::post('auth/change-password', [AuthController::class, 'changePassword']);
+});
+
+// Protected AI routes (JWT required) - DISABLED until OpenAI package is installed
+// Route::middleware('jwt')->group(function () {
+//     Route::get('ai/capabilities', [AIController::class, 'getCapabilities']);
+//     Route::get('ai/report-types', [AIController::class, 'getReportTypes']);
+//     Route::post('ai/generate-report', [AIController::class, 'generateReport']);
+//     Route::post('ai/ask-question', [AIController::class, 'askQuestion']);
+// });
+
+// Protected Demo AI routes (JWT required) - FREE VERSION
+Route::middleware('jwt')->prefix('tenant')->group(function () {
+    Route::get('demo-ai/capabilities', [DemoAIController::class, 'getCapabilities']);
+    Route::get('demo-ai/report-types', [DemoAIController::class, 'getReportTypes']);
+    Route::post('demo-ai/generate-report', [DemoAIController::class, 'generateReport']);
+    Route::post('demo-ai/ask-question', [DemoAIController::class, 'askQuestion']);
 });
 
 // Protected patient routes (JWT required)
@@ -132,10 +179,16 @@ Route::middleware('jwt')->group(function () {
     Route::apiResource('clinic-expenses', ClinicExpenseController::class);
     Route::patch('clinic-expenses/{id}/mark-paid', [ClinicExpenseController::class, 'markAsPaid'])->name('clinic-expenses.mark-paid');
     Route::patch('clinic-expenses/{id}/mark-unpaid', [ClinicExpenseController::class, 'markAsUnpaid'])->name('clinic-expenses.mark-unpaid');
+    Route::post('clinic-expenses/bulk-mark-paid', [ClinicExpenseController::class, 'markAsPaidByDateRange'])->name('clinic-expenses.bulk-mark-paid');
+    Route::get('clinic-expenses-summary', [ClinicExpenseController::class, 'summary'])->name('clinic-expenses.summary');
     Route::get('clinic-expenses-statistics', [ClinicExpenseController::class, 'statistics'])->name('clinic-expenses.statistics');
     Route::get('clinic-expenses-unpaid', [ClinicExpenseController::class, 'unpaid'])->name('clinic-expenses.unpaid');
     Route::get('clinic-expenses-by-date-range', [ClinicExpenseController::class, 'byDateRange'])->name('clinic-expenses.by-date-range');
 });
+
+// NOTE: Warehouse / inventory routes live in routes/tenant.php so they run inside
+// tenant DB context (InitializeTenancyByHeader). Do not add them here — the api.php
+// group has no tenancy initialization and would hit the central database.
 
 // Protected doctor routes (JWT required)
 Route::middleware('jwt')->group(function () {

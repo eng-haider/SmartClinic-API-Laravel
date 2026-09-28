@@ -18,9 +18,9 @@ class CaseController extends Controller
     {
         // index method will check permissions inside the method
         $this->middleware('permission:create-case')->only(['store']);
-        $this->middleware('permission:view-clinic-cases')->only(['show']);
+        // $this->middleware('permission:view-clinic-cases')->only(['show']);
         $this->middleware('permission:edit-case')->only(['update']);
-        $this->middleware('permission:delete-case')->only(['destroy']);
+        // $this->middleware('permission:delete-case')->only(['destroy']);
     }
 
     /**
@@ -45,12 +45,12 @@ class CaseController extends Controller
         ]);
 
         $perPage = $request->input('per_page', 15);
-        
+
         // Multi-tenancy: Database is already isolated by tenant
         // Only filter by doctor_id for regular doctors
         $doctorId = $this->getDoctorIdFilter();
-        
-        $cases = $this->caseRepository->getAllWithFilters($filters, $perPage, null, $doctorId);
+
+        $cases = $this->caseRepository->getAllWithFilters($filters, $perPage, $doctorId);
 
         return response()->json([
             'success' => true,
@@ -173,25 +173,33 @@ class CaseController extends Controller
     /**
      * Multi-tenancy: Database is already isolated by tenant via middleware.
      * We only need to filter by doctor for regular doctors who should only see their own cases.
-     * 
-     * - Super Doctor/Secretary: sees all cases in their tenant database [null]
-     * - Doctor: sees ONLY their own cases [user_id]
+     *
+     * NOTE: doctor_bills_isolation does NOT filter the case list.
+     *       It only hides price/bills inside CaseResource for non-owned cases.
+     *
+     * - Super Doctor / Secretary / Admin → null (see all cases)
+     * - Doctor with view-clinic-cases permission → null (see all cases)
+     * - Doctor without view-clinic-cases permission → user_id (own cases only)
      */
     private function getDoctorIdFilter(): ?int
     {
         $user = Auth::user();
-        
-        // Super doctor and secretary see all cases in this tenant
+
+        // Admins always see all cases
         if ($user->hasRole('clinic_super_doctor') || $user->hasRole('secretary') || $user->hasRole('super_admin')) {
             return null;
         }
-        
-        // Doctor sees only their own cases
+
+        // Doctor with view-clinic-cases permission sees all cases
+        if ($user->hasPermissionTo('view-clinic-cases')) {
+            return null;
+        }
+
+        // Doctor without permission sees only their own cases
         if ($user->hasRole('doctor')) {
             return $user->id;
         }
-        
-        // Default: show all cases in this tenant
+
         return null;
     }
 }

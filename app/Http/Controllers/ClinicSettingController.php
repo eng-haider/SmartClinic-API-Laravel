@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ClinicSettingRequest;
 use App\Http\Resources\ClinicSettingResource;
+use App\Models\ClinicSetting;
 use App\Models\SettingDefinition;
 use App\Repositories\ClinicSettingRepository;
 use App\Services\ClinicSettingService;
@@ -35,15 +36,7 @@ class ClinicSettingController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-        
-        // Sync any missing settings from definitions
-        $clinic = \App\Models\Clinic::find($clinicId);
-        if ($clinic) {
-            $this->clinicSettingService->syncAllDefinitionsToClinic($clinic);
-        }
-        
-        $settings = $this->clinicSettingRepository->getAllByClinicGrouped($clinicId);
+        $settings = $this->clinicSettingRepository->getAllByClinicGrouped();
 
         return response()->json([
             'success' => true,
@@ -57,8 +50,7 @@ class ClinicSettingController extends Controller
      */
     public function show(string $key): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
-        $setting = $this->clinicSettingRepository->getByKey($clinicId, $key);
+        $setting = $this->clinicSettingRepository->getByKey($key);
 
         if (!$setting) {
             return response()->json([
@@ -82,10 +74,8 @@ class ClinicSettingController extends Controller
     public function update(ClinicSettingRequest $request, string $key): JsonResponse
     {
         try {
-            $clinicId = $this->getClinicIdByRole();
-            
             // Check if setting exists (must be defined by super admin)
-            $setting = $this->clinicSettingRepository->getByKey($clinicId, $key);
+            $setting = $this->clinicSettingRepository->getByKey($key);
             
             if (!$setting) {
                 return response()->json([
@@ -96,7 +86,6 @@ class ClinicSettingController extends Controller
 
             // Update only the value
             $setting = $this->clinicSettingRepository->updateValue(
-                $clinicId,
                 $key,
                 $request->input('setting_value')
             );
@@ -116,43 +105,59 @@ class ClinicSettingController extends Controller
 
     /**
      * Update multiple clinic settings at once.
-     * Only updates existing settings, does not create new ones.
-     * Settings without a value will be skipped.
+     * Creates the setting if it doesn't exist yet, otherwise updates it.
+     *
+     * Accepts either shape:
+     *   { "settings": [ { "key": ..., "value": ..., "type": ... }, ... ] }
+     *   [ { "key": ..., "value": ..., "type": ... }, ... ]   // bare array
      */
     public function updateBulk(Request $request): JsonResponse
     {
-        $request->validate([
-            'settings' => 'required|array',
-            'settings.*.key' => 'required|string',
-            'settings.*.value' => 'nullable',
-        ]);
+        // Support both a wrapped { "settings": [...] } payload and a bare top-level array.
+        $settings = $request->input('settings');
+        if (!is_array($settings)) {
+            $all = $request->all();
+            $settings = array_is_list($all) ? $all : [];
+        }
+
+        if (empty($settings)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No settings provided. Send an array of { key, value, type } items.',
+            ], 422);
+        }
 
         try {
             $updated = [];
             $skipped = [];
 
-            foreach ($request->input('settings') as $settingData) {
-                // Skip settings without a key or value (null or not provided)
-                if (!array_key_exists('key', $settingData) || $settingData['key'] === null ||
-                    !array_key_exists('value', $settingData) || $settingData['value'] === null) {
+            foreach ($settings as $settingData) {
+                // Skip malformed items or items without a key.
+                if (!is_array($settingData) ||
+                    !array_key_exists('key', $settingData) ||
+                    $settingData['key'] === null ||
+                    $settingData['key'] === '' ||
+                    !array_key_exists('value', $settingData)) {
+                    $skipped[] = is_array($settingData) ? ($settingData['key'] ?? null) : null;
                     continue;
                 }
-                
-                $setting = $this->clinicSettingRepository->updateValue(
+
+                $setting = $this->clinicSettingRepository->updateOrCreate(
                     $settingData['key'],
-                    $settingData['value']
+                    [
+                        'setting_value' => $settingData['value'],
+                        'setting_type' => $settingData['type'] ?? 'string',
+                    ]
                 );
 
-                if ($setting) {
-                    $updated[] = new ClinicSettingResource($setting);
-                } else {
-                    $skipped[] = $settingData['key'];
-                }
+                $updated[] = new ClinicSettingResource($setting);
             }
+
+            $skipped = array_values(array_filter($skipped));
 
             $message = count($updated) . ' settings updated successfully';
             if (!empty($skipped)) {
-                $message .= '. Skipped ' . count($skipped) . ' unknown keys: ' . implode(', ', $skipped);
+                $message .= '. Skipped ' . count($skipped) . ' invalid items: ' . implode(', ', $skipped);
             }
 
             return response()->json([
@@ -181,14 +186,16 @@ class ClinicSettingController extends Controller
         ]);
 
         try {
-            $clinicId = $this->getClinicIdByRole();
-
             // Get the old logo setting to delete old file
-            $oldSetting = $this->clinicSettingRepository->getByKey($clinicId, 'logo');
-            
+            $oldSetting = $this->clinicSettingRepository->getByKey('logo');
+
             if ($oldSetting && $oldSetting->setting_value) {
-                // Delete old logo file
-                Storage::disk('public')->delete($oldSetting->setting_value);
+                // Old value may be a bare path or a full URL - normalise before deleting.
+                $oldPath = ClinicSetting::fileStoragePath($oldSetting->setting_value);
+
+                if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                    Storage::disk('public')->delete($oldPath);
+                }
             }
 
             // Store new logo
@@ -196,7 +203,6 @@ class ClinicSettingController extends Controller
 
             // Update setting
             $setting = $this->clinicSettingRepository->updateOrCreate(
-                $clinicId,
                 'logo',
                 [
                     'setting_value' => $path,
@@ -209,7 +215,7 @@ class ClinicSettingController extends Controller
                 'success' => true,
                 'message' => 'Logo uploaded successfully',
                 'data' => [
-                    'logo_url' => Storage::url($path),
+                    'logo_url' => ClinicSetting::fileUrl($path),
                     'logo_path' => $path,
                     'setting' => new ClinicSettingResource($setting),
                 ],
@@ -228,8 +234,7 @@ class ClinicSettingController extends Controller
     public function destroy(string $key): JsonResponse
     {
         try {
-            $clinicId = $this->getClinicIdByRole();
-            $setting = $this->clinicSettingRepository->getByKey($clinicId, $key);
+            $setting = $this->clinicSettingRepository->getByKey($key);
 
             if (!$setting) {
                 return response()->json([
@@ -240,7 +245,11 @@ class ClinicSettingController extends Controller
 
             // If it's a logo, delete the file
             if ($key === 'logo' && $setting->setting_value) {
-                Storage::disk('public')->delete($setting->setting_value);
+                $logoPath = ClinicSetting::fileStoragePath($setting->setting_value);
+
+                if ($logoPath && Storage::disk('public')->exists($logoPath)) {
+                    Storage::disk('public')->delete($logoPath);
+                }
             }
 
             $this->clinicSettingRepository->delete($setting->id);
@@ -255,19 +264,5 @@ class ClinicSettingController extends Controller
                 'message' => $e->getMessage(),
             ], 422);
         }
-    }
-
-    /**
-     * Get clinic ID based on user role.
-     */
-    private function getClinicIdByRole(): ?int
-    {
-        $user = Auth::user();
-        
-        if (!$user) {
-            return null;
-        }
-
-        return $user->clinic_id;
     }
 }

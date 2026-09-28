@@ -3,19 +3,44 @@
 namespace App\Repositories;
 
 use App\Models\CaseModel;
+use App\Services\SpecialtyManager;
+use App\Services\WarehouseService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Spatie\QueryBuilder\QueryBuilder;
 use Spatie\QueryBuilder\AllowedFilter;
 
 class CaseRepository
 {
+    public function __construct(private WarehouseService $warehouse)
+    {
+    }
+
     /**
      * Get the query builder instance
      */
     protected function query(): Builder
     {
         return CaseModel::query();
+    }
+
+    /**
+     * Pull the warehouse_items payload out of the case data.
+     * Returns null when the key is absent (→ use the category's default kit),
+     * or the explicit list (possibly empty) when the client sent it.
+     *
+     * @return array<int,array{warehouse_item_id:int,quantity:int}>|null
+     */
+    private function extractWarehouseItems(array &$data): ?array
+    {
+        $items = array_key_exists('warehouse_items', $data)
+            ? ($data['warehouse_items'] ?? [])
+            : null;
+
+        unset($data['warehouse_items']);
+
+        return $items;
     }
 
     /**
@@ -58,6 +83,8 @@ class CaseRepository
                 'status',
                 'notes',
                 'bills',
+                'warehouseItems',
+                'ophthalmologyEncounterDetails',
             ])
             ->defaultSort('-created_at');
     }
@@ -83,8 +110,8 @@ class CaseRepository
     public function getById(int $id, ?int $doctorId = null): ?CaseModel
     {
         $query = $this->query()
-            ->with(['patient', 'doctor', 'category', 'status']);
-        
+            ->with(['patient', 'doctor', 'category', 'status', 'bills', 'warehouseItems']);
+
         // Filter by doctor if provided (for doctors to see only their own cases)
         if ($doctorId !== null) {
             $query->where('doctor_id', $doctorId);
@@ -98,7 +125,19 @@ class CaseRepository
      */
     public function create(array $data): CaseModel
     {
-        return CaseModel::create($data);
+        $items = $this->extractWarehouseItems($data);
+
+        return DB::transaction(function () use ($data, $items) {
+            $handler = SpecialtyManager::handler();
+            $caseData = $handler->beforeSave($data);
+            $case = CaseModel::create($caseData);
+            $handler->afterSave($case, $data);
+
+            // Decrement stock for consumed materials (explicit list or category kit).
+            $this->warehouse->syncCaseConsumption($case, $items);
+
+            return $case;
+        });
     }
 
     /**
@@ -106,9 +145,23 @@ class CaseRepository
      */
     public function update(int $id, array $data): CaseModel
     {
-        $case = $this->query()->findOrFail($id);
-        $case->update($data);
-        return $case->fresh(['patient', 'doctor', 'category', 'status']);
+        $items = $this->extractWarehouseItems($data);
+
+        return DB::transaction(function () use ($id, $data, $items) {
+            $handler = SpecialtyManager::handler();
+            $caseData = $handler->beforeSave($data);
+            $case = $this->query()->findOrFail($id);
+            $case->update($caseData);
+            $handler->afterSave($case, $data);
+
+            // Re-sync consumption only when the client sent a warehouse_items payload;
+            // leaving it out keeps the existing consumption untouched.
+            if ($items !== null) {
+                $this->warehouse->syncCaseConsumption($case, $items);
+            }
+
+            return $case->fresh(['patient', 'doctor', 'category', 'status']);
+        });
     }
 
     /**
@@ -117,7 +170,13 @@ class CaseRepository
     public function delete(int $id): bool
     {
         $case = $this->query()->findOrFail($id);
-        return $case->delete();
+
+        return DB::transaction(function () use ($case) {
+            // Return consumed materials to stock before removing the case.
+            $this->warehouse->reverseCaseConsumption($case);
+
+            return $case->delete();
+        });
     }
 
     /**
@@ -144,7 +203,7 @@ class CaseRepository
     public function getByPatientId(int $patientId, int $perPage = 15): LengthAwarePaginator
     {
         return $this->query()
-            ->with(['doctor', 'category', 'status'])
+            ->with(['doctor', 'category', 'status', 'warehouseItems'])
             ->where('patient_id', $patientId)
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
@@ -303,7 +362,8 @@ class CaseRepository
                   ->orWhere('tooth_num', 'like', "%{$search}%")
                   ->orWhereHas('patient', function ($patientQuery) use ($search) {
                       $patientQuery->where('name', 'like', "%{$search}%")
-                                   ->orWhere('phone', 'like', "%{$search}%");
+                                   ->orWhere('phone', 'like', "%{$search}%")
+                                   ->orWhere('phone2', 'like', "%{$search}%");
                   });
             });
         }

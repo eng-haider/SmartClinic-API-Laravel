@@ -20,6 +20,14 @@ class ReservationResource extends JsonResource
             'doctor_id' => $this->doctor_id,
             'clinics_id' => $this->clinics_id,
             'status_id' => $this->status_id,
+            'reservation_type_id' => $this->reservation_type_id,
+            'reservation_type_note' => $this->reservation_type_note,
+            'reservation_type' => $this->when($this->relationLoaded('reservationType'), function () {
+                return $this->reservationType ? [
+                    'id' => $this->reservationType->id,
+                    'name' => $this->reservationType->name,
+                ] : null;
+            }),
             'notes' => $this->notes,
             'reservation_start_date' => $this->reservation_start_date?->format('Y-m-d'),
             'reservation_end_date' => $this->reservation_end_date?->format('Y-m-d'),
@@ -27,23 +35,27 @@ class ReservationResource extends JsonResource
             'reservation_to_time' => $this->reservation_to_time,
             'is_waiting' => $this->is_waiting,
             'patient' => $this->when($this->relationLoaded('patient'), function () {
-                return [
+                return $this->patient ? [
                     'id' => $this->patient->id,
                     'name' => $this->patient->name,
                     'phone' => $this->patient->phone,
-                ];
+                    'age' => $this->patient->age,
+                ] : null;
             }),
             'doctor' => $this->when($this->relationLoaded('doctor'), function () {
-                return [
+                return $this->doctor ? [
                     'id' => $this->doctor->id,
                     'name' => $this->doctor->name,
-                ];
+                ] : null;
             }),
             'status' => $this->when($this->relationLoaded('status'), function () {
-                return [
+                return $this->status ? [
                     'id' => $this->status->id,
                     'name' => $this->status->name,
-                ];
+                    'color' => $this->status->color,
+                    'name_ar' => $this->status->name_ar,
+                    
+                ] : null;
             }),
             'creator_id' => $this->creator_id,
             'updator_id' => $this->updator_id,
