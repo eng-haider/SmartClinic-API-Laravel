@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -30,7 +31,7 @@ class OldDatabaseMigrationSeeder extends Seeder
      * Set the old clinic ID to migrate data for.
      * Each clinic becomes a tenant in the new system.
      */
-    private int $oldClinicId = 105; // <-- CHANGE THIS to the clinic ID you want to migrate
+    private int $oldClinicId = 1; // <-- CHANGE THIS to the clinic ID you want to migrate
 
     /**
      * The tenant ID to use (will be generated from clinic name)
@@ -109,10 +110,9 @@ class OldDatabaseMigrationSeeder extends Seeder
         // 4. Create the tenant
         $this->command->info("🏥 Creating tenant: {$this->tenantId}");
         
-        // Generate database name based on tenant ID
-        $dbPrefix = config('tenancy.database.prefix', 'tenant');
-        $dbName = $dbPrefix . str_replace('clinic_', '', $this->tenantId);
-        
+        // Database name must match what tenancy connects to: prefix + tenant id + suffix
+        $dbName = config('tenancy.database.prefix', 'tenant') . $this->tenantId . config('tenancy.database.suffix', '');
+
         $this->command->info("   Database: {$dbName}");
         $this->command->info("   Using credentials from .env (DB_USERNAME and DB_PASSWORD)");
         
@@ -130,6 +130,15 @@ class OldDatabaseMigrationSeeder extends Seeder
             'db_username' => config('database.connections.mysql.username'),
             'db_password' => config('database.connections.mysql.password'),
         ]);
+
+        // Create the tenant database (TenantCreated jobs are disabled in TenancyServiceProvider).
+        // On Hostinger shared hosting this fails — create the database in hPanel first.
+        try {
+            DB::statement("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        } catch (\Throwable $e) {
+            $this->command->warn("⚠ Could not create database {$dbName}: " . $e->getMessage());
+            $this->command->warn("  Create it manually (hPanel → Databases) and run the seeder again.");
+        }
 
         // 5. Run tenant-scoped migration
         $this->command->info("📦 Running tenant migrations...");
@@ -379,16 +388,28 @@ class OldDatabaseMigrationSeeder extends Seeder
 
         $this->command->info("   Found " . count($clinicDoctorIds) . " doctors for clinic {$this->oldClinicId}");
 
-        // Get patient IDs from DoctorPatient table (many-to-many relationship)
-        $clinicPatientIds = DB::connection($this->oldDb)
-            ->table('DoctorPatient')
-            ->whereIn('doctors_id', $clinicDoctorIds)
-            ->pluck('patients_id')
-            ->unique()
-            ->toArray();
+        // Some old DB versions have no DoctorPatient pivot — patients then carry clinics_id/doctor_id directly
+        $hasDoctorPatient = Schema::connection($this->oldDb)->hasTable('DoctorPatient');
+
+        if ($hasDoctorPatient) {
+            // Get patient IDs from DoctorPatient table (many-to-many relationship)
+            $clinicPatientIds = DB::connection($this->oldDb)
+                ->table('DoctorPatient')
+                ->whereIn('doctors_id', $clinicDoctorIds)
+                ->pluck('patients_id')
+                ->unique()
+                ->toArray();
+        } else {
+            $this->command->info('   DoctorPatient table not found, using patients.clinics_id');
+            $clinicPatientIds = DB::connection($this->oldDb)
+                ->table('patients')
+                ->where('clinics_id', $this->oldClinicId)
+                ->pluck('id')
+                ->toArray();
+        }
 
         if (empty($clinicPatientIds)) {
-            $this->command->warn('   ⚠ No patients found in DoctorPatient table for this clinic');
+            $this->command->warn('   ⚠ No patients found for this clinic');
             return;
         }
 
@@ -401,20 +422,24 @@ class OldDatabaseMigrationSeeder extends Seeder
             ->get();
 
         foreach ($oldPatients as $oldPatient) {
-            // Get primary doctor for this patient from DoctorPatient table
-            $doctorPatientRecord = DB::connection($this->oldDb)
-                ->table('DoctorPatient')
-                ->where('patients_id', $oldPatient->id)
-                ->whereIn('doctors_id', $clinicDoctorIds) // Only doctors from this clinic
-                ->first();
+            // Get primary doctor for this patient (DoctorPatient pivot, or patients.doctor_id → doctors.id)
+            if ($hasDoctorPatient) {
+                $oldDoctorId = DB::connection($this->oldDb)
+                    ->table('DoctorPatient')
+                    ->where('patients_id', $oldPatient->id)
+                    ->whereIn('doctors_id', $clinicDoctorIds) // Only doctors from this clinic
+                    ->value('doctors_id');
+            } else {
+                $oldDoctorId = in_array($oldPatient->doctor_id, $clinicDoctorIds) ? $oldPatient->doctor_id : null;
+            }
 
             $newDoctorId = null;
             $clinicId = null;
-            
-            if ($doctorPatientRecord) {
+
+            if ($oldDoctorId) {
                 $oldDoctorRecord = DB::connection($this->oldDb)
                     ->table('doctors')
-                    ->where('id', $doctorPatientRecord->doctors_id)
+                    ->where('id', $oldDoctorId)
                     ->first();
 
                 if ($oldDoctorRecord) {

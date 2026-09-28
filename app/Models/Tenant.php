@@ -27,6 +27,26 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     protected $keyType = 'string';
 
     /**
+     * IDs are set manually (clinic_xxx). Override stancl's GeneratesIds, which treats the key as
+     * auto-increment when tenancy.id_generator is null — Eloquent would then overwrite the new
+     * tenant's id with lastInsertId (0) after create(), so $tenant->run() hit "{prefix}0".
+     */
+    public function getIncrementing()
+    {
+        return false;
+    }
+
+    public function shouldGenerateId(): bool
+    {
+        return false;
+    }
+
+    public function getKeyType()
+    {
+        return 'string';
+    }
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
