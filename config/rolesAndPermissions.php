@@ -340,8 +340,9 @@ return [
                 'edit-patient',
                 'search-patient',
 
-                // Case permissions - view only
-                'view-clinic-cases',
+                // Case permissions - none by default. 'view-clinic-cases' is granted
+                // per secretary from the permissions dialog; create-bill alone still
+                // lists a patient's cases in the bill form (see CaseController::index).
 
                 // Bill permissions - view and create
                 'view-clinic-bills',

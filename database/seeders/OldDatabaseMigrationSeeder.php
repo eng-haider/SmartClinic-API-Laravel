@@ -299,15 +299,26 @@ class OldDatabaseMigrationSeeder extends Seeder
         // Collect user IDs of doctors in this clinic
         $clinicUserIds = $oldDoctorRecords->pluck('user_id')->toArray();
 
-        // Also get users directly linked to this clinic via clinic_id
+        // Also get users directly linked to this clinic via clinic_id.
+        // The old app stored patient accounts with role_id 3 (secretary), so role 3 users
+        // only count as staff when they are in the `secretaries` table.
         $clinicDirectUsers = DB::connection($this->oldDb)
             ->table('users')
             ->where('clinic_id', $this->oldClinicId)
             ->whereNotNull('role_id')
+            ->where('role_id', '!=', 3)
             ->pluck('id')
             ->toArray();
 
-        $allUserIds = array_unique(array_merge($clinicUserIds, $clinicDirectUsers));
+        $clinicSecretaryUsers = $this->oldTableExists('secretaries')
+            ? DB::connection($this->oldDb)
+                ->table('secretaries')
+                ->where('clinics_id', $this->oldClinicId)
+                ->pluck('user_id')
+                ->toArray()
+            : [];
+
+        $allUserIds = array_unique(array_merge($clinicUserIds, $clinicDirectUsers, $clinicSecretaryUsers));
 
         if (empty($allUserIds)) {
             $this->command->warn('   ⚠ No users found for this clinic');
