@@ -2,112 +2,91 @@
 
 namespace App\Http\Resources;
 
+use App\Models\CaseModel;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * Resource for public patient profile.
- * 
- * This resource is used for public access via QR code.
- * It excludes sensitive information like financial data, phone, address, etc.
+ * The public portal is a bearer-link experience, not a staff chart. Keep this
+ * representation intentionally small: no database IDs, notes, identifiers,
+ * raw image links, or clinician-only prescription/document content.
  */
 class PublicPatientResource extends JsonResource
 {
-    /**
-     * @param array<string, mixed> $clinic Public clinic identity (name, logo, contact)
-     */
-    public function __construct($resource, private array $clinic = [])
+    /** @param array<string, mixed> $clinic */
+    public function __construct($resource, private array $clinic = [], private array $finance = [])
     {
         parent::__construct($resource);
     }
 
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
-        return [
-            'id' => $this->id,
-            'name' => $this->name,
-            'age' => $this->age,
-            'sex' => $this->sex,
-            'sex_label' => $this->sex === 1 ? 'Male' : ($this->sex === 2 ? 'Female' : null),
-            'birth_date' => $this->birth_date?->format('Y-m-d'),
-            'systemic_conditions' => $this->systemic_conditions,
-            'tooth_details' => $this->tooth_details,
+        $cases = $this->resource->relationLoaded('cases') ? $this->resource->getRelation('cases') : collect();
+        $reservations = $this->resource->relationLoaded('reservations')
+            ? $this->resource->getRelation('reservations')
+            : collect();
+        $activeCase = $cases->first(fn (CaseModel $case) => (int) $case->status_id !== CaseModel::COMPLETED_STATUS_ID);
 
-            // Clinic branding for the public page header
+        return [
+            // A greeting needs a name, but nothing else from the patient identity.
+            'name' => $this->name,
             'clinic' => $this->clinic ?: null,
-            
-            // Doctor information (limited)
-            'doctor' => $this->whenLoaded('doctor', function () {
-                return [
-                    'name' => $this->doctor->name,
-                ];
-            }),
-            
-            // Cases (limited information)
-            'cases' => $this->whenLoaded('cases', function () {
-                return $this->cases->map(function ($case) {
-                    return [
-                        'id' => $case->id,
-                        'tooth_num' => $case->tooth_num,
-                        'notes' => $case->notes,
-                        'category' => $case->category ? [
-                            'name' => $case->category->name,
-                            'name_en' => $case->category->name_en,
-                            'name_ar' => $case->category->name_ar,
-                            'is_orthodontic' => (bool) $case->category->is_orthodontic,
-                        ] : null,
-                        'status' => $case->status ? [
-                            'name_en' => $case->status->name_en,
-                            'name_ar' => $case->status->name_ar,
-                            'color' => $case->status->color,
-                        ] : null,
-                        'created_at' => $case->created_at?->format('Y-m-d'),
-                    ];
-                });
-            }),
-            
-            // Images
-            'images' => $this->whenLoaded('images', function () {
-                return $this->images->map(function ($image) {
-                    return [
-                        'id' => $image->id,
-                        'url' => $image->url,
-                        'type' => $image->type,
-                        'alt_text' => $image->alt_text,
-                        'created_at' => $image->created_at?->format('Y-m-d'),
-                    ];
-                });
-            }),
-            
-            // Upcoming reservations only
-            'upcoming_reservations' => $this->whenLoaded('reservations', function () {
-                return $this->reservations->map(function ($reservation) {
-                    return [
-                        'date' => $reservation->reservation_start_date?->format('Y-m-d'),
-                        'time' => $reservation->reservation_from_time,
-                        'status' => $reservation->status ? [
-                            'name_en' => $reservation->status->name_en,
-                            'name_ar' => $reservation->status->name_ar,
-                            'color' => $reservation->status->color,
-                        ] : null,
-                        'notes' => $reservation->notes,
-                        'doctor' => $reservation->doctor ? [
-                            'name' => $reservation->doctor->name,
-                        ] : null,
-                    ];
-                });
-            }),
-            
-            // Counts
-            'cases_count' => $this->cases->count(),
-            'images_count' => $this->images->count(),
-            
-            'member_since' => $this->created_at?->format('Y-m-d'),
+            'next_appointment' => $this->appointment($reservations->first()),
+            'appointments' => $reservations
+                ->map(fn ($reservation) => $this->appointment($reservation))
+                ->filter()
+                ->values(),
+            'current_treatment' => $activeCase ? $this->treatment($activeCase) : null,
+            'treatment_timeline' => $cases
+                ->map(fn (CaseModel $case) => $this->treatment($case))
+                ->values(),
+            'financial_summary' => [
+                'total' => (int) ($this->finance['total'] ?? 0),
+                'paid' => (int) ($this->finance['paid'] ?? 0),
+                'remaining' => (int) ($this->finance['remaining'] ?? 0),
+                'currency' => $this->clinic['currency'] ?? 'IQD',
+            ],
+            'payment_history' => collect($this->finance['payments'] ?? [])->values(),
+            // There is no explicit patient-visibility field on recipes or
+            // images yet. Returning an empty collection is safer than guessing.
+            'prescriptions' => [],
+            'documents' => [],
+        ];
+    }
+
+    private function appointment($reservation): ?array
+    {
+        if (!$reservation) {
+            return null;
+        }
+
+        return [
+            'date' => $reservation->reservation_start_date?->format('Y-m-d'),
+            'time' => $reservation->reservation_from_time,
+            'doctor' => $reservation->doctor?->name,
+            'status' => $reservation->status ? [
+                'name_en' => $reservation->status->name_en,
+                'name_ar' => $reservation->status->name_ar,
+            ] : null,
+        ];
+    }
+
+    private function treatment(CaseModel $case): array
+    {
+        return [
+            'tooth' => $case->tooth_num,
+            'category' => $case->category ? [
+                'name' => $case->category->name,
+                'name_en' => $case->category->name_en,
+                'name_ar' => $case->category->name_ar,
+            ] : null,
+            'status' => $case->status ? [
+                'name_en' => $case->status->name_en,
+                'name_ar' => $case->status->name_ar,
+            ] : null,
+            'doctor' => $case->doctor?->name,
+            'date' => ($case->case_date ?? $case->created_at)?->format('Y-m-d'),
         ];
     }
 }

@@ -6,194 +6,144 @@ use App\Http\Resources\PublicPatientResource;
 use App\Models\Patient;
 use App\Repositories\ClinicSettingRepository;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class PublicPatientController extends Controller
 {
-    public function __construct(
-        private ClinicSettingRepository $clinicSettings
-    ) {
+    public function __construct(private ClinicSettingRepository $clinicSettings)
+    {
     }
 
     /**
-     * Get patient public profile by token.
-     *
-     * This endpoint is publicly accessible (no authentication required).
-     * Used for QR code scanning to view patient information.
-     *
-     * @param string $token
-     * @return JsonResponse
+     * Patient dashboard by opaque public token. Tenant selection happens in
+     * middleware; every relation below is therefore scoped to that tenant.
      */
     public function show(string $token): JsonResponse
     {
-        $patient = Patient::findByPublicToken($token);
-
+        $patient = $this->patient($token);
         if (!$patient) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Patient profile not found or not publicly accessible.',
-            ], 404);
+            return $this->unavailable();
         }
 
-        // Load relationships for public display
         $patient->load([
-            'doctor:id,name',
-            'cases' => function ($query) {
-                $query->with(['category:id,name,name_en,name_ar,is_orthodontic', 'status:id,name_en,name_ar,color'])
-                    ->select('id', 'patient_id', 'case_categores_id', 'status_id', 'tooth_num', 'notes', 'created_at');
-            },
-            'images' => function ($query) {
-                $query->select('id', 'path', 'disk', 'type', 'alt_text', 'imageable_id', 'imageable_type', 'created_at')
-                    ->orderBy('created_at', 'desc');
-            },
-            'reservations' => function ($query) {
-                $query->select('id', 'patient_id', 'doctor_id', 'status_id', 'reservation_start_date', 'reservation_from_time', 'notes', 'created_at')
-                    ->where('reservation_start_date', '>=', now()->toDateString())
-                    ->orderBy('reservation_start_date', 'asc')
-                    ->with(['doctor:id,name', 'status:id,name_en,name_ar,color']);
-            },
+            'cases' => fn ($query) => $query
+                ->with([
+                    'category:id,name,name_en,name_ar',
+                    'status:id,name_en,name_ar',
+                    'doctor:id,name',
+                ])
+                ->select('id', 'patient_id', 'doctor_id', 'case_categores_id', 'status_id', 'tooth_num', 'case_date', 'price', 'created_at')
+                ->orderByDesc('case_date')
+                ->orderByDesc('created_at'),
+            'reservations' => fn ($query) => $query
+                ->with(['doctor:id,name', 'status:id,name_en,name_ar'])
+                ->select('id', 'patient_id', 'doctor_id', 'status_id', 'reservation_start_date', 'reservation_from_time')
+                ->whereDate('reservation_start_date', '>=', now()->toDateString())
+                ->orderBy('reservation_start_date')
+                ->orderBy('reservation_from_time'),
+            'bills' => fn ($query) => $query
+                ->select('id', 'patient_id', 'price', 'bill_date', 'created_at')
+                ->orderByDesc('bill_date')
+                ->orderByDesc('created_at')
+                ->limit(20),
         ]);
 
-        return response()->json([
+        $total = (int) $patient->cases->sum(fn ($case) => max(0, (int) ($case->price ?? 0)));
+        // The history is deliberately capped for a one-hand mobile view, but
+        // the summary itself must always use the complete payment total.
+        $paid = (int) $patient->bills()->sum('price');
+        $paid = min($paid, $total);
+
+        $finance = [
+            'total' => $total,
+            'paid' => $paid,
+            'remaining' => max(0, $total - $paid),
+            'payments' => $patient->bills->map(fn ($bill) => [
+                'date' => ($bill->bill_date ?? $bill->created_at)?->format('Y-m-d'),
+                'amount' => (int) $bill->price,
+            ])->values()->all(),
+        ];
+
+        $clinic = $this->clinicSettings->publicIdentity();
+        if (function_exists('tenant') && tenant()?->public_slug) {
+            $clinic['public_website_path'] = '/clinic/' . tenant()->public_slug;
+        }
+
+        return $this->privateResponse([
             'success' => true,
-            // The visitor is not authenticated, so /clinic-settings is closed to
-            // them - the clinic's own branding has to travel with this payload.
-            'data' => new PublicPatientResource($patient, $this->clinicSettings->publicIdentity()),
+            'data' => new PublicPatientResource($patient, $clinic, $finance),
         ]);
     }
 
     /**
-     * Get patient cases by public token.
-     *
-     * @param string $token
-     * @return JsonResponse
+     * Compatibility endpoint for older clients. It returns the same safe
+     * treatment representation, without internal identifiers or notes.
      */
     public function cases(string $token): JsonResponse
     {
-        $patient = Patient::findByPublicToken($token);
-
+        $patient = $this->patient($token);
         if (!$patient) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Patient profile not found or not publicly accessible.',
-            ], 404);
+            return $this->unavailable();
         }
 
-        $cases = $patient->cases()
-            ->with(['category:id,name,name_en,name_ar,is_orthodontic', 'status:id,name_en,name_ar,color', 'doctor:id,name'])
-            ->select('id', 'patient_id', 'doctor_id', 'case_categores_id', 'status_id', 'tooth_num', 'notes', 'created_at')
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $patient->load(['cases' => fn ($query) => $query
+            ->with(['category:id,name,name_en,name_ar', 'status:id,name_en,name_ar', 'doctor:id,name'])
+            ->select('id', 'patient_id', 'doctor_id', 'case_categores_id', 'status_id', 'tooth_num', 'case_date', 'created_at')
+            ->orderByDesc('case_date')->orderByDesc('created_at')]);
 
-        return response()->json([
-            'success' => true,
-            'data' => $cases->map(function ($case) {
-                return [
-                    'id' => $case->id,
-                    'tooth_num' => $case->tooth_num,
-                    'notes' => $case->notes,
-                    'category' => $case->category ? [
-                        'id' => $case->category->id,
-                        'name' => $case->category->name,
-                        'name_en' => $case->category->name_en,
-                        'name_ar' => $case->category->name_ar,
-                        'is_orthodontic' => (bool) $case->category->is_orthodontic,
-                    ] : null,
-                    'status' => $case->status ? [
-                        'id' => $case->status->id,
-                        'name_en' => $case->status->name_en,
-                        'name_ar' => $case->status->name_ar,
-                        'color' => $case->status->color,
-                    ] : null,
-                    'doctor' => $case->doctor ? [
-                        'id' => $case->doctor->id,
-                        'name' => $case->doctor->name,
-                    ] : null,
-                    'created_at' => $case->created_at?->format('Y-m-d H:i:s'),
-                ];
-            }),
-        ]);
+        $data = (new PublicPatientResource($patient))->toArray(request())['treatment_timeline'];
+        return $this->privateResponse(['success' => true, 'data' => $data]);
     }
 
     /**
-     * Get patient images by public token.
-     *
-     * @param string $token
-     * @return JsonResponse
+     * Images remain unavailable until the data model carries an explicit
+     * patient-visible flag and a token-scoped file delivery mechanism.
      */
     public function images(string $token): JsonResponse
     {
-        $patient = Patient::findByPublicToken($token);
-
-        if (!$patient) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Patient profile not found or not publicly accessible.',
-            ], 404);
-        }
-
-        $images = $patient->images()
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $images->map(function ($image) {
-                return [
-                    'id' => $image->id,
-                    'url' => $image->url,
-                    'type' => $image->type,
-                    'alt_text' => $image->alt_text,
-                    'created_at' => $image->created_at?->format('Y-m-d H:i:s'),
-                ];
-            }),
-        ]);
+        return $this->patient($token)
+            ? $this->privateResponse(['success' => true, 'data' => []])
+            : $this->unavailable();
     }
 
-    /**
-     * Get patient upcoming reservations by public token.
-     *
-     * @param string $token
-     * @return JsonResponse
-     */
     public function reservations(string $token): JsonResponse
     {
-        $patient = Patient::findByPublicToken($token);
-
+        $patient = $this->patient($token);
         if (!$patient) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Patient profile not found or not publicly accessible.',
-            ], 404);
+            return $this->unavailable();
         }
 
-        $reservations = $patient->reservations()
-            ->with(['doctor:id,name', 'status:id,name_en,name_ar,color'])
-            ->where('reservation_start_date', '>=', now()->toDateString())
-            ->orderBy('reservation_start_date', 'asc')
-            ->orderBy('reservation_from_time', 'asc')
-            ->get();
+        $patient->load(['reservations' => fn ($query) => $query
+            ->with(['doctor:id,name', 'status:id,name_en,name_ar'])
+            ->select('id', 'patient_id', 'doctor_id', 'status_id', 'reservation_start_date', 'reservation_from_time')
+            ->whereDate('reservation_start_date', '>=', now()->toDateString())
+            ->orderBy('reservation_start_date')->orderBy('reservation_from_time')]);
 
-        return response()->json([
-            'success' => true,
-            'data' => $reservations->map(function ($reservation) {
-                return [
-                    'id' => $reservation->id,
-                    'date' => $reservation->reservation_start_date?->format('Y-m-d'),
-                    'time' => $reservation->reservation_from_time,
-                    'status' => $reservation->status ? [
-                        'name_en' => $reservation->status->name_en,
-                        'name_ar' => $reservation->status->name_ar,
-                        'color' => $reservation->status->color,
-                    ] : null,
-                    'notes' => $reservation->notes,
-                    'doctor' => $reservation->doctor ? [
-                        'id' => $reservation->doctor->id,
-                        'name' => $reservation->doctor->name,
-                    ] : null,
-                    'created_at' => $reservation->created_at?->format('Y-m-d H:i:s'),
-                ];
-            }),
-        ]);
+        $data = (new PublicPatientResource($patient))->toArray(request())['appointments'];
+        return $this->privateResponse(['success' => true, 'data' => $data]);
+    }
+
+    private function patient(string $token): ?Patient
+    {
+        return Patient::findByPublicToken($token);
+    }
+
+    private function unavailable(): JsonResponse
+    {
+        // Do not reveal whether a token existed, was disabled, or belongs to
+        // another tenant.
+        return $this->privateResponse([
+            'success' => false,
+            'message' => 'This patient link is unavailable.',
+        ], 404);
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function privateResponse(array $payload, int $status = 200): JsonResponse
+    {
+        return response()->json($payload, $status)
+            ->header('Cache-Control', 'no-store, private')
+            ->header('Pragma', 'no-cache')
+            ->header('Referrer-Policy', 'no-referrer')
+            ->header('X-Robots-Tag', 'noindex, nofollow, noarchive');
     }
 }

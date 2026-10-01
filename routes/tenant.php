@@ -86,7 +86,8 @@ Route::middleware(['api', InitializeTenancyByPatientToken::class])
 Route::middleware(['api', InitializeTenancyByPatientToken::class])
     ->prefix('api/tenant/public')
     ->group(function () {
-        Route::post('/booking-requests', [PublicBookingController::class, 'store']);
+        Route::post('/booking-requests', [PublicBookingController::class, 'store'])
+            ->middleware('throttle:5,1');
         Route::get('/clinic-info', [PublicBookingController::class, 'clinicInfo']);
     });
 

@@ -136,6 +136,7 @@ class TenantController extends Controller
 
         // ── Generate tenant ID ────────────────────────────────────────────
         $tenantId = $this->generateUniqueTenantId($validated['name']);
+        $publicSlug = $this->generateUniquePublicSlug($validated['name']);
 
         Log::info('=== CREATING NEW TENANT ===', [
             'name'      => $validated['name'],
@@ -172,6 +173,7 @@ class TenantController extends Controller
             $tenant = Tenant::create([
                 'id'                    => $tenantId,
                 'name'                  => $validated['name'],
+                'public_slug'           => $publicSlug,
                 'specialty'             => $validated['specialty'],
                 'address'               => $validated['address'] ?? null,
                 'rx_img'                => $validated['rx_img'] ?? null,
@@ -607,5 +609,21 @@ class TenantController extends Controller
                 'message_ar' => 'فشل في تشغيل البذور: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Generate an URL-safe public slug without exposing the database key.
+     */
+    private function generateUniquePublicSlug(string $clinicName): string
+    {
+        $base = Str::slug($clinicName) ?: 'clinic';
+        $slug = $base;
+        $suffix = 2;
+
+        while (Tenant::where('public_slug', $slug)->exists()) {
+            $slug = $base . '-' . $suffix++;
+        }
+
+        return $slug;
     }
 }

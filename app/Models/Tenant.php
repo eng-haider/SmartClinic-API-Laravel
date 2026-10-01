@@ -56,6 +56,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     protected $fillable = [
         'id',
         'name',
+        'public_slug',
         'specialty',
         'address',
         'rx_img',
@@ -146,6 +147,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         return [
             'id',
             'name',
+            'public_slug',
             'specialty',
             'address',
             'rx_img',

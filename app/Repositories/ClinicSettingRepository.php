@@ -236,10 +236,18 @@ class ClinicSettingRepository extends BaseRepository
     {
         $settings = $this->getByKeys([
             'clinic_name', 'logo', 'phone', 'email', 'address', 'working_hours',
+            'location', 'website', 'whatsapp', 'facebook', 'instagram', 'twitter',
+            'theme_color', 'currency', 'enable_online_booking', 'public_site_enabled',
+            'clinic_description', 'hero_image', 'timezone',
             self::BABY_TEETH_NOTATION_KEY,
         ]);
 
-        $value = fn (string $key) => $settings->get($key)?->getValue() ?: null;
+        // Do not use a truthy fallback here: false is meaningful for public
+        // website/booking switches and must not be converted to null.
+        $value = function (string $key) use ($settings) {
+            $setting = $settings->get($key);
+            return $setting ? $setting->getValue() : null;
+        };
 
         return [
             'name' => $value('clinic_name'),
@@ -248,6 +256,22 @@ class ClinicSettingRepository extends BaseRepository
             'email' => $value('email'),
             'address' => $value('address'),
             'working_hours' => $value('working_hours'),
+            'location' => $value('location'),
+            'website' => $value('website'),
+            'whatsapp' => $value('whatsapp'),
+            'facebook' => $value('facebook'),
+            'instagram' => $value('instagram'),
+            'twitter' => $value('twitter'),
+            'theme_color' => $value('theme_color'),
+            'currency' => $value('currency') ?: 'IQD',
+            'enable_online_booking' => (bool) $value('enable_online_booking'),
+            // Empty is backwards-compatible: existing clinics remain enabled.
+            'public_site_enabled' => $value('public_site_enabled') === null
+                ? true
+                : (bool) $value('public_site_enabled'),
+            'description' => $value('clinic_description'),
+            'hero_image' => ClinicSetting::fileUrl($settings->get('hero_image')?->setting_value),
+            'timezone' => $value('timezone'),
             // The public patient profile draws the same dental chart, so it needs
             // to know how this clinic labels baby teeth.
             'baby_teeth_notation' => $this->normalizeValue(
@@ -398,4 +422,3 @@ class ClinicSettingRepository extends BaseRepository
         return $order[$key] ?? 999; // Unknown settings go to the end
     }
 }
-

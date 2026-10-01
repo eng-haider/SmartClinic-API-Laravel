@@ -19,6 +19,8 @@ use App\Http\Controllers\SecretaryController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\PublicPatientController;
+use App\Http\Controllers\PublicClinicController;
+use App\Http\Middleware\InitializeTenancyByPatientToken;
 use App\Http\Controllers\PatientPublicProfileController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\Report\BillReportController;
@@ -71,12 +73,20 @@ Route::prefix('tenants')->middleware('tenant.admin')->group(function () {
 // ============================================
 Route::prefix('public/patients')
     ->withoutMiddleware(\App\Http\Middleware\InitializeTenancyByHeader::class)
+    ->middleware(InitializeTenancyByPatientToken::class)
     ->group(function () {
         Route::get('/{token}', [PublicPatientController::class, 'show'])->name('public.patients.show');
         Route::get('/{token}/cases', [PublicPatientController::class, 'cases'])->name('public.patients.cases');
         Route::get('/{token}/images', [PublicPatientController::class, 'images'])->name('public.patients.images');
         Route::get('/{token}/reservations', [PublicPatientController::class, 'reservations'])->name('public.patients.reservations');
     });
+
+// Public clinic marketing site. This is intentionally resolved by a stable
+// public slug instead of a tenant/database identifier.
+Route::get('public/clinics/{slug}', [PublicClinicController::class, 'show'])
+    ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')
+    ->middleware('throttle:60,1')
+    ->name('public.clinics.show');
 
 // ============================================
 // PUBLIC AUTH ROUTES (No authentication required)

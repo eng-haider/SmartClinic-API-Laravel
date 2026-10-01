@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 
 class Image extends Model
 {
@@ -63,8 +64,13 @@ class Image extends Model
         // Try to get the current tenant ID from the tenancy context
         if (function_exists('tenant') && tenant()) {
             $tenantId = tenant()->id;
-            // Build API route URL for tenant-specific file serving
-            return rtrim(config('app.url'), '/') . '/file/tenant/' . $tenantId . '/' . $this->path;
+            // Clinical files are private. A short-lived signed route lets an
+            // authenticated dashboard display an image without making the
+            // tenant file tree guessable or publicly cacheable.
+            return URL::temporarySignedRoute('file.tenant.private', now()->addMinutes(10), [
+                'tenant' => $tenantId,
+                'path' => $this->path,
+            ]);
         }
         
         // Fallback for non-tenant context (central database)

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Stancl\Tenancy\Tenancy;
 use App\Models\Tenant;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 class InitializeTenancyByPatientToken
@@ -57,6 +58,16 @@ class InitializeTenancyByPatientToken
                 'message' => 'Unable to resolve clinic for this request.',
                 'message_ar' => 'تعذّر تحديد العيادة لهذا الطلب.',
             ], 400);
+        }
+
+        // Public tokens are UUIDs. Reject malformed values before scanning
+        // tenant databases, which protects this anonymous route from needless
+        // work and keeps invalid-link responses generic.
+        if (!Str::isUuid((string) $token)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This patient link is unavailable.',
+            ], 404)->header('Cache-Control', 'no-store, private');
         }
 
         $tenant = $this->resolveTenantFromToken($token);

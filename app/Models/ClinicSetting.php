@@ -80,7 +80,16 @@ class ClinicSetting extends Model
         $path = ltrim($path, '/');
 
         if (function_exists('tenant') && tenant()) {
-            return rtrim(config('app.url'), '/') . '/file/tenant/' . tenant()->id . '/' . $path;
+            // Logos and explicit hero assets are intentionally public; every
+            // other settings file follows the signed clinical-file path.
+            if (str_starts_with($path, 'clinic-logos/') || str_starts_with($path, 'clinic-hero/')) {
+                return route('file.tenant.public', ['tenant' => tenant()->id, 'path' => $path]);
+            }
+
+            return \Illuminate\Support\Facades\URL::temporarySignedRoute('file.tenant.private', now()->addMinutes(10), [
+                'tenant' => tenant()->id,
+                'path' => $path,
+            ]);
         }
 
         $url = Storage::disk('public')->url($path);
