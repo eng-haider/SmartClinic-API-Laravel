@@ -26,6 +26,7 @@ class Image extends Model
         'width',
         'height',
         'alt_text',
+        'tooth_num',
         'order',
         'imageable_id',
         'imageable_type',

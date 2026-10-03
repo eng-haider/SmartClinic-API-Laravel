@@ -171,7 +171,7 @@ class ImageController extends Controller
     public function update(ImageRequest $request, string|int $id): JsonResponse
     {
         try {
-            $data = $request->only(['type', 'alt_text', 'order']);
+            $data = $request->only(['type', 'alt_text', 'tooth_num', 'order']);
 
             $image = $this->imageRepository->update((int)$id, $data);
 

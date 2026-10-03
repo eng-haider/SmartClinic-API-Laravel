@@ -27,6 +27,7 @@ class ImageResource extends JsonResource
             'height' => $this->height,
             'dimensions' => $this->width && $this->height ? "{$this->width}x{$this->height}" : null,
             'alt_text' => $this->alt_text,
+            'tooth_num' => $this->tooth_num,
             'order' => $this->order,
             'imageable_type' => $this->imageable_type,
             'imageable_id' => $this->imageable_id,

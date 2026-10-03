@@ -46,6 +46,7 @@ class ImageRequest extends FormRequest
                 Rule::in(['profile', 'document', 'xray', 'before', 'after', 'treatment', 'prescription', 'other']),
             ],
             'alt_text' => 'nullable|string|max:255',
+            'tooth_num' => 'nullable|string|max:100',
             'order' => 'nullable|integer|min:0',
             
             // Polymorphic relationship
