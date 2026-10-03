@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Console\Application as Artisan;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
@@ -12,7 +13,23 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Persistent PDO connections survive DB::purge() until the process exits, so a console
+        // process that walks tenants (tenants:migrate, queue workers, the scheduler) keeps one
+        // open socket per tenant DB. Past ~20 of them Hostinger refuses new connections with
+        // "SQLSTATE[HY000] [2002] Operation not permitted". Web requests keep DB_PERSISTENT.
+        // Artisan::starting rather than here directly: config:cache boots a fresh app in the
+        // CLI, and stripping the option then would bake it out of the cached web config too.
+        if ($this->app->runningInConsole()) {
+            Artisan::starting(function () {
+                foreach (config('database.connections', []) as $name => $connection) {
+                    if (isset($connection['options'][\PDO::ATTR_PERSISTENT])) {
+                        $options = $connection['options'];
+                        unset($options[\PDO::ATTR_PERSISTENT]);
+                        config(["database.connections.{$name}.options" => $options]);
+                    }
+                }
+            });
+        }
     }
 
     /**
