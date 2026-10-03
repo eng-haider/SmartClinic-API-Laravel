@@ -2,12 +2,14 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\ConnectsToTenantDatabase;
 use App\Models\Tenant;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 class ListTenants extends Command
 {
+    use ConnectsToTenantDatabase;
+
     /**
      * The name and signature of the console command.
      *
@@ -60,20 +62,9 @@ class ListTenants extends Command
 
             if ($testConnection) {
                 $dbPassword = $tenant->db_password ?? env('TENANT_DB_PASSWORD');
-                $centralConfig = config('database.connections.central');
-                
-                config([
-                    'database.connections.tenant.database' => $dbName,
-                    'database.connections.tenant.username' => $dbUsername,
-                    'database.connections.tenant.password' => $dbPassword,
-                    'database.connections.tenant.host' => $centralConfig['host'],
-                    'database.connections.tenant.port' => $centralConfig['port'],
-                ]);
-
-                DB::purge('tenant');
 
                 try {
-                    DB::connection('tenant')->getPdo();
+                    $this->connectTenantDatabase($dbName, $dbUsername, $dbPassword);
                     $row[] = '✓ Connected';
                 } catch (\Exception $e) {
                     $row[] = '✗ Failed';

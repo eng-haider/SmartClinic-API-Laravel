@@ -141,6 +141,9 @@ return [
                 'create-case',
                 'edit-case',
                 'delete-case',
+                // Listed here so it shows in the secretary permissions dialog: a
+                // secretary holding it is notified when a doctor adds a case.
+                'notify-new-cases',
 
               
                 // Bill permissions

@@ -2,14 +2,16 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\ConnectsToTenantDatabase;
 use App\Models\Tenant;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class SeedAllTenants extends Command
 {
+    use ConnectsToTenantDatabase;
+
     /**
      * The name and signature of the console command.
      *
@@ -72,22 +74,9 @@ class SeedAllTenants extends Command
                     continue;
                 }
 
-                // Configure tenant connection
-                $centralConfig = config('database.connections.central');
-                
-                config([
-                    'database.connections.tenant.database' => $dbName,
-                    'database.connections.tenant.username' => $dbUsername,
-                    'database.connections.tenant.password' => $dbPassword,
-                    'database.connections.tenant.host' => $centralConfig['host'],
-                    'database.connections.tenant.port' => $centralConfig['port'],
-                ]);
-
-                DB::purge('tenant');
-
-                // Test connection
+                // Configure and test the tenant connection (retries while Hostinger throttles new connections)
                 try {
-                    DB::connection('tenant')->getPdo();
+                    $this->connectTenantDatabase($dbName, $dbUsername, $dbPassword);
                     $this->line("  ✓ Connected to database: {$dbName}");
                 } catch (\Exception $e) {
                     $this->error("  ✗ Cannot connect to database: {$dbName}");
