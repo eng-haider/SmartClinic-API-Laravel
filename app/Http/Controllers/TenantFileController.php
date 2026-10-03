@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
@@ -27,7 +28,8 @@ class TenantFileController extends Controller
 
     private function serve(string $tenant, string $path, string $cacheControl): BinaryFileResponse
     {
-        if (str_contains($tenant, ['/', '\\', "\0"]) || str_contains($path, ['..', '\\', "\0"])) {
+        // Str::contains, not native str_contains: the native one rejects an array of needles
+        if (Str::contains($tenant, ['/', '\\', "\0"]) || Str::contains($path, ['..', '\\', "\0"])) {
             abort(404);
         }
 
