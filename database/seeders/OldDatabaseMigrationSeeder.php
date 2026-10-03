@@ -800,9 +800,12 @@ class OldDatabaseMigrationSeeder extends Seeder
                 }
             }
 
-            // CaseDoctor.doctors_id references old doctors.id
-            $newDoctorId = null;
-            if (isset($caseDoctorMap[$oldCase->id])) {
+            // cases.doctor_id references old doctors.id and is the doctor the old app shows.
+            // CaseDoctor only covers a handful of cases, so it is a fallback, not the source.
+            $newDoctorId = isset($oldCase->doctor_id) ? ($this->doctorIdMap[$oldCase->doctor_id] ?? null) : null;
+
+            // Fallback: CaseDoctor.doctors_id (also references old doctors.id)
+            if (!$newDoctorId && isset($caseDoctorMap[$oldCase->id])) {
                 $newDoctorId = $this->doctorIdMap[$caseDoctorMap[$oldCase->id]] ?? null;
             }
 
@@ -831,12 +834,14 @@ class OldDatabaseMigrationSeeder extends Seeder
                     'tooth_num' => $oldCase->tooth_num,
                     'root_stuffing' => $oldCase->root_stuffing,
                     'is_paid' => $oldCase->is_paid ?? false,
+                    'item_cost' => $oldCase->item_cost ?? 0,
                 ]);
             });
 
-            // Preserve original timestamps
+            // Preserve original timestamps and soft delete status
             $newCase->created_at = $oldCase->created_at;
             $newCase->updated_at = $oldCase->updated_at;
+            $newCase->deleted_at = $oldCase->deleted_at ?? null;
             $newCase->saveQuietly();
 
             $this->caseIdMap[$oldCase->id] = $newCase->id;
@@ -867,19 +872,22 @@ class OldDatabaseMigrationSeeder extends Seeder
             return;
         }
 
-        $createdBy = $this->fallbackUserId();
+        $fallbackCreatedBy = $this->fallbackUserId();
         $count = 0;
 
         DB::connection($this->oldDb)
             ->table('sessions')
             ->whereIn('case_id', $oldCaseIds)
             ->orderBy('id')
-            ->chunk(500, function ($oldSessions) use ($createdBy, &$count) {
+            ->chunk(500, function ($oldSessions) use ($fallbackCreatedBy, &$count) {
         foreach ($oldSessions as $oldSession) {
             $newCaseId = $this->caseIdMap[$oldSession->case_id] ?? null;
             if (!$newCaseId) {
                 continue;
             }
+
+            // Old sessions have no author, so credit the case's doctor
+            $createdBy = $this->caseOwnerMap[$oldSession->case_id]['doctor_id'] ?? $fallbackCreatedBy;
 
             $content = $oldSession->note ?? '';
             if (empty(trim($content))) {
@@ -893,10 +901,13 @@ class OldDatabaseMigrationSeeder extends Seeder
                 'created_by' => $createdBy,
             ]);
 
-            // Preserve original date
+            // Preserve original date and soft delete status
             if ($oldSession->date) {
                 $note->created_at = $oldSession->date;
                 $note->updated_at = $oldSession->date;
+            }
+            $note->deleted_at = $oldSession->deleted_at ?? null;
+            if ($note->isDirty()) {
                 $note->saveQuietly();
             }
 
@@ -946,15 +957,22 @@ class OldDatabaseMigrationSeeder extends Seeder
                         'patient_id' => $owner['patient_id'],
                         'billable_id' => $newCaseId,
                         'billable_type' => CaseModel::class,
-                        'is_paid' => $oldBill->PaymentDate ? true : false,
                         'price' => $oldBill->price,
                         'doctor_id' => $owner['doctor_id'],
+                        'use_credit' => (bool) ($oldBill->use_credit ?? false),
+                        // PaymentDate is the payment date reports bucket by (COALESCE(bill_date, created_at))
+                        'bill_date' => $oldBill->PaymentDate,
                     ]);
                 });
 
-                // Preserve timestamps
+                // is_paid is not fillable on Bill, so it is set after create.
+                // Prefer the old is_paid column; older dumps only have PaymentDate.
+                $bill->is_paid = (bool) ($oldBill->is_paid ?? $oldBill->PaymentDate);
+
+                // Preserve timestamps and soft delete status
                 $bill->created_at = $oldBill->created_at;
                 $bill->updated_at = $oldBill->updated_at;
+                $bill->deleted_at = $oldBill->deleted_at ?? null;
                 $bill->saveQuietly();
 
                 $count++;
