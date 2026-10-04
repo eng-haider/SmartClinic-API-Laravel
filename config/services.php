@@ -42,4 +42,11 @@ return [
         'embedding_model' => env('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small'),
     ],
 
+    // Free browser push notifications (see App\Services\WebPushService)
+    'webpush' => [
+        'subject' => env('VAPID_SUBJECT', 'mailto:admin@smartclinic.software'),
+        'public_key' => env('VAPID_PUBLIC_KEY'),
+        'private_key' => env('VAPID_PRIVATE_KEY'),
+    ],
+
 ];

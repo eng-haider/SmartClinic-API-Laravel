@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Notification;
+use App\Models\PushSubscription;
 use App\Services\NotificationService;
+use App\Services\WebPushService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -258,6 +260,66 @@ class NotificationController extends Controller
             'success' => true,
             'message' => 'Notification deleted successfully',
         ]);
+    }
+
+    /**
+     * VAPID public key the browser needs to subscribe to Web Push.
+     */
+    public function pushPublicKey(WebPushService $webPush): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'enabled' => $webPush->isConfigured(),
+            'public_key' => $webPush->publicKey(),
+        ]);
+    }
+
+    /**
+     * Save this browser's Web Push subscription for the authenticated user.
+     *
+     * Called on every app load, so it also refreshes the browser's language. The same browser
+     * moves to whoever logged in last, so a shared clinic PC only notifies its current user.
+     */
+    public function pushSubscribe(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'endpoint' => 'required|url|max:2048',
+            'keys.p256dh' => 'required|string|max:255',
+            'keys.auth' => 'required|string|max:255',
+            'content_encoding' => 'nullable|in:aesgcm,aes128gcm',
+            'locale' => 'nullable|string|max:10',
+        ]);
+
+        PushSubscription::updateOrCreate(
+            ['endpoint_hash' => PushSubscription::hashEndpoint($validated['endpoint'])],
+            [
+                'user_id' => Auth::id(),
+                'endpoint' => $validated['endpoint'],
+                'public_key' => $validated['keys']['p256dh'],
+                'auth_token' => $validated['keys']['auth'],
+                'content_encoding' => $validated['content_encoding'] ?? 'aes128gcm',
+                'locale' => $validated['locale'] ?? null,
+                'user_agent' => substr((string) $request->userAgent(), 0, 255) ?: null,
+            ]
+        );
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Stop pushing to this browser (logout, or the user turned notifications off).
+     */
+    public function pushUnsubscribe(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'endpoint' => 'required|string|max:2048',
+        ]);
+
+        PushSubscription::where('endpoint_hash', PushSubscription::hashEndpoint($validated['endpoint']))
+            ->where('user_id', Auth::id())
+            ->delete();
+
+        return response()->json(['success' => true]);
     }
 
     /**

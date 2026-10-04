@@ -11,6 +11,10 @@ use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {
+    public function __construct(
+        private WebPushService $webPush,
+    ) {}
+
     /**
      * Send a notification to a user or model.
      *
@@ -33,6 +37,19 @@ class NotificationService
             // Send via OneSignal if player ID exists
             if ($notifiable->getOneSignalPlayerId()) {
                 $this->sendViaOneSignal($notification, $notifiable);
+            }
+
+            // Browser push to every browser the user enabled; the notification is already
+            // stored, so a push failure must not turn this into a failed send
+            if ($notifiable instanceof User) {
+                try {
+                    $this->webPush->sendToUser($notifiable, $notification);
+                } catch (\Throwable $e) {
+                    Log::warning('Web push failed', [
+                        'notification_id' => $notification->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
 
             return $notification;
