@@ -72,9 +72,16 @@ class WebPushService
         }
 
         foreach ($webPush->flush() as $report) {
-            if ($report->isSubscriptionExpired()) {
+            // 403: the browser subscribed with a different VAPID key (the keys were changed), so
+            // this subscription can never receive again. Drop it like an expired one; the browser
+            // re-subscribes with the current key on its next app load (push.service.js sync()).
+            $staleKey = $report->getResponse()?->getStatusCode() === 403;
+
+            if ($report->isSubscriptionExpired() || $staleKey) {
                 PushSubscription::where('endpoint_hash', PushSubscription::hashEndpoint($report->getEndpoint()))->delete();
-            } elseif (!$report->isSuccess()) {
+            }
+
+            if (!$report->isSuccess() && !$report->isSubscriptionExpired()) {
                 Log::warning('Web push failed', [
                     'notification_id' => $notification->id,
                     'reason' => $report->getReason(),
