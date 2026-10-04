@@ -37,6 +37,15 @@ class CaseController extends Controller
             ], 403);
         }
 
+        // create-bill alone is only for picking a case to bill, so it lists one patient's
+        // cases at a time instead of every case in the clinic
+        if (!$user->hasPermissionTo('view-clinic-cases') && !$request->filled('filter.patient_id')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Without view-clinic-cases, cases can only be listed for one patient (filter[patient_id]).',
+            ], 403);
+        }
+
         $filters = $request->only([
             'search',
             'filter',
@@ -93,6 +102,15 @@ class CaseController extends Controller
      */
     public function show(int $id): JsonResponse
     {
+        // Same rule as index: viewing cases, or billing them
+        $user = Auth::user();
+        if (!$user->hasPermissionTo('view-clinic-cases') && !$user->hasPermissionTo('create-bill')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You need either view-clinic-cases or create-bill permission.',
+            ], 403);
+        }
+
         // Multi-tenancy: Database is already isolated by tenant
         $doctorId = $this->getDoctorIdFilter();
         $case = $this->caseRepository->getById($id, null, $doctorId);

@@ -377,8 +377,8 @@ return [
                 'edit-warehouse',
                 'restock-warehouse',
 
-                // Images - view only
-                'view-images',
+                // Image permissions - none by default. 'view-images' (and create/edit/
+                // delete-image) are granted per secretary from the permissions dialog.
 
                 // Reports
                 'view-reports',

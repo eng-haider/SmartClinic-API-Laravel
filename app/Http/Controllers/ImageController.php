@@ -19,6 +19,11 @@ class ImageController extends Controller
     public function __construct(ImageRepository $imageRepository)
     {
         $this->imageRepository = $imageRepository;
+
+        $this->middleware('permission:view-images')->only(['index', 'show', 'getByImageable', 'statistics']);
+        $this->middleware('permission:create-image')->only(['store']);
+        $this->middleware('permission:edit-image')->only(['update', 'updateOrder']);
+        $this->middleware('permission:delete-image')->only(['destroy']);
     }
 
     /**
