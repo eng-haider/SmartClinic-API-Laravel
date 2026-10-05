@@ -24,15 +24,23 @@ use Illuminate\Support\Facades\DB;
  * - Only ever sets is_paid from 0 to 1, never back.
  * - Deleted cases and deleted bills are ignored.
  * - Updates go through the query builder: no model events, automations or updated_at changes.
+ * - Every applied run writes an undo file (storage/logs/cases-sync-paid-*.sql) holding
+ *   the UPDATE that puts the changed cases back to unpaid, per tenant database.
+ * - A tenant that fails is reported and skipped; the others still run.
  *
  * Usage:
- *   php artisan cases:sync-paid --dry-run               # Preview, all tenants
- *   php artisan cases:sync-paid --tenant=clinic_1       # One tenant
+ *   php artisan cases:sync-paid --tenant=clinic_1 --dry-run   # Preview one tenant
+ *   php artisan cases:sync-paid --tenant=clinic_1             # Apply to one tenant
+ *   php artisan cases:sync-paid --all --dry-run               # Preview every tenant
+ *
+ * --all has to be asked for: a clinic that never used is_paid would have most of its
+ * cases flipped, so check each tenant's preview first.
  */
 class SyncCasePaidFromBills extends Command
 {
     protected $signature = 'cases:sync-paid
                             {--tenant= : Specific tenant ID to process}
+                            {--all : Process every tenant}
                             {--dry-run : Preview without saving}';
 
     protected $description = 'Mark cases paid when their bills (or the patient\'s bills) already cover the price';
@@ -41,6 +49,11 @@ class SyncCasePaidFromBills extends Command
     {
         $isDryRun = (bool) $this->option('dry-run');
         $specificTenant = $this->option('tenant');
+
+        if (!$specificTenant && !$this->option('all')) {
+            $this->error('Pass --tenant=<id> for one tenant, or --all for every tenant.');
+            return self::FAILURE;
+        }
 
         if ($isDryRun) {
             $this->warn('🔍 DRY RUN MODE — no data will be saved');
@@ -55,37 +68,64 @@ class SyncCasePaidFromBills extends Command
             return self::FAILURE;
         }
 
+        // Resolved before tenancy starts, which points storage_path() at the tenant's folder.
+        $undoFile = storage_path('logs/cases-sync-paid-' . now()->format('Y-m-d_His') . '.sql');
+
         $total = 0;
+        $failed = [];
 
         foreach ($tenants as $tenant) {
-            $total += $tenant->run(function () use ($tenant, $isDryRun) {
-                [$coveredByCase, $coveredByPatient] = $this->findCasesToMark();
-                $caseIds = array_values(array_unique(array_merge($coveredByCase, $coveredByPatient)));
+            try {
+                $total += $tenant->run(function () use ($tenant, $isDryRun, $undoFile) {
+                    [$coveredByCase, $coveredByPatient] = $this->findCasesToMark();
+                    $caseIds = array_values(array_unique(array_merge($coveredByCase, $coveredByPatient)));
+                    sort($caseIds);
 
-                $this->info(sprintf(
-                    '%s: %d cases to mark paid (%d covered by their own bills, %d by the patient\'s bills)',
-                    $tenant->id,
-                    count($caseIds),
-                    count($coveredByCase),
-                    count(array_diff($coveredByPatient, $coveredByCase))
-                ));
+                    $this->info(sprintf(
+                        '%s: %d cases to mark paid (%d covered by their own bills, %d by the patient\'s bills)',
+                        $tenant->id,
+                        count($caseIds),
+                        count($coveredByCase),
+                        count(array_diff($coveredByPatient, $coveredByCase))
+                    ));
 
-                if (!$isDryRun && $caseIds) {
-                    DB::transaction(function () use ($caseIds) {
-                        foreach (array_chunk($caseIds, 500) as $chunk) {
-                            DB::table('cases')->whereIn('id', $chunk)->update(['is_paid' => 1]);
-                        }
-                    });
-                }
+                    if (!$isDryRun && $caseIds) {
+                        // Written first, so the undo exists even if the update fails half way.
+                        file_put_contents($undoFile, sprintf(
+                            "-- %s (database %s)\nUPDATE cases SET is_paid = 0 WHERE id IN (%s);\n",
+                            $tenant->id,
+                            DB::connection()->getDatabaseName(),
+                            implode(',', $caseIds)
+                        ), FILE_APPEND);
 
-                return count($caseIds);
-            });
+                        DB::transaction(function () use ($caseIds) {
+                            foreach (array_chunk($caseIds, 500) as $chunk) {
+                                DB::table('cases')->whereIn('id', $chunk)->update(['is_paid' => 1]);
+                            }
+                        });
+                    }
+
+                    return count($caseIds);
+                });
+            } catch (\Throwable $e) {
+                $failed[] = $tenant->id;
+                $this->error("{$tenant->id}: skipped - {$e->getMessage()}");
+            }
         }
 
         $this->newLine();
         $this->info($isDryRun
             ? "🔍 {$total} cases would be marked paid. Run again without --dry-run to apply."
             : "✅ {$total} cases marked paid.");
+
+        if (!$isDryRun && $total > 0) {
+            $this->info("↩️  Undo file: {$undoFile}");
+        }
+
+        if ($failed) {
+            $this->error('Failed tenants: ' . implode(', ', $failed));
+            return self::FAILURE;
+        }
 
         return self::SUCCESS;
     }
