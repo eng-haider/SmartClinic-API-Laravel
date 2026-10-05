@@ -42,6 +42,25 @@ class Bill extends Model
 
         static::saved($syncExpense);
         static::deleted($syncExpense);
+
+        // Sync is_paid on the case the same way, so paying in instalments marks it
+        // paid once the bills cover its price. A bill moved to another case also
+        // re-checks the case it left.
+        $syncCase = function ($bill) {
+            if (!in_array($bill->billable_type, CaseModel::BILLABLE_TYPES, true)) {
+                return;
+            }
+
+            $caseIds = array_filter([
+                $bill->billable_id,
+                $bill->wasChanged('billable_id') ? $bill->getOriginal('billable_id') : null,
+            ]);
+
+            CaseModel::whereIn('id', $caseIds)->get()->each->syncIsPaid();
+        };
+
+        static::saved($syncCase);
+        static::deleted($syncCase);
     }
 
     /**

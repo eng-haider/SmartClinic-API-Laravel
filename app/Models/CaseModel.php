@@ -47,6 +47,12 @@ class CaseModel extends Model
     public const COMPLETED_STATUS_ID = 3;
 
     /**
+     * billable_type values a case's bills are stored under: new bills use the
+     * morph class (App\Models\Case), migrated ones the real class name.
+     */
+    public const BILLABLE_TYPES = ['Case', 'CaseModel', 'App\\Models\\Case', 'App\\Models\\CaseModel'];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -168,6 +174,21 @@ class CaseModel extends Model
     public function getMorphClass()
     {
         return 'App\Models\Case';
+    }
+
+    /**
+     * Mark the case paid once its bills cover the price, unpaid otherwise.
+     * Runs whenever one of its bills is added, changed or removed.
+     */
+    public function syncIsPaid(): void
+    {
+        // Queried directly: bills() only sees the morph class, not migrated bills.
+        $paid = (int) Bill::query()
+            ->whereIn('billable_type', self::BILLABLE_TYPES)
+            ->where('billable_id', $this->id)
+            ->sum('price');
+
+        $this->updateQuietly(['is_paid' => $paid >= (int) $this->price]);
     }
 
     /**
