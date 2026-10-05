@@ -257,6 +257,13 @@ class TenantClinicSettingsSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'setting_key' => 'hide_dashboard_numbers',
+                'setting_value' => '0',
+                'setting_type' => 'boolean',
+                'description' => 'When enabled, the dashboard opens with its counts and amounts hidden, and a button shows or hides them',
+                'is_active' => true,
+            ],
+            [
                 'setting_key' => 'tooth_colors',
                 'setting_value' => json_encode([
                     [
