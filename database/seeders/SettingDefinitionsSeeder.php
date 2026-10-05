@@ -259,6 +259,15 @@ class SettingDefinitionsSeeder extends Seeder
                 'display_order' => 5,
                 'is_required' => false,
             ],
+            [
+                'setting_key' => 'hide_dashboard_numbers',
+                'setting_type' => 'boolean',
+                'default_value' => '0',
+                'description' => 'Open the dashboard with its counts and amounts hidden, with a button to show them',
+                'category' => 'display',
+                'display_order' => 6,
+                'is_required' => false,
+            ],
 
             // ========================
             // SOCIAL CATEGORY

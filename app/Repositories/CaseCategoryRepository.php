@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Models\CaseCategory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class CaseCategoryRepository
@@ -27,6 +28,7 @@ class CaseCategoryRepository
                 'name',
                 'category_type',
                 'clinic_id',
+                AllowedFilter::exact('is_active'),
             ])
             ->allowedSorts([
                 'id',

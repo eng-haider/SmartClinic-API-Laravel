@@ -19,9 +19,20 @@ class CaseCategory extends Model
         'name',
         'category_type',
         'is_orthodontic',
+        'is_active',
         'order',
         'item_cost',
         'without_detect_tooth',
+    ];
+
+    /**
+     * Default attribute values, so a freshly created category is active
+     * before it is reloaded from the database.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'is_active' => true,
     ];
 
     /**
@@ -36,6 +47,7 @@ class CaseCategory extends Model
             'item_cost' => 'integer',
             'without_detect_tooth' => 'boolean',
             'is_orthodontic' => 'boolean',
+            'is_active' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -91,6 +103,15 @@ class CaseCategory extends Model
     public function requiresToothDetection(): bool
     {
         return $this->isDental() && !$this->without_detect_tooth;
+    }
+
+    /**
+     * Scope a query to only include active categories (the ones that can be
+     * picked for a new case).
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 
     /**

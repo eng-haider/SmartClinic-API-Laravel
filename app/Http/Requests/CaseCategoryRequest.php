@@ -28,6 +28,9 @@ class CaseCategoryRequest extends FormRequest
             'name' => 'required|string|max:255',
             'category_type' => 'required|in:dental,beauty,general',
             'is_orthodontic' => 'nullable|boolean',
+            // Inactive categories are hidden when picking one for a new case;
+            // cases that already use them keep them. Omit to leave unchanged.
+            'is_active' => 'sometimes|boolean',
             'order' => 'nullable|integer|min:0',
             'item_cost' => 'nullable|integer|min:0',
             'without_detect_tooth' => 'nullable|boolean',
@@ -48,6 +51,7 @@ class CaseCategoryRequest extends FormRequest
             'category_type.required' => 'Category type is required',
             'category_type.in' => 'Category type must be dental, beauty, or general',
             'is_orthodontic.boolean' => 'Orthodontic flag must be true or false',
+            'is_active.boolean' => 'Active flag must be true or false',
             'order.integer' => 'Order must be an integer',
             'order.min' => 'Order must be at least 0',
             'item_cost.integer' => 'Item cost must be an integer',

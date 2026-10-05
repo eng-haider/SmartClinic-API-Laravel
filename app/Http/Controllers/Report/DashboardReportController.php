@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Report;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\DoctorFilterTrait;
+use App\Repositories\ClinicSettingRepository;
 use App\Repositories\Reports\ReportsRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,8 +13,10 @@ use Illuminate\Support\Facades\Auth;
 class DashboardReportController extends Controller
 {
     use DoctorFilterTrait;
-    public function __construct(private ReportsRepository $reportsRepository)
-    {
+    public function __construct(
+        private ReportsRepository $reportsRepository,
+        private ClinicSettingRepository $clinicSettingRepository
+    ) {
         $this->middleware('permission:view-reports')->only(['overview', 'today']);
     }
 
@@ -80,6 +83,11 @@ class DashboardReportController extends Controller
             'data' => $todaySummary,
             'filters' => [
                 'date' => now()->toDateString(),
+            ],
+            // Sent here because everyone who sees the dashboard can read this
+            // endpoint, while /clinic-settings needs view-clinic-settings.
+            'display' => [
+                'hide_numbers' => $this->clinicSettingRepository->hideDashboardNumbers(),
             ],
         ]);
     }

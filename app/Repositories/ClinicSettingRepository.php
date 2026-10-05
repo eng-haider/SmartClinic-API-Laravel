@@ -18,6 +18,12 @@ class ClinicSettingRepository extends BaseRepository
     public const BABY_TEETH_NOTATIONS = ['fdi', 'universal', 'palmer'];
     public const DEFAULT_BABY_TEETH_NOTATION = 'fdi';
 
+    /**
+     * When on, the dashboard opens with its counts and amounts hidden and
+     * shows a button to reveal them. Off (and missing) means always shown.
+     */
+    public const HIDE_DASHBOARD_NUMBERS_KEY = 'hide_dashboard_numbers';
+
     public function __construct(ClinicSetting $model)
     {
         parent::__construct($model);
@@ -226,6 +232,14 @@ class ClinicSettingRepository extends BaseRepository
     }
 
     /**
+     * Whether the dashboard should open with its numbers hidden.
+     */
+    public function hideDashboardNumbers(): bool
+    {
+        return (bool) $this->getByKey(self::HIDE_DASHBOARD_NUMBERS_KEY)?->getValue();
+    }
+
+    /**
      * The clinic's public identity: what an unauthenticated visitor is allowed
      * to see about the clinic itself (booking page, public patient profile).
      *
@@ -348,7 +362,7 @@ class ClinicSettingRepository extends BaseRepository
         }
 
         // Display category
-        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY])) {
+        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY, self::HIDE_DASHBOARD_NUMBERS_KEY])) {
             return 'display';
         }
 
@@ -409,6 +423,7 @@ class ClinicSettingRepository extends BaseRepository
             'teeth_v2' => 24,
             'tooth_colors' => 25,
             'baby_teeth_notation' => 26,
+            'hide_dashboard_numbers' => 27,
 
             // Social (26-28)
             'facebook_url' => 26,

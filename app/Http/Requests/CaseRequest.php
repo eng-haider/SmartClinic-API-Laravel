@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\CaseCategory;
+use App\Models\CaseModel;
 use App\Services\SpecialtyManager;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 
@@ -25,7 +28,7 @@ class CaseRequest extends FormRequest
         $rules = [
             'patient_id' => 'required|exists:patients,id',
             'doctor_id' => 'nullable|exists:users,id',
-            'case_categores_id' => 'nullable|exists:case_categories,id',
+            'case_categores_id' => ['nullable', 'exists:case_categories,id', $this->activeCategoryRule()],
             'status_id' => 'nullable|exists:statuses,id',
             'notes' => 'nullable|string|max:5000',
             'price' => 'nullable|integer|min:0',
@@ -42,6 +45,26 @@ class CaseRequest extends FormRequest
         // Merge specialty-specific rules (dental: tooth_num, root_stuffing)
         // (ophthalmology: eye_side, visual_acuity, iop, etc.)
         return array_merge($rules, SpecialtyManager::handler()->validationRules());
+    }
+
+    /**
+     * An inactive category can no longer be picked for a case, but a case that
+     * already has one keeps it when it is edited.
+     */
+    private function activeCategoryRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if (! CaseCategory::query()->whereKey($value)->where('is_active', false)->exists()) {
+                return;
+            }
+
+            $caseId = $this->route('case');
+            if ($caseId !== null && (int) $value === (int) CaseModel::query()->whereKey($caseId)->value('case_categores_id')) {
+                return;
+            }
+
+            $fail('Selected case category is not active');
+        };
     }
 
     /**
