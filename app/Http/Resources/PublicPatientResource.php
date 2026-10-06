@@ -3,13 +3,15 @@
 namespace App\Http\Resources;
 
 use App\Models\CaseModel;
+use App\Models\Image;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * The public portal is a bearer-link experience, not a staff chart. Keep this
  * representation intentionally small: no database IDs, notes, identifiers,
- * raw image links, or clinician-only prescription/document content.
+ * permanent image links, or clinician-only prescription/document content.
+ * Case photos are exposed only as short-lived signed URLs.
  */
 class PublicPatientResource extends JsonResource
 {
@@ -87,6 +89,14 @@ class PublicPatientResource extends JsonResource
             ] : null,
             'doctor' => $case->doctor?->name,
             'date' => ($case->case_date ?? $case->created_at)?->format('Y-m-d'),
+            'images' => $case->relationLoaded('images')
+                ? $case->getRelation('images')->map(fn (Image $image) => [
+                    'url' => $image->url,
+                    'type' => $image->type,
+                    'tooth' => $image->tooth_num,
+                    'date' => $image->created_at?->format('Y-m-d'),
+                ])->values()->all()
+                : [],
         ];
     }
 }

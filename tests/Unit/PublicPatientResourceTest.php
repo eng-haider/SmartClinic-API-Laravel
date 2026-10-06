@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Http\Resources\PublicPatientResource;
 use App\Models\CaseCategory;
 use App\Models\CaseModel;
+use App\Models\Image;
 use App\Models\Patient;
 use App\Models\Status;
 use App\Models\User;
@@ -52,5 +53,45 @@ class PublicPatientResourceTest extends TestCase
         $this->assertSame(150000, $payload['financial_summary']['remaining']);
         $this->assertSame([], $payload['prescriptions']);
         $this->assertSame([], $payload['documents']);
+    }
+
+    public function test_it_serializes_case_images_without_paths_or_ids(): void
+    {
+        $case = $this->bareCase(['id' => 99, 'status_id' => 1, 'case_date' => '2026-10-01']);
+        $case->setRelation('images', new Collection([
+            new Image(['id' => 5, 'path' => 'images/before/a.jpg', 'disk' => 'public', 'type' => 'before', 'tooth_num' => '16', 'alt_text' => 'Internal note']),
+        ]));
+
+        $patient = new Patient(['name' => 'Sara Ahmed']);
+        $patient->setRelation('cases', new Collection([$case]));
+
+        $payload = (new PublicPatientResource($patient))->toArray(Request::create('/'));
+        $image = $payload['current_treatment']['images'][0];
+
+        $this->assertSame(['url', 'type', 'tooth', 'date'], array_keys($image));
+        $this->assertSame('before', $image['type']);
+        $this->assertSame('16', $image['tooth']);
+        $this->assertCount(1, $payload['treatment_timeline'][0]['images']);
+    }
+
+    public function test_cases_without_loaded_images_serialize_an_empty_list(): void
+    {
+        $patient = new Patient(['name' => 'Sara Ahmed']);
+        $patient->setRelation('cases', new Collection([$this->bareCase(['id' => 1, 'status_id' => 1])]));
+
+        $payload = (new PublicPatientResource($patient))->toArray(Request::create('/'));
+
+        $this->assertSame([], $payload['current_treatment']['images']);
+    }
+
+    /** A case with its display relations preset, so serializing it never queries. */
+    private function bareCase(array $attributes): CaseModel
+    {
+        $case = new CaseModel($attributes);
+        foreach (['category', 'status', 'doctor'] as $relation) {
+            $case->setRelation($relation, null);
+        }
+
+        return $case;
     }
 }

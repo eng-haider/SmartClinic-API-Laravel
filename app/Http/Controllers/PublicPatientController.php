@@ -3,12 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\PublicPatientResource;
+use App\Models\Image;
 use App\Models\Patient;
 use App\Repositories\ClinicSettingRepository;
 use Illuminate\Http\JsonResponse;
 
 class PublicPatientController extends Controller
 {
+    /** Every imageable_type a case image may carry (see the morph map). */
+    private const CASE_IMAGE_TYPES = ['Case', 'CaseModel', 'App\\Models\\CaseModel', 'App\\Models\\Case'];
+
     public function __construct(private ClinicSettingRepository $clinicSettings)
     {
     }
@@ -46,6 +50,7 @@ class PublicPatientController extends Controller
                 ->orderByDesc('created_at')
                 ->limit(20),
         ]);
+        $this->attachCaseImages($patient);
 
         $total = (int) $patient->cases->sum(fn ($case) => max(0, (int) ($case->price ?? 0)));
         // The history is deliberately capped for a one-hand mobile view, but
@@ -89,20 +94,32 @@ class PublicPatientController extends Controller
             ->with(['category:id,name,name_en,name_ar', 'status:id,name_en,name_ar', 'doctor:id,name'])
             ->select('id', 'patient_id', 'doctor_id', 'case_categores_id', 'status_id', 'tooth_num', 'case_date', 'created_at')
             ->orderByDesc('case_date')->orderByDesc('created_at')]);
+        $this->attachCaseImages($patient);
 
         $data = (new PublicPatientResource($patient))->toArray(request())['treatment_timeline'];
         return $this->privateResponse(['success' => true, 'data' => $data]);
     }
 
     /**
-     * Images remain unavailable until the data model carries an explicit
-     * patient-visible flag and a token-scoped file delivery mechanism.
+     * Case photos as a flat list. URLs are short-lived signed links, so the
+     * response never hands out a permanent path into the tenant file tree.
      */
     public function images(string $token): JsonResponse
     {
-        return $this->patient($token)
-            ? $this->privateResponse(['success' => true, 'data' => []])
-            : $this->unavailable();
+        $patient = $this->patient($token);
+        if (!$patient) {
+            return $this->unavailable();
+        }
+
+        $patient->load(['cases' => fn ($query) => $query
+            ->select('id', 'patient_id', 'case_date', 'created_at')
+            ->orderByDesc('case_date')->orderByDesc('created_at')]);
+        $this->attachCaseImages($patient);
+
+        $data = collect((new PublicPatientResource($patient))->toArray(request())['treatment_timeline'])
+            ->flatMap(fn (array $treatment) => $treatment['images'])
+            ->values();
+        return $this->privateResponse(['success' => true, 'data' => $data]);
     }
 
     public function reservations(string $token): JsonResponse
@@ -125,6 +142,25 @@ class PublicPatientController extends Controller
     private function patient(string $token): ?Patient
     {
         return Patient::findByPublicToken($token);
+    }
+
+    /**
+     * One query for every case's images instead of a morphMany per case: the
+     * morph relation only matches the canonical 'Case' alias, while older
+     * uploads may carry any alias from CASE_IMAGE_TYPES.
+     */
+    private function attachCaseImages(Patient $patient): void
+    {
+        $cases = $patient->getRelation('cases');
+        $images = Image::query()
+            ->whereIn('imageable_type', self::CASE_IMAGE_TYPES)
+            ->whereIn('imageable_id', $cases->pluck('id'))
+            ->ordered()
+            ->orderBy('created_at')
+            ->get(['id', 'path', 'disk', 'type', 'tooth_num', 'imageable_id', 'created_at'])
+            ->groupBy('imageable_id');
+
+        $cases->each(fn ($case) => $case->setRelation('images', $images->get($case->id, collect())->values()));
     }
 
     private function unavailable(): JsonResponse
