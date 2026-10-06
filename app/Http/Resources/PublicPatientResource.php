@@ -43,6 +43,10 @@ class PublicPatientResource extends JsonResource
             'treatment_timeline' => $cases
                 ->map(fn (CaseModel $case) => $this->treatment($case))
                 ->values(),
+            // Photos uploaded to the patient's gallery rather than to one case.
+            'photos' => $this->resource->relationLoaded('images')
+                ? $this->resource->getRelation('images')->map(fn (Image $image) => $this->image($image))->values()->all()
+                : [],
             'financial_summary' => [
                 'total' => (int) ($this->finance['total'] ?? 0),
                 'paid' => (int) ($this->finance['paid'] ?? 0),
@@ -90,13 +94,18 @@ class PublicPatientResource extends JsonResource
             'doctor' => $case->doctor?->name,
             'date' => ($case->case_date ?? $case->created_at)?->format('Y-m-d'),
             'images' => $case->relationLoaded('images')
-                ? $case->getRelation('images')->map(fn (Image $image) => [
-                    'url' => $image->url,
-                    'type' => $image->type,
-                    'tooth' => $image->tooth_num,
-                    'date' => $image->created_at?->format('Y-m-d'),
-                ])->values()->all()
+                ? $case->getRelation('images')->map(fn (Image $image) => $this->image($image))->values()->all()
                 : [],
+        ];
+    }
+
+    private function image(Image $image): array
+    {
+        return [
+            'url' => $image->url,
+            'type' => $image->type,
+            'tooth' => $image->tooth_num,
+            'date' => $image->created_at?->format('Y-m-d'),
         ];
     }
 }

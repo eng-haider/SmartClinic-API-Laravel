@@ -82,6 +82,21 @@ class PublicPatientResourceTest extends TestCase
         $payload = (new PublicPatientResource($patient))->toArray(Request::create('/'));
 
         $this->assertSame([], $payload['current_treatment']['images']);
+        $this->assertSame([], $payload['photos']);
+    }
+
+    public function test_it_serializes_patient_gallery_photos(): void
+    {
+        $patient = new Patient(['name' => 'Sara Ahmed']);
+        $patient->setRelation('cases', new Collection());
+        $patient->setRelation('images', new Collection([
+            new Image(['id' => 8, 'path' => 'images/document/b.jpg', 'disk' => 'public', 'type' => 'document']),
+        ]));
+
+        $payload = (new PublicPatientResource($patient))->toArray(Request::create('/'));
+
+        $this->assertCount(1, $payload['photos']);
+        $this->assertSame(['url', 'type', 'tooth', 'date'], array_keys($payload['photos'][0]));
     }
 
     /** A case with its display relations preset, so serializing it never queries. */

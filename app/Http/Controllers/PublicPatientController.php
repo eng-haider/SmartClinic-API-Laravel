@@ -12,6 +12,7 @@ class PublicPatientController extends Controller
 {
     /** Every imageable_type a case image may carry (see the morph map). */
     private const CASE_IMAGE_TYPES = ['Case', 'CaseModel', 'App\\Models\\CaseModel', 'App\\Models\\Case'];
+    private const PATIENT_IMAGE_TYPES = ['Patient', 'App\\Models\\Patient'];
 
     public function __construct(private ClinicSettingRepository $clinicSettings)
     {
@@ -51,6 +52,7 @@ class PublicPatientController extends Controller
                 ->limit(20),
         ]);
         $this->attachCaseImages($patient);
+        $this->attachPatientPhotos($patient);
 
         $total = (int) $patient->cases->sum(fn ($case) => max(0, (int) ($case->price ?? 0)));
         // The history is deliberately capped for a one-hand mobile view, but
@@ -115,9 +117,11 @@ class PublicPatientController extends Controller
             ->select('id', 'patient_id', 'case_date', 'created_at')
             ->orderByDesc('case_date')->orderByDesc('created_at')]);
         $this->attachCaseImages($patient);
+        $this->attachPatientPhotos($patient);
 
-        $data = collect((new PublicPatientResource($patient))->toArray(request())['treatment_timeline'])
-            ->flatMap(fn (array $treatment) => $treatment['images'])
+        $payload = (new PublicPatientResource($patient))->toArray(request());
+        $data = collect($payload['photos'])
+            ->concat(collect($payload['treatment_timeline'])->flatMap(fn (array $treatment) => $treatment['images']))
             ->values();
         return $this->privateResponse(['success' => true, 'data' => $data]);
     }
@@ -157,10 +161,28 @@ class PublicPatientController extends Controller
             ->whereIn('imageable_id', $cases->pluck('id'))
             ->ordered()
             ->orderBy('created_at')
-            ->get(['id', 'path', 'disk', 'type', 'tooth_num', 'imageable_id', 'created_at'])
+            // No column list: tooth_num only exists on tenants that have run
+            // the 2026_10_03 migration, and a missing column would 500 the page.
+            ->get()
             ->groupBy('imageable_id');
 
         $cases->each(fn ($case) => $case->setRelation('images', $images->get($case->id, collect())->values()));
+    }
+
+    /**
+     * The dashboard's "Case Photos" gallery stores uploads on the patient, not
+     * on a case, so those photos only reach the portal through this relation.
+     * Profile pictures are not clinical photos and stay out.
+     */
+    private function attachPatientPhotos(Patient $patient): void
+    {
+        $patient->setRelation('images', Image::query()
+            ->whereIn('imageable_type', self::PATIENT_IMAGE_TYPES)
+            ->where('imageable_id', $patient->id)
+            ->where(fn ($query) => $query->whereNull('type')->orWhere('type', '!=', 'profile'))
+            ->ordered()
+            ->orderBy('created_at')
+            ->get());
     }
 
     private function unavailable(): JsonResponse
