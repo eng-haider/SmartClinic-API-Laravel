@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
+use App\Repositories\ImageRepository;
 use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -197,6 +198,8 @@ class AuthController extends Controller
                 ], 404);
             }
 
+            $user->load('profilePhoto');
+
             return response()->json([
                 'success' => true,
                 'message' => 'User retrieved successfully',
@@ -289,5 +292,57 @@ class AuthController extends Controller
                 'message' => $e->getMessage(),
             ], 422);
         }
+    }
+
+    /**
+     * Set the authenticated user's profile photo, replacing the previous one.
+     * Only ever touches the caller's own account.
+     */
+    public function uploadProfilePhoto(Request $request, ImageRepository $images): JsonResponse
+    {
+        $request->validate([
+            'photo' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
+        ]);
+
+        $user = $this->authService->me();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+
+        $user->images()->where('type', 'profile')->get()->each->delete();
+        $images->uploadImage($request->file('photo'), 'User', $user->id, 'profile');
+        $user->load('profilePhoto');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile photo updated',
+            'data' => new UserResource($user),
+        ]);
+    }
+
+    /**
+     * Remove the authenticated user's profile photo.
+     */
+    public function deleteProfilePhoto(): JsonResponse
+    {
+        $user = $this->authService->me();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+
+        $user->images()->where('type', 'profile')->get()->each->delete();
+        $user->load('profilePhoto');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile photo removed',
+            'data' => new UserResource($user),
+        ]);
     }
 }

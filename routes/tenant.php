@@ -109,6 +109,8 @@ Route::middleware([
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::post('auth/refresh', [AuthController::class, 'refresh']);
         Route::post('auth/change-password', [AuthController::class, 'changePassword']);
+        Route::post('auth/profile-photo', [AuthController::class, 'uploadProfilePhoto']);
+        Route::delete('auth/profile-photo', [AuthController::class, 'deleteProfilePhoto']);
     });
 
     // Patient routes

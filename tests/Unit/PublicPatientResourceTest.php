@@ -99,6 +99,22 @@ class PublicPatientResourceTest extends TestCase
         $this->assertSame(['url', 'type', 'tooth', 'date'], array_keys($payload['photos'][0]));
     }
 
+    public function test_it_serializes_the_doctors_profile_photo(): void
+    {
+        $doctor = new User(['name' => 'Dr. Noor']);
+        $doctor->setRelation('profilePhoto', new Image(['path' => 'images/profile/d.jpg', 'disk' => 'public', 'type' => 'profile']));
+        $case = $this->bareCase(['id' => 1, 'status_id' => 1]);
+        $case->setRelation('doctor', $doctor);
+
+        $patient = new Patient(['name' => 'Sara Ahmed']);
+        $patient->setRelation('cases', new Collection([$case, $this->bareCase(['id' => 2, 'status_id' => 1])]));
+
+        $payload = (new PublicPatientResource($patient))->toArray(Request::create('/'));
+
+        $this->assertNotEmpty($payload['treatment_timeline'][0]['doctor_photo']);
+        $this->assertNull($payload['treatment_timeline'][1]['doctor_photo']);
+    }
+
     /** A case with its display relations preset, so serializing it never queries. */
     private function bareCase(array $attributes): CaseModel
     {

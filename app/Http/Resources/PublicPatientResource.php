@@ -92,6 +92,8 @@ class PublicPatientResource extends JsonResource
                 'name_ar' => $case->status->name_ar,
             ] : null,
             'doctor' => $case->doctor?->name,
+            // Signed, short-lived link to the doctor's own profile photo.
+            'doctor_photo' => $case->doctor?->relationLoaded('profilePhoto') ? $case->doctor->profilePhoto?->url : null,
             'date' => ($case->case_date ?? $case->created_at)?->format('Y-m-d'),
             'images' => $case->relationLoaded('images')
                 ? $case->getRelation('images')->map(fn (Image $image) => $this->image($image))->values()->all()

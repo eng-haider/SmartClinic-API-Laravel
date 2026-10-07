@@ -35,6 +35,7 @@ class PublicPatientController extends Controller
                     'category:id,name,name_en,name_ar',
                     'status:id,name_en,name_ar',
                     'doctor:id,name',
+                    'doctor.profilePhoto',
                 ])
                 ->select('id', 'patient_id', 'doctor_id', 'case_categores_id', 'status_id', 'tooth_num', 'case_date', 'price', 'created_at')
                 ->orderByDesc('case_date')
@@ -93,7 +94,7 @@ class PublicPatientController extends Controller
         }
 
         $patient->load(['cases' => fn ($query) => $query
-            ->with(['category:id,name,name_en,name_ar', 'status:id,name_en,name_ar', 'doctor:id,name'])
+            ->with(['category:id,name,name_en,name_ar', 'status:id,name_en,name_ar', 'doctor:id,name', 'doctor.profilePhoto'])
             ->select('id', 'patient_id', 'doctor_id', 'case_categores_id', 'status_id', 'tooth_num', 'case_date', 'created_at')
             ->orderByDesc('case_date')->orderByDesc('created_at')]);
         $this->attachCaseImages($patient);

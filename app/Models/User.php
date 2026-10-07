@@ -140,4 +140,13 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->morphMany(Image::class, 'imageable');
     }
+
+    /**
+     * The user's current profile photo, shown to patients next to their name.
+     */
+    public function profilePhoto()
+    {
+        return $this->morphOne(Image::class, 'imageable')
+            ->ofMany(['id' => 'max'], fn ($query) => $query->where('type', 'profile'));
+    }
 }
