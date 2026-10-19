@@ -40,7 +40,7 @@ class PatientAccountReportController extends Controller
         ]);
 
         $filters = [
-            'doctor_id' => $this->getDoctorIdFilter(),
+            'doctor_id' => $this->getReportDoctorIdFilter($request),
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
             'search' => $request->input('search'),
@@ -82,7 +82,7 @@ class PatientAccountReportController extends Controller
         ]);
 
         $filters = array_filter([
-            'doctor_id' => $this->getDoctorIdFilter(),
+            'doctor_id' => $this->getReportDoctorIdFilter($request),
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
             'page' => $request->input('page'),

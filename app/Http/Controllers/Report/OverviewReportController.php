@@ -31,7 +31,7 @@ class OverviewReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $doctorId = $this->getDoctorIdFilter();
+        $doctorId = $this->getReportDoctorIdFilter($request);
         $filters = [
             'doctor_id' => $doctorId,
             'date_from' => $request->input('date_from'),

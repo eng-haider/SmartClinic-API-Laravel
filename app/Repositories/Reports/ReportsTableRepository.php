@@ -154,9 +154,7 @@ class ReportsTableRepository
                 DB::raw('COALESCE(resv.reservation_count, 0) as reservation_count')
             );
 
-        if (! empty($filters['restrict_doctor_id'])) {
-            $query->where('users.id', $filters['restrict_doctor_id']);
-        } elseif (! empty($filters['doctor_id'])) {
+        if (! empty($filters['doctor_id'])) {
             $query->where('users.id', $filters['doctor_id']);
         }
         if (! empty($filters['search'])) {

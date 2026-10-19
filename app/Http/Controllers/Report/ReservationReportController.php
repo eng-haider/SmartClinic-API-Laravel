@@ -7,7 +7,6 @@ use App\Http\Controllers\Traits\DoctorFilterTrait;
 use App\Repositories\Reports\ReportsRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class ReservationReportController extends Controller
 {
@@ -37,7 +36,7 @@ class ReservationReportController extends Controller
         $dateTo = $request->input('date_to');
 
         // Get doctor ID filter based on user role
-        $doctorIdFilter = $this->getDoctorIdFilter();
+        $doctorIdFilter = $this->getReportDoctorIdFilter($request);
 
         // Multi-tenancy: No need for clinic_id filter
         $summary = $this->reportsRepository->getReservationsSummary($doctorIdFilter, $dateFrom, $dateTo);
@@ -74,7 +73,7 @@ class ReservationReportController extends Controller
         $dateTo = $request->input('date_to');
 
         // Get doctor ID filter based on user role
-        $doctorIdFilter = $this->getDoctorIdFilter();
+        $doctorIdFilter = $this->getReportDoctorIdFilter($request);
 
         // Multi-tenancy: No need for clinic_id filter
         $data = $this->reportsRepository->getReservationsByStatus($doctorIdFilter, $dateFrom, $dateTo);
@@ -112,7 +111,7 @@ class ReservationReportController extends Controller
         $dateTo = $request->input('date_to');
 
         // Get doctor ID filter based on user role
-        $doctorIdFilter = $this->getDoctorIdFilter();
+        $doctorIdFilter = $this->getReportDoctorIdFilter($request);
         
         // Multi-tenancy: No need for clinic_id filter
         $data = $this->reportsRepository->getReservationsByDoctor($doctorIdFilter, $dateFrom, $dateTo);
@@ -153,7 +152,7 @@ class ReservationReportController extends Controller
         $period = $request->input('period', 'month');
 
         // Get doctor ID filter based on user role
-        $doctorIdFilter = $this->getDoctorIdFilter();
+        $doctorIdFilter = $this->getReportDoctorIdFilter($request);
 
         $data = $this->reportsRepository->getReservationsTrend($doctorIdFilter, $period, $dateFrom, $dateTo);
 

@@ -21,9 +21,9 @@ class DoctorReportController extends Controller
      * Doctors report: per-doctor patients/cases/value/paid/remaining for the
      * selected period, paginated, searchable and sortable.
      *
-     * Role-based filtering: a doctor without view-all-bills only ever sees
-     * their own row (getDoctorIdFilter -> restrict_doctor_id), preventing
-     * IDOR via a doctor_id query override.
+     * Role-based filtering: a doctor only ever sees their own row (any
+     * doctor_id they send is ignored, preventing IDOR); admins may narrow the
+     * table to one doctor via ?doctor_id=.
      */
     public function index(Request $request): JsonResponse
     {
@@ -36,10 +36,8 @@ class DoctorReportController extends Controller
             'per_page' => 'nullable|integer|min:1|max:200',
         ]);
 
-        $restrictDoctorId = $this->getDoctorIdFilter();
-
         $filters = [
-            'restrict_doctor_id' => $restrictDoctorId,
+            'doctor_id' => $this->getReportDoctorIdFilter($request),
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
             'search' => $request->input('search'),
@@ -78,7 +76,7 @@ class DoctorReportController extends Controller
             'per_page' => 'nullable|integer|min:1|max:200',
         ]);
 
-        $restrictDoctorId = $this->getDoctorIdFilter();
+        $restrictDoctorId = $this->getReportRestrictedDoctorId();
         if ($restrictDoctorId !== null && $restrictDoctorId !== $doctor) {
             return response()->json(['success' => false, 'message' => 'Forbidden'], 403);
         }

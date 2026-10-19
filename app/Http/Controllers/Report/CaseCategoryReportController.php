@@ -31,7 +31,7 @@ class CaseCategoryReportController extends Controller
         ]);
 
         $filters = [
-            'doctor_id' => $this->getDoctorIdFilter(),
+            'doctor_id' => $this->getReportDoctorIdFilter($request),
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
             'sort' => $request->input('sort'),
@@ -58,7 +58,7 @@ class CaseCategoryReportController extends Controller
         ]);
 
         $data = $this->reportsTableRepository->getCategoryCases($category, [
-            'doctor_id' => $this->getDoctorIdFilter(),
+            'doctor_id' => $this->getReportDoctorIdFilter($request),
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
             'page' => $request->input('page'),

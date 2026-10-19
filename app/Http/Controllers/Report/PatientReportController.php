@@ -7,7 +7,6 @@ use App\Http\Controllers\Traits\DoctorFilterTrait;
 use App\Repositories\Reports\ReportsRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class PatientReportController extends Controller
 {
@@ -32,18 +31,18 @@ class PatientReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $clinicId = $this->getClinicIdByRole();
+        $doctorId = $this->getReportDoctorIdFilter($request);
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
-        $summary = $this->reportsRepository->getPatientsSummary($clinicId, $dateFrom, $dateTo);
+        $summary = $this->reportsRepository->getPatientsSummary($doctorId, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
             'message' => 'Patient summary retrieved successfully',
             'data' => $summary,
             'filters' => [
-                'clinic_id' => $clinicId,
+                'doctor_id' => $doctorId,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
             ],
@@ -66,18 +65,18 @@ class PatientReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $clinicId = $this->getClinicIdByRole();
+        $doctorId = $this->getReportDoctorIdFilter($request);
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
-        $data = $this->reportsRepository->getPatientsBySource($clinicId, $dateFrom, $dateTo);
+        $data = $this->reportsRepository->getPatientsBySource($doctorId, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
             'message' => 'Patients by source retrieved successfully',
             'data' => $data,
             'filters' => [
-                'clinic_id' => $clinicId,
+                'doctor_id' => $doctorId,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
             ],
@@ -101,18 +100,18 @@ class PatientReportController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $clinicId = $this->getClinicIdByRole();
+        $doctorId = $this->getReportDoctorIdFilter($request);
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
-        $data = $this->reportsRepository->getPatientsByDoctor($clinicId, $dateFrom, $dateTo);
+        $data = $this->reportsRepository->getPatientsByDoctor($doctorId, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
             'message' => 'Patients by doctor retrieved successfully',
             'data' => $data,
             'filters' => [
-                'clinic_id' => $clinicId,
+                'doctor_id' => $doctorId,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
             ],
@@ -137,19 +136,19 @@ class PatientReportController extends Controller
             'period' => 'nullable|in:day,week,month,year',
         ]);
 
-        $clinicId = $this->getClinicIdByRole();
+        $doctorId = $this->getReportDoctorIdFilter($request);
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
         $period = $request->input('period', 'month');
 
-        $data = $this->reportsRepository->getPatientsTrend($clinicId, $period, $dateFrom, $dateTo);
+        $data = $this->reportsRepository->getPatientsTrend($doctorId, $period, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
             'message' => 'Patient trend retrieved successfully',
             'data' => $data,
             'filters' => [
-                'clinic_id' => $clinicId,
+                'doctor_id' => $doctorId,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
                 'period' => $period,
@@ -169,35 +168,18 @@ class PatientReportController extends Controller
      */
     public function ageDistribution(Request $request): JsonResponse
     {
-        $clinicId = $this->getClinicIdByRole();
+        $doctorId = $this->getReportDoctorIdFilter($request);
 
-        $data = $this->reportsRepository->getPatientsAgeDistribution($clinicId);
+        $data = $this->reportsRepository->getPatientsAgeDistribution($doctorId);
 
         return response()->json([
             'success' => true,
             'message' => 'Patient age distribution retrieved successfully',
             'data' => $data,
             'filters' => [
-                'clinic_id' => $clinicId,
+                'doctor_id' => $doctorId,
             ],
             'chart_type' => 'bar',
         ]);
-    }
-
-    /**
-     * Get clinic ID based on user role.
-     * Super admin sees all, others see only their clinic.
-     */
-    private function getClinicIdByRole(): ?int
-    {
-        $user = Auth::user();
-
-        // Super admin can see all data from all clinics
-        if ($user->hasRole('super_admin')) {
-            return null;
-        }
-
-        // All other roles see only their clinic's data
-        return $user->clinic_id;
     }
 }

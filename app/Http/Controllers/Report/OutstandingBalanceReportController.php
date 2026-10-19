@@ -40,7 +40,7 @@ class OutstandingBalanceReportController extends Controller
         ]);
 
         $filters = [
-            'doctor_id' => $this->getDoctorIdFilter(),
+            'doctor_id' => $this->getReportDoctorIdFilter($request),
             'search' => $request->input('search'),
             'sort' => $request->input('sort'),
             'balance_min' => $request->input('balance_min'),

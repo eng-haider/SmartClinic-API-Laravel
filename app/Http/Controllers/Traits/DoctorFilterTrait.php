@@ -3,17 +3,59 @@
 namespace App\Http\Controllers\Traits;
 
 use App\Http\Helpers\BillsIsolationHelper;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 /**
  * Provides role-based doctor ID filtering for controllers.
  *
- * Two filtering methods:
- *  - getDoctorIdFilter()      → permission-based only (used by cases, reports, etc.)
- *  - getBillsDoctorIdFilter() → also checks doctor_bills_isolation setting (bills only)
+ * Filtering methods:
+ *  - getDoctorIdFilter()       → permission-based only (used by cases, dashboard, etc.)
+ *  - getBillsDoctorIdFilter()  → also checks doctor_bills_isolation setting (bills only)
+ *  - getReportDoctorIdFilter() → Reports pages: doctors locked to own data, admins may filter
  */
 trait DoctorFilterTrait
 {
+    /**
+     * Get doctor_id filter for REPORTS.
+     *
+     * Used by: the controllers under App\Http\Controllers\Report.
+     *
+     * - Doctor → ALWAYS their own user_id. Ignores view-all-bills and any
+     *   doctor_id the client sends, so a doctor can never read another
+     *   doctor's report data.
+     * - Super Doctor / Secretary / Admin → the optional ?doctor_id= filter,
+     *   or null (whole clinic) when it isn't sent.
+     */
+    private function getReportDoctorIdFilter(Request $request): ?int
+    {
+        $restrictedDoctorId = $this->getReportRestrictedDoctorId();
+        if ($restrictedDoctorId !== null) {
+            return $restrictedDoctorId;
+        }
+
+        $request->validate([
+            'doctor_id' => 'nullable|integer|exists:users,id',
+        ]);
+
+        return $request->filled('doctor_id') ? (int) $request->input('doctor_id') : null;
+    }
+
+    /**
+     * The doctor a reports user is locked to, or null when they may see (and
+     * filter by) every doctor. See getReportDoctorIdFilter().
+     */
+    private function getReportRestrictedDoctorId(): ?int
+    {
+        $user = Auth::user();
+
+        if ($user->hasAnyRole(['clinic_super_doctor', 'secretary', 'super_admin'])) {
+            return null;
+        }
+
+        return $user->hasRole('doctor') ? $user->id : null;
+    }
+
     /**
      * Get doctor_id filter — PERMISSION-BASED ONLY.
      *

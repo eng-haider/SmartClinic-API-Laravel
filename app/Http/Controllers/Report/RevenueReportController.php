@@ -36,7 +36,7 @@ class RevenueReportController extends Controller
         ]);
 
         $filters = [
-            'doctor_id' => $this->getDoctorIdFilter(),
+            'doctor_id' => $this->getReportDoctorIdFilter($request),
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
             'search' => $request->input('search'),

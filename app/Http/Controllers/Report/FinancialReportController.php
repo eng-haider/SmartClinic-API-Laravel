@@ -7,7 +7,6 @@ use App\Http\Controllers\Traits\DoctorFilterTrait;
 use App\Repositories\Reports\ReportsRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class FinancialReportController extends Controller
 {
@@ -39,8 +38,10 @@ class FinancialReportController extends Controller
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
+        $doctorId = $this->getReportDoctorIdFilter($request);
+
         // Multi-tenancy: No need for clinic_id, database is already isolated by tenant
-        $summary = $this->reportsRepository->getBillsSummary(null, $dateFrom, $dateTo);
+        $summary = $this->reportsRepository->getBillsSummary($doctorId, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
@@ -72,11 +73,10 @@ class FinancialReportController extends Controller
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
-        // Get doctor ID filter based on user role
-        $doctorIdFilter = $this->getDoctorIdFilter();
+        $doctorId = $this->getReportDoctorIdFilter($request);
 
         // Multi-tenancy: No need for clinic_id, database is already isolated by tenant
-        $data = $this->reportsRepository->getRevenueByDoctor($doctorIdFilter, $dateFrom, $dateTo);
+        $data = $this->reportsRepository->getRevenueByDoctor($doctorId, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
@@ -111,8 +111,10 @@ class FinancialReportController extends Controller
         $dateTo = $request->input('date_to');
         $period = $request->input('period', 'month');
 
+        $doctorId = $this->getReportDoctorIdFilter($request);
+
         // Multi-tenancy: No need for clinic_id, database is already isolated by tenant
-        $data = $this->reportsRepository->getRevenueTrend(null, $period, $dateFrom, $dateTo);
+        $data = $this->reportsRepository->getRevenueTrend($doctorId, $period, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
@@ -146,8 +148,10 @@ class FinancialReportController extends Controller
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
+        $doctorId = $this->getReportDoctorIdFilter($request);
+
         // Multi-tenancy: No need for clinic_id, database is already isolated by tenant
-        $data = $this->reportsRepository->getBillsByPaymentStatus(null, $dateFrom, $dateTo);
+        $data = $this->reportsRepository->getBillsByPaymentStatus($doctorId, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
@@ -179,8 +183,10 @@ class FinancialReportController extends Controller
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
+        $doctorId = $this->getReportDoctorIdFilter($request);
+
         // Multi-tenancy: No need for clinic_id, database is already isolated by tenant
-        $summary = $this->reportsRepository->getExpensesSummary(null, $dateFrom, $dateTo);
+        $summary = $this->reportsRepository->getExpensesSummary($doctorId, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
@@ -212,8 +218,10 @@ class FinancialReportController extends Controller
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
+        $doctorId = $this->getReportDoctorIdFilter($request);
+
         // Multi-tenancy: No need for clinic_id, database is already isolated by tenant
-        $data = $this->reportsRepository->getExpensesByCategory(null, $dateFrom, $dateTo);
+        $data = $this->reportsRepository->getExpensesByCategory($doctorId, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
@@ -248,8 +256,10 @@ class FinancialReportController extends Controller
         $dateTo = $request->input('date_to');
         $period = $request->input('period', 'month');
 
+        $doctorId = $this->getReportDoctorIdFilter($request);
+
         // Multi-tenancy: No need for clinic_id, database is already isolated by tenant
-        $data = $this->reportsRepository->getExpensesTrend(null, $period, $dateFrom, $dateTo);
+        $data = $this->reportsRepository->getExpensesTrend($doctorId, $period, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
@@ -282,8 +292,10 @@ class FinancialReportController extends Controller
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
+        $doctorId = $this->getReportDoctorIdFilter($request);
+
         // Multi-tenancy: No need for clinic_id, database is already isolated by tenant
-        $data = $this->reportsRepository->getProfitLossReport(null, $dateFrom, $dateTo);
+        $data = $this->reportsRepository->getProfitLossReport($doctorId, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
@@ -317,8 +329,10 @@ class FinancialReportController extends Controller
         $dateTo = $request->input('date_to');
         $period = $request->input('period', 'month');
 
+        $doctorId = $this->getReportDoctorIdFilter($request);
+
         // Multi-tenancy: No need for clinic_id, database is already isolated by tenant
-        $data = $this->reportsRepository->getProfitLossTrend(null, $period, $dateFrom, $dateTo);
+        $data = $this->reportsRepository->getProfitLossTrend($doctorId, $period, $dateFrom, $dateTo);
 
         return response()->json([
             'success' => true,
@@ -347,12 +361,11 @@ class FinancialReportController extends Controller
         $request->validate([
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
-            'doctor_id' => 'nullable|integer|exists:users,id',
         ]);
 
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
-        $doctorId = $request->input('doctor_id');
+        $doctorId = $this->getReportDoctorIdFilter($request);
 
         // Multi-tenancy: No need for clinic_id, database is already isolated by tenant
         $data = $this->reportsRepository->getDoctorPerformance(null, $doctorId, $dateFrom, $dateTo);

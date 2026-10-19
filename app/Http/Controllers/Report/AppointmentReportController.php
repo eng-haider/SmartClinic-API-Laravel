@@ -27,14 +27,12 @@ class AppointmentReportController extends Controller
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
             'search' => 'nullable|string|max:255',
-            'doctor_id' => 'nullable|integer|exists:users,id',
             'status_id' => 'nullable|integer|exists:statuses,id',
             'page' => 'nullable|integer|min:1',
             'per_page' => 'nullable|integer|min:1|max:200',
         ]);
 
-        $restrictDoctorId = $this->getDoctorIdFilter();
-        $doctorId = $restrictDoctorId ?? $request->input('doctor_id');
+        $doctorId = $this->getReportDoctorIdFilter($request);
 
         $filters = [
             'doctor_id' => $doctorId,
