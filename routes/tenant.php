@@ -118,6 +118,8 @@ Route::middleware([
         Route::apiResource('patients', PatientController::class);
         Route::get('patients/search/phone/{phone}', [PatientController::class, 'searchByPhone']);
         Route::put('patients/{id}/tooth-details', [PatientController::class, 'updateToothDetails']);
+        Route::post('patients/{id}/photo', [PatientController::class, 'uploadPhoto']);
+        Route::delete('patients/{id}/photo', [PatientController::class, 'deletePhoto']);
         
         // Public Profile Management
         Route::get('patients/{id}/public-profile', [PatientPublicProfileController::class, 'getPublicProfile']);

@@ -35,7 +35,8 @@ class PatientResource extends JsonResource
             'credit_balance' => $this->credit_balance,
             'credit_balance_add_at' => $this->credit_balance_add_at?->format('Y-m-d H:i:s'),
             'tooth_details' => $this->tooth_details,
-            
+            'profile_photo_url' => $this->whenLoaded('profilePhoto', fn () => $this->profilePhoto?->url),
+
             // Public profile fields
             'public_token' => $this->public_token,
             'is_public_profile_enabled' => $this->is_public_profile_enabled,

@@ -61,7 +61,7 @@ class PatientRepository
      */
     public function getAllWithFilters(array $filters, int $perPage = 15): LengthAwarePaginator
     {
-        $query = $this->queryBuilder();
+        $query = $this->queryBuilder()->with('profilePhoto');
 
         // Apply search filter
         if (!empty($filters['search'])) {
@@ -82,8 +82,8 @@ class PatientRepository
      */
     public function getById(int $id): ?Patient
     {
-        $query = $this->query();
-        
+        $query = $this->query()->with('profilePhoto');
+
         return $query->find($id);
     }
 
@@ -108,7 +108,7 @@ class PatientRepository
 
         $patient->update($data);
 
-        return $patient->fresh();
+        return $patient->fresh('profilePhoto');
     }
 
     /**

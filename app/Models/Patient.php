@@ -192,6 +192,15 @@ class Patient extends Model
     }
 
     /**
+     * The patient's current profile photo, shown on the patient page and list.
+     */
+    public function profilePhoto()
+    {
+        return $this->morphOne(Image::class, 'imageable')
+            ->ofMany(['id' => 'max'], fn ($query) => $query->where('type', 'profile'));
+    }
+
+    /**
      * Get all of the patient's booking requests.
      */
     public function bookingRequests()

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\PatientRequest;
 use App\Http\Resources\PatientResource;
+use App\Repositories\ImageRepository;
 use App\Repositories\PatientRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,12 +15,14 @@ class PatientController extends Controller
     /**
      * Create a new controller instance
      */
-    public function __construct(private PatientRepository $patientRepository)
-    {
+    public function __construct(
+        private PatientRepository $patientRepository,
+        private ImageRepository $imageRepository
+    ) {
         $this->middleware('permission:view-clinic-patients')->only(['index']);
         $this->middleware('permission:create-patient')->only(['store']);
         $this->middleware('permission:view-clinic-patients')->only(['show']);
-        $this->middleware('permission:edit-patient')->only(['update']);
+        $this->middleware('permission:edit-patient')->only(['update', 'uploadPhoto', 'deletePhoto']);
         $this->middleware('permission:delete-patient')->only(['destroy']);
         $this->middleware('permission:search-patient')->only(['searchByPhone', 'searchByEmail']);
     }
@@ -215,6 +218,62 @@ class PatientController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Tooth details updated successfully',
+            'data' => new PatientResource($patient),
+        ]);
+    }
+
+    /**
+     * Upload the patient's profile photo, replacing any previous one.
+     */
+    public function uploadPhoto(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'photo' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
+        ]);
+
+        $clinicId = $this->getClinicIdByRole();
+        $patient = $this->patientRepository->getById($id, $clinicId);
+
+        if (!$patient) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Patient not found',
+            ], 404);
+        }
+
+        // Upload first so a failed upload never leaves the patient without a photo
+        $photo = $this->imageRepository->uploadImage($request->file('photo'), 'Patient', $patient->id, 'profile');
+        $patient->images()->where('type', 'profile')->whereKeyNot($photo->id)->get()->each->delete();
+        $patient->load('profilePhoto');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile photo updated',
+            'data' => new PatientResource($patient),
+        ]);
+    }
+
+    /**
+     * Remove the patient's profile photo.
+     */
+    public function deletePhoto(int $id): JsonResponse
+    {
+        $clinicId = $this->getClinicIdByRole();
+        $patient = $this->patientRepository->getById($id, $clinicId);
+
+        if (!$patient) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Patient not found',
+            ], 404);
+        }
+
+        $patient->images()->where('type', 'profile')->get()->each->delete();
+        $patient->load('profilePhoto');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile photo removed',
             'data' => new PatientResource($patient),
         ]);
     }

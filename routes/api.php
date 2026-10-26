@@ -135,6 +135,8 @@ Route::middleware('jwt')->group(function () {
     Route::get('patients/search/phone/{phone}', [PatientController::class, 'searchByPhone'])->name('patients.search.phone');
     Route::get('patients/search/email/{email}', [PatientController::class, 'searchByEmail'])->name('patients.search.email');
     Route::put('patients/{id}/tooth-details', [PatientController::class, 'updateToothDetails'])->name('patients.update-tooth-details');
+    Route::post('patients/{id}/photo', [PatientController::class, 'uploadPhoto'])->name('patients.photo.upload');
+    Route::delete('patients/{id}/photo', [PatientController::class, 'deletePhoto'])->name('patients.photo.delete');
     
     // Patient Public Profile Management
     Route::get('patients/{id}/public-profile', [PatientPublicProfileController::class, 'getPublicProfile'])->name('patients.public-profile');
