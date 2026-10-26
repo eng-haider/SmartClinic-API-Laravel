@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\CaseCategory;
 use App\Models\CaseModel;
+use App\Models\User;
 use App\Services\SpecialtyManager;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -11,6 +12,16 @@ use Illuminate\Support\Facades\Auth;
 
 class CaseRequest extends FormRequest
 {
+    /**
+     * Clinic admins who can assign a case to any doctor through doctor_id.
+     */
+    private const DOCTOR_ASSIGNER_ROLES = ['clinic_super_doctor', 'super_admin'];
+
+    /**
+     * Set when an admin picked the case's doctor, so it is checked to be a doctor.
+     */
+    private bool $assignsDoctor = false;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -27,7 +38,7 @@ class CaseRequest extends FormRequest
     {
         $rules = [
             'patient_id' => 'required|exists:patients,id',
-            'doctor_id' => 'nullable|exists:users,id',
+            'doctor_id' => ['nullable', 'exists:users,id', $this->doctorRoleRule()],
             'case_categores_id' => ['nullable', 'exists:case_categories,id', $this->activeCategoryRule()],
             'status_id' => 'nullable|exists:statuses,id',
             'notes' => 'nullable|string|max:5000',
@@ -68,6 +79,47 @@ class CaseRequest extends FormRequest
     }
 
     /**
+     * A case an admin assigns can only go to a user who is a doctor in the clinic.
+     */
+    private function doctorRoleRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if (! $this->assignsDoctor) {
+                return;
+            }
+
+            $isDoctor = User::query()
+                ->whereKey($value)
+                ->whereHas('roles', fn ($query) => $query->whereIn('name', ['doctor', 'clinic_super_doctor']))
+                ->exists();
+
+            if (! $isDoctor) {
+                $fail('Selected user is not a doctor');
+            }
+        };
+    }
+
+    /**
+     * Clinic admins assign the case to the doctor they send. Otherwise a new case
+     * belongs to its creator, and an edited case keeps its current doctor.
+     */
+    private function resolveDoctorId(User $user): mixed
+    {
+        if ($this->filled('doctor_id') && $user->hasAnyRole(self::DOCTOR_ASSIGNER_ROLES)) {
+            $this->assignsDoctor = true;
+
+            return $this->input('doctor_id');
+        }
+
+        $caseId = $this->route('case');
+        if ($caseId !== null) {
+            return CaseModel::query()->whereKey($caseId)->value('doctor_id');
+        }
+
+        return $user->id;
+    }
+
+    /**
      * Prepare the data for validation.
      */
     protected function prepareForValidation(): void
@@ -78,11 +130,11 @@ class CaseRequest extends FormRequest
 
         $user = Auth::user();
 
-        // Always set doctor_id from authenticated user
+        // Only clinic admins choose doctor_id (see resolveDoctorId)
         // Set default status_id to 2 if not provided
         // Set default case_date to current datetime if not provided
         $this->merge([
-            'doctor_id' => $user->id,
+            'doctor_id' => $this->resolveDoctorId($user),
             'status_id' => $this->status_id ?? 2,
             'case_date' => $this->case_date ?? now()->toDateTimeString(),
         ]);

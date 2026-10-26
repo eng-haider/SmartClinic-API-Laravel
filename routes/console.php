@@ -10,3 +10,6 @@ Artisan::command('inspire', function () {
 
 // ── Messaging Automation Scheduler ──
 Schedule::command('automation:process')->everyMinute();
+
+// ── Account deletion: purge accounts whose grace period has ended ──
+Schedule::command('accounts:purge-deleted')->dailyAt('03:00');

@@ -37,4 +37,14 @@ class MessagingSetting extends Model
     {
         return $query->where('provider', $provider);
     }
+
+    /**
+     * WhatsApp goes through Meta's Cloud API unless meta.driver picks Gupshup.
+     * For Gupshup, whatsapp_access_token holds the Gupshup API key and the app
+     * details live in meta (gupshup_app_name, gupshup_app_id, gupshup_source_number).
+     */
+    public function usesGupshup(): bool
+    {
+        return $this->provider === 'whatsapp' && ($this->meta['driver'] ?? null) === 'gupshup';
+    }
 }

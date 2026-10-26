@@ -6,9 +6,11 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Repositories\ImageRepository;
+use App\Services\AccountDeletionService;
 use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
@@ -343,6 +345,57 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Profile photo removed',
             'data' => new UserResource($user),
+        ]);
+    }
+
+    /**
+     * Delete the authenticated user's account (App Store / Google Play
+     * requirement). Login is refused immediately; the data is purged after
+     * AccountDeletionService::GRACE_DAYS.
+     * POST /api/tenant/auth/delete-account
+     */
+    public function deleteAccount(Request $request, AccountDeletionService $deletions): JsonResponse
+    {
+        $validated = $request->validate([
+            'password' => 'required|string',
+        ]);
+
+        $user = $this->authService->me();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+
+        try {
+            $deletion = $deletions->request(
+                $user,
+                $validated['password'],
+                function_exists('tenant') && tenant() ? (string) tenant('id') : null
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'message_ar' => 'كلمة المرور غير صحيحة',
+            ], 422);
+        }
+
+        try {
+            JWTAuth::invalidate(JWTAuth::getToken());
+        } catch (\Exception $e) {
+            // The account is already inactive, so the token can no longer log in.
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Account deactivated and scheduled for permanent deletion.',
+            'message_ar' => 'تم إيقاف الحساب وسيُحذف نهائياً.',
+            'data' => [
+                'purge_after' => $deletion->purge_after->toIso8601String(),
+                'deletes_clinic' => $deletion->deletes_clinic,
+            ],
         ]);
     }
 }

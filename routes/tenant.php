@@ -111,6 +111,7 @@ Route::middleware([
         Route::post('auth/change-password', [AuthController::class, 'changePassword']);
         Route::post('auth/profile-photo', [AuthController::class, 'uploadProfilePhoto']);
         Route::delete('auth/profile-photo', [AuthController::class, 'deleteProfilePhoto']);
+        Route::post('auth/delete-account', [AuthController::class, 'deleteAccount']);
     });
 
     // Patient routes

@@ -84,7 +84,7 @@ Create a new medical case.
 **Validation Rules:**
 
 - `patient_id`: required, must exist in patients table
-- `doctor_id`: required, must exist in users table
+- `doctor_id`: optional, only used when sent by a `clinic_super_doctor` or `super_admin`; must be a user with the `doctor` or `clinic_super_doctor` role. For everyone else it is ignored and the case belongs to the user creating it
 - `case_categores_id`: required, must exist in case_categories table
 - `status_id`: required, must exist in statuses table
 - `notes`: optional, string, max 5000 characters
@@ -171,6 +171,15 @@ Get details of a specific case.
 Update an existing case.
 
 **Request Body:** (Same as Create Case)
+
+**Changing the doctor:** a `clinic_super_doctor` or `super_admin` can reassign the case by sending `doctor_id` with the new doctor's user id. If `doctor_id` is left out, or the editor is not one of those roles, the case keeps its current doctor. The case's existing bills keep their own `doctor_id`.
+
+```json
+{
+  "patient_id": 1,
+  "doctor_id": 5
+}
+```
 
 **Response (200 OK):**
 

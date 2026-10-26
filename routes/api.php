@@ -44,6 +44,12 @@ Route::prefix('webhooks/whatsapp')->withoutMiddleware('throttle:api')->group(fun
 });
 
 // ============================================
+// GUPSHUP WEBHOOK ROUTE (No auth - called by Gupshup; the URL names the clinic and its secret)
+// ============================================
+Route::match(['get', 'post'], 'webhooks/gupshup/{tenant}/{token}', [WebhookController::class, 'handleGupshup'])
+    ->withoutMiddleware('throttle:api');
+
+// ============================================
 // TENANT MANAGEMENT ROUTES (Central Database)
 // These routes manage clinics/tenants
 // ============================================

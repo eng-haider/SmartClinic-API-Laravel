@@ -46,4 +46,17 @@ class WebhookController extends Controller
 
         return response()->json(['success' => true]);
     }
+
+    /**
+     * Gupshup webhook. Gupshup only POSTs events; a GET just confirms the URL is reachable.
+     */
+    public function handleGupshup(Request $request, string $tenant, string $token): Response
+    {
+        if ($request->isMethod('post') && !$this->webhookService->handleGupshup($tenant, $token, $request->all())) {
+            return response('Forbidden', 403);
+        }
+
+        // Gupshup expects a 2xx with an empty body
+        return response('', 200);
+    }
 }

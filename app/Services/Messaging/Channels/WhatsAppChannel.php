@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 class WhatsAppChannel implements ChannelDriver
 {
-    private ?MessagingSetting $settings = null;
+    public function __construct(private ?MessagingSetting $settings = null) {}
 
     public function channel(): string
     {

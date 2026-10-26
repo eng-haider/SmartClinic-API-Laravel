@@ -261,7 +261,7 @@ All services live in `app/Services/Messaging/`.
 
 ### `ChannelManager`
 
-Resolves and caches channel driver instances.
+Resolves channel driver instances. Email and push drivers are cached; the WhatsApp driver is resolved on every call from the clinic's `MessagingSetting`, so a queue worker serving several clinics never reuses another clinic's settings. It is `GupshupChannel` when `meta.driver` is `gupshup`, otherwise `WhatsAppChannel` (Meta).
 
 ```php
 $driver = app(ChannelManager::class)->driver('whatsapp');
@@ -276,6 +276,14 @@ Implements `ChannelDriver`. Sends text and template messages via Meta Graph API 
 - Reads `MessagingSetting` for credentials at runtime (tenant-aware)
 - Normalizes phone numbers (removes `+`, spaces, etc.)
 - Distinguishes text send vs. template send based on `options['template_name']`
+
+### `GupshupChannel`
+
+Implements `ChannelDriver` for clinics that send WhatsApp through [Gupshup](https://docs.gupshup.io) instead of Meta.
+
+- Text: `POST https://api.gupshup.io/wa/api/v1/msg`. Free-form text is only delivered within WhatsApp's 24-hour window after the patient last wrote.
+- Templates: `POST https://api.gupshup.io/wa/api/v1/template/msg`. Automations name templates by name (`template_key`), but Gupshup sends them by its own template id, so the id is looked up among the app's APPROVED templates (`GET /wa/app/{appId}/template`, cached 10 minutes, refreshed once on a miss). Name a `message_templates.key` exactly like the template's name in Gupshup; params are sent in the order of the template's variables.
+- Local patient numbers (`0770 123 4567`) get `meta.country_code` (default `964`) in front of them.
 
 ### `TemplateEngine`
 
@@ -472,6 +480,35 @@ https://yourdomain.com/api/webhooks/whatsapp
 ```
 
 Set the verify token to the value stored in `messaging_settings.whatsapp_webhook_verify_token` for the tenant.
+
+### Gupshup
+
+Gupshup does not sign its webhooks, so the callback URL names the clinic and carries its secret:
+
+```
+https://yourdomain.com/api/webhooks/gupshup/{tenant_id}/{whatsapp_webhook_verify_token}
+```
+
+`GET /api/messaging/settings/webhook-info` returns the full URL; the token is generated when Gupshup settings are first saved. In apps.gupshup.io → your app → **Webhooks**, add that URL in Gupshup (V2) format and enable Message, Sent, Delivered, Read and Failed events. Inbound `message` events are stored like Meta's (matched to the patient by phone number); `message-event` statuses are matched on the Gupshup message id (`gsId` for sent/delivered/read, `id` for failed). A status never moves backwards (a late "delivered" after "read" is ignored). A wrong clinic or token gets `403`.
+
+Settings for a Gupshup clinic (`POST /api/messaging/settings`):
+
+```json
+{
+  "provider": "whatsapp",
+  "whatsapp_access_token": "<Gupshup API key>",
+  "is_active": true,
+  "meta": {
+    "driver": "gupshup",
+    "gupshup_app_name": "SmartClinicpluse",
+    "gupshup_app_id": "2790f1ec-7a6a-470e-a370-7f2673301768",
+    "gupshup_source_number": "9647700281899",
+    "country_code": "964"
+  }
+}
+```
+
+`POST /api/messaging/settings/test-connection` with the same body checks the API key and app id and returns the app's approved template names.
 
 ---
 
