@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class MessagingSettingController extends Controller
 {
@@ -34,6 +35,10 @@ class MessagingSettingController extends Controller
      */
     public function upsert(Request $request): JsonResponse
     {
+        // Gupshup's details and the reminder template only matter while the clinic sends by API
+        $sendsByApi = fn () => $request->boolean('is_active');
+        $gupshupRequired = Rule::requiredIf(fn () => $sendsByApi() && $request->input('meta.driver') === 'gupshup');
+
         $validated = $request->validate([
             'provider' => 'required|string|in:whatsapp,email,push',
             'whatsapp_phone_number_id' => 'nullable|string|max:255',
@@ -44,11 +49,20 @@ class MessagingSettingController extends Controller
             'meta' => 'nullable|array',
             // WhatsApp through Gupshup instead of Meta; the Gupshup API key goes in whatsapp_access_token
             'meta.driver' => 'nullable|string|in:meta,gupshup',
-            'meta.gupshup_app_name' => 'required_if:meta.driver,gupshup|nullable|string|max:255',
-            'meta.gupshup_app_id' => 'required_if:meta.driver,gupshup|nullable|string|max:255',
-            'meta.gupshup_source_number' => 'required_if:meta.driver,gupshup|nullable|string|max:20',
+            'meta.gupshup_app_name' => [$gupshupRequired, 'nullable', 'string', 'max:255'],
+            'meta.gupshup_app_id' => [$gupshupRequired, 'nullable', 'string', 'max:255'],
+            'meta.gupshup_source_number' => [$gupshupRequired, 'nullable', 'string', 'max:20'],
             // Country code put in front of patients' local numbers (0770...) for Gupshup, default 964
             'meta.country_code' => 'nullable|digits_between:1,4',
+            // Simple setup (see BookingReminderService): send by API automatically, or by hand from the device's WhatsApp
+            'meta.send_mode' => 'nullable|string|in:api,device',
+            'meta.booking_reminder_enabled' => 'nullable|boolean',
+            'meta.booking_reminder_minutes' => 'nullable|integer|min:5|max:10080',
+            'meta.booking_reminder_template' => [
+                Rule::requiredIf(fn () => $sendsByApi() && $request->boolean('meta.booking_reminder_enabled')),
+                'nullable', 'string', 'max:255',
+            ],
+            'meta.booking_reminder_text' => 'nullable|string|max:1000',
         ]);
 
         // Gupshup's callback URL carries this secret (see webhookInfo), so make one if missing

@@ -285,6 +285,20 @@ Implements `ChannelDriver` for clinics that send WhatsApp through [Gupshup](http
 - Templates: `POST https://api.gupshup.io/wa/api/v1/template/msg`. Automations name templates by name (`template_key`), but Gupshup sends them by its own template id, so the id is looked up among the app's APPROVED templates (`GET /wa/app/{appId}/template`, cached 10 minutes, refreshed once on a miss). Name a `message_templates.key` exactly like the template's name in Gupshup; params are sent in the order of the template's variables.
 - Local patient numbers (`0770 123 4567`) get `meta.country_code` (default `964`) in front of them.
 
+### `BookingReminderService`
+
+The simple setup on the WhatsApp settings page, for clinics that do not want to build automation rules. Stored in the WhatsApp `messaging_settings.meta`:
+
+| Key | Meaning |
+|---|---|
+| `send_mode` | `device`: staff send from their own WhatsApp (the booking dialog's "send WhatsApp reminder"), nothing goes by API and `is_active` is false. `api`: the system sends by itself |
+| `booking_reminder_enabled` | Send each booking one reminder |
+| `booking_reminder_minutes` | How long before the booking starts (5 to 10080) |
+| `booking_reminder_template` | The approved template's name at Gupshup/Meta |
+| `booking_reminder_text` | The message, with `{{patient_name}}`, `{{date}}`, `{{time}}`, `{{doctor_name}}`, `{{clinic_name}}` |
+
+The approved template must be the same text with `{{1}}`, `{{2}}`… in place of the placeholders: values are sent in the order the placeholders appear (the settings page shows that text to copy). `ProcessAutomationTargetsJob` calls `sendDue()` every minute: bookings starting within the window that are not waiting-list, completed (3) or cancelled (4) and have a patient phone are sent once (`reservations.reminder_sent_at`, tenant migration `2026_10_27_000001`). Moving a booking to a new date or time clears it, so the new time is reminded too. Each reminder is a `Message` (meta `type: booking_reminder`, `reservation_id`) in the patient's conversation, sent or failed.
+
 ### `TemplateEngine`
 
 Builds variable maps from context and renders templates.

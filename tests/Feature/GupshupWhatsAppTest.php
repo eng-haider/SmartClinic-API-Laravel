@@ -2,14 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\MessagingSettingController;
 use App\Services\Messaging\ChannelManager;
 use App\Services\Messaging\Channels\GupshupChannel;
 use App\Services\Messaging\Channels\WhatsAppChannel;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class GupshupWhatsAppTest extends TestCase
@@ -156,6 +159,36 @@ class GupshupWhatsAppTest extends TestCase
         $this->postJson(self::WEBHOOK, $event)->assertForbidden();
 
         $this->get(self::WEBHOOK)->assertOk();
+    }
+
+    public function test_settings_need_gupshup_details_and_a_reminder_template_only_when_sending_by_api(): void
+    {
+        $device = ['provider' => 'whatsapp', 'is_active' => false, 'meta' => [
+            'driver' => 'gupshup', 'send_mode' => 'device', 'booking_reminder_enabled' => true,
+        ]];
+        $this->assertSame([], $this->settingsErrors($device));
+
+        $api = ['provider' => 'whatsapp', 'is_active' => true, 'meta' => [
+            'driver' => 'gupshup', 'send_mode' => 'api', 'booking_reminder_enabled' => true,
+        ]];
+        $this->assertSame(
+            ['meta.gupshup_app_name', 'meta.gupshup_app_id', 'meta.gupshup_source_number', 'meta.booking_reminder_template'],
+            $this->settingsErrors($api),
+        );
+
+        $api['meta'] += ['gupshup_app_name' => 'SmartClinicpluse', 'gupshup_app_id' => 'app-1', 'gupshup_source_number' => '9647700281899'];
+        $this->assertSame(['meta.booking_reminder_template'], $this->settingsErrors($api));
+    }
+
+    private function settingsErrors(array $data): array
+    {
+        try {
+            app(MessagingSettingController::class)->upsert(HttpRequest::create('/', 'POST', $data));
+
+            return [];
+        } catch (ValidationException $e) {
+            return array_keys($e->errors());
+        }
     }
 
     private function statusEvent(array $payload): void

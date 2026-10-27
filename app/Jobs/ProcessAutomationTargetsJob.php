@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\AutomationTarget;
 use App\Services\Messaging\AutomationEngine;
+use App\Services\Messaging\BookingReminderService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -39,6 +40,15 @@ class ProcessAutomationTargetsJob implements ShouldQueue
 
         if ($created > 0) {
             Log::info("ProcessAutomationTargetsJob: created {$created} periodic targets", [
+                'tenant' => $this->tenantId,
+            ]);
+        }
+
+        // Booking reminders set up on the WhatsApp settings page
+        $reminded = app(BookingReminderService::class)->sendDue();
+
+        if ($reminded > 0) {
+            Log::info("ProcessAutomationTargetsJob: sent {$reminded} booking reminders", [
                 'tenant' => $this->tenantId,
             ]);
         }

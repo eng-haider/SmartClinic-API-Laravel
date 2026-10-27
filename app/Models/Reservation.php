@@ -50,6 +50,7 @@ class Reservation extends Model
             'reservation_start_date' => 'date',
             'reservation_end_date' => 'date',
             'is_waiting' => 'boolean',
+            'reminder_sent_at' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
@@ -74,6 +75,11 @@ class Reservation extends Model
         static::updating(function ($reservation) {
             if (Auth::check()) {
                 $reservation->updator_id = Auth::id();
+            }
+
+            // A booking moved to a new time gets its WhatsApp reminder again
+            if ($reservation->isDirty(['reservation_start_date', 'reservation_from_time'])) {
+                $reservation->reminder_sent_at = null;
             }
         });
     }
