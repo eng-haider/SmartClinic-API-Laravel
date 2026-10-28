@@ -14,7 +14,7 @@ return new class extends Migration
             $table->foreignId('patient_id')->constrained('patients')->cascadeOnDelete();
             $table->unsignedBigInteger('case_id')->nullable();
             $table->timestamp('scheduled_for');
-            $table->string('status')->default('pending'); // pending, sent, failed, cancelled
+            $table->string('status')->default('pending'); // pending, sending, sent, failed, cancelled
             $table->unsignedBigInteger('message_id')->nullable();
             $table->text('error_message')->nullable();
             $table->unsignedInteger('attempt_count')->default(0);

@@ -31,8 +31,14 @@ class SendAutomationMessageJob implements ShouldQueue
             return;
         }
 
-        if ($target->status !== AutomationTarget::STATUS_PENDING) {
-            return; // Already processed or cancelled
+        // Claim the target first so overlapping workers never send it twice
+        $claimed = AutomationTarget::query()
+            ->whereKey($target->id)
+            ->where('status', AutomationTarget::STATUS_PENDING)
+            ->update(['status' => AutomationTarget::STATUS_SENDING]);
+
+        if (!$claimed) {
+            return; // Already processed, cancelled or claimed by another worker
         }
 
         if (!$target->rule || !$target->rule->is_active) {

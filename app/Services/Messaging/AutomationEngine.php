@@ -102,7 +102,11 @@ class AutomationEngine
             // Find patients that should receive the next periodic message
             // Get latest target per patient for this rule
             $latestTargets = AutomationTarget::where('automation_rule_id', $rule->id)
-                ->whereIn('status', [AutomationTarget::STATUS_SENT, AutomationTarget::STATUS_PENDING])
+                ->whereIn('status', [
+                    AutomationTarget::STATUS_SENT,
+                    AutomationTarget::STATUS_SENDING,
+                    AutomationTarget::STATUS_PENDING,
+                ])
                 ->selectRaw('patient_id, MAX(scheduled_for) as last_scheduled')
                 ->groupBy('patient_id')
                 ->get();
