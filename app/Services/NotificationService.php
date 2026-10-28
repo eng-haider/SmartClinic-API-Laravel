@@ -4,9 +4,9 @@ namespace App\Services;
 
 use App\Models\Notification;
 use App\Models\User;
-use Berkayk\OneSignal\OneSignalFacade as OneSignal;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class NotificationService
@@ -173,42 +173,47 @@ class NotificationService
                 return;
             }
 
-            // Prepare OneSignal notification data
+            $data = $notification->data ?? [];
+
+            // The player ID is the mobile app's OneSignal subscription ID.
+            // The table has one (English) title/body; the Arabic copy rides
+            // along in data, and OneSignal shows the phone's language.
             $params = [
-                'include_player_ids' => [$playerId],
-                'headings' => ['en' => $notification->title],
-                'contents' => ['en' => $notification->body],
-                'data' => array_merge(
-                    $notification->data ?? [],
-                    [
-                        'notification_id' => $notification->id,
-                        'type' => $notification->type,
-                        'action_url' => $notification->action_url,
-                    ]
-                ),
+                'app_id' => config('onesignal.app_id'),
+                'target_channel' => 'push',
+                'include_subscription_ids' => [$playerId],
+                'headings' => array_filter(['en' => $notification->title, 'ar' => $data['title_ar'] ?? null]),
+                'contents' => array_filter(['en' => $notification->body, 'ar' => $data['body_ar'] ?? null]),
+                // The app opens the page from action_url itself; a 'url' here
+                // would send the phone to a browser instead.
+                'data' => array_merge($data, [
+                    'notification_id' => $notification->id,
+                    'type' => $notification->type,
+                    'action_url' => $notification->action_url,
+                ]),
             ];
 
             // Add priority-based settings
             $params = $this->addPrioritySettings($params, $notification->priority);
 
-            // Add action URL if exists
-            if ($notification->action_url) {
-                $params['url'] = $notification->action_url;
-            }
-
-            // Send via OneSignal
-            $response = OneSignal::sendNotificationCustom($params);
+            // App API keys (os_v2_...) authenticate with "Key", not the "Basic"
+            // the OneSignal package sends, and the package returns the raw HTTP
+            // response, so the result could never be read from it.
+            $response = Http::withHeaders(['Authorization' => 'Key ' . config('onesignal.rest_api_key')])
+                ->acceptJson()
+                ->timeout(10)
+                ->post(rtrim(config('onesignal.rest_api_url'), '/') . '/notifications', $params);
 
             // Update notification with OneSignal response
-            if (isset($response['id'])) {
+            if ($response->successful() && $response->json('id')) {
                 $notification->update([
-                    'onesignal_notification_id' => $response['id'],
+                    'onesignal_notification_id' => $response->json('id'),
                     'onesignal_status' => Notification::ONESIGNAL_SENT,
                 ]);
             } else {
                 $notification->update([
                     'onesignal_status' => Notification::ONESIGNAL_FAILED,
-                    'onesignal_error' => json_encode($response),
+                    'onesignal_error' => $response->body(),
                 ]);
             }
         } catch (\Exception $e) {
@@ -233,14 +238,14 @@ class NotificationService
      */
     protected function addPrioritySettings(array $params, string $priority): array
     {
+        // No android_channel_id: OneSignal only accepts the IDs of channels
+        // created in its dashboard, and an unknown one fails the send. Only
+        // 10 counts as high priority; anything else may wait while a phone
+        // is idle, which a booking request should not.
         switch ($priority) {
             case Notification::PRIORITY_URGENT:
-                $params['priority'] = 10;
-                $params['android_channel_id'] = 'urgent-notifications';
-                break;
             case Notification::PRIORITY_HIGH:
-                $params['priority'] = 9;
-                $params['android_channel_id'] = 'high-priority-notifications';
+                $params['priority'] = 10;
                 break;
             case Notification::PRIORITY_MEDIUM:
                 $params['priority'] = 5;

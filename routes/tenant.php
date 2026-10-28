@@ -207,6 +207,8 @@ Route::middleware([
         Route::get('notifications/push/public-key', [NotificationController::class, 'pushPublicKey'])->name('notifications.push.public-key');
         Route::post('notifications/push/subscribe', [NotificationController::class, 'pushSubscribe'])->name('notifications.push.subscribe');
         Route::post('notifications/push/unsubscribe', [NotificationController::class, 'pushUnsubscribe'])->name('notifications.push.unsubscribe');
+        Route::post('notifications/onesignal/subscribe', [NotificationController::class, 'updatePlayerID'])->name('notifications.onesignal.subscribe');
+        Route::post('notifications/onesignal/unsubscribe', [NotificationController::class, 'removePlayerID'])->name('notifications.onesignal.unsubscribe');
         Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
         Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
         Route::delete('notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');

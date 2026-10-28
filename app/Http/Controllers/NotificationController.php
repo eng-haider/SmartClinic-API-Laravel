@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Notification;
 use App\Models\PushSubscription;
+use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\WebPushService;
 use Illuminate\Http\JsonResponse;
@@ -360,12 +361,37 @@ class NotificationController extends Controller
         }
 
         $user = Auth::user();
-        $user->setOneSignalPlayerId($request->input('player_id'));
+        $playerId = $request->input('player_id');
+
+        // One phone belongs to one account: whoever signed in on it before
+        // must stop getting their notifications on it.
+        User::where('onesignal_player_id', $playerId)
+            ->whereKeyNot($user->id)
+            ->update(['onesignal_player_id' => null]);
+        $user->setOneSignalPlayerId($playerId);
 
         return response()->json([
             'success' => true,
             'message' => 'Player ID updated successfully',
         ]);
+    }
+
+    /**
+     * Stop pushing to this phone (the app calls this on sign-out). Only clears
+     * the ID if it is still this phone's, so a newer phone keeps its link.
+     */
+    public function removePlayerID(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'player_id' => 'required|string',
+        ]);
+
+        $user = Auth::user();
+        if ($user->getOneSignalPlayerId() === $validated['player_id']) {
+            $user->setOneSignalPlayerId(null);
+        }
+
+        return response()->json(['success' => true]);
     }
 
     /**
