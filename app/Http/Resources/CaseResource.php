@@ -86,6 +86,9 @@ class CaseResource extends JsonResource
                         'payment_status' => $bill->is_paid ? 'Paid' : 'Unpaid',
                         'use_credit'     => $bill->use_credit,
                         'credit_usage'   => $bill->use_credit ? 'Used Credit' : 'No Credit',
+                        'creator'        => $bill->relationLoaded('creator') && $bill->creator
+                            ? ['id' => $bill->creator->id, 'name' => $bill->creator->name]
+                            : null,
                         'created_at'     => $bill->created_at?->format('Y-m-d H:i:s'),
                         'updated_at'     => $bill->updated_at?->format('Y-m-d H:i:s'),
                     ];

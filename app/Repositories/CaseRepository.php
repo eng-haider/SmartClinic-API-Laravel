@@ -10,6 +10,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Spatie\QueryBuilder\QueryBuilder;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedInclude;
 
 class CaseRepository
 {
@@ -82,7 +83,8 @@ class CaseRepository
                 'category',
                 'status',
                 'notes',
-                'bills',
+                // Bills always carry who registered them (shown in the case drawer).
+                AllowedInclude::callback('bills', fn ($query) => $query->with('creator:id,name')),
                 'warehouseItems',
                 'ophthalmologyEncounterDetails',
             ])
@@ -110,7 +112,7 @@ class CaseRepository
     public function getById(int $id, ?int $doctorId = null): ?CaseModel
     {
         $query = $this->query()
-            ->with(['patient', 'doctor', 'category', 'status', 'bills', 'warehouseItems']);
+            ->with(['patient', 'doctor', 'category', 'status', 'bills.creator:id,name', 'warehouseItems']);
 
         // Filter by doctor if provided (for doctors to see only their own cases)
         if ($doctorId !== null) {
