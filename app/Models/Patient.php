@@ -209,6 +209,22 @@ class Patient extends Model
     }
 
     /**
+     * The patient's age, worked out from the birth date when there is one so it
+     * stays current (the stored age is from the day the patient was saved). Patients
+     * entered by age, or with a nonsense imported date, fall back to the stored age.
+     */
+    public function getAgeAttribute($value): ?int
+    {
+        $age = $this->birth_date ? (int) $this->birth_date->diffInYears(now()) : null;
+
+        if ($age !== null && $age >= 0 && $age <= 150) {
+            return $age;
+        }
+
+        return $value === null ? null : (int) $value;
+    }
+
+    /**
      * Get the patient's gender label.
      */
     public function getSexLabelAttribute(): string

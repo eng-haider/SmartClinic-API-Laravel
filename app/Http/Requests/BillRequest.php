@@ -45,11 +45,10 @@ class BillRequest extends FormRequest
     {
         $data = [];
 
-        // Set clinic_id from authenticated user
-        if (auth()->check()) {
-          
-            // Set doctor_id if not provided
-             $data['doctor_id'] = auth()->id();
+        // The bill belongs to whoever adds it, not to the doctor who opened the case.
+        // Only on create: editing a bill later must not move it to the editor.
+        if (auth()->check() && $this->isMethod('POST')) {
+            $data['doctor_id'] = auth()->id();
         }
 
         // Set default bill_date to current datetime only when creating
@@ -71,13 +70,13 @@ class BillRequest extends FormRequest
     {
         $validated = parent::validated($key, $default);
 
-        // Add clinics_id and doctor_id to validated data
-        if (auth()->check()) {
-            
-            
-            if (!isset($validated['doctor_id'])) {
+        if ($this->isMethod('POST')) {
+            if (auth()->check() && !isset($validated['doctor_id'])) {
                 $validated['doctor_id'] = auth()->id();
             }
+        } else {
+            // A bill stays with the doctor who added it, whoever edits it later
+            unset($validated['doctor_id']);
         }
 
         return $validated;

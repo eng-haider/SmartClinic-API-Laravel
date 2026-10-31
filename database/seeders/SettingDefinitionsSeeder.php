@@ -268,6 +268,15 @@ class SettingDefinitionsSeeder extends Seeder
                 'display_order' => 6,
                 'is_required' => false,
             ],
+            [
+                'setting_key' => 'patient_age_input',
+                'setting_type' => 'string',
+                'default_value' => 'birth_date',
+                'description' => 'What the patient form asks for: birth_date (the age is worked out from it) or age (a number of years)',
+                'category' => 'display',
+                'display_order' => 7,
+                'is_required' => false,
+            ],
 
             // ========================
             // SOCIAL CATEGORY

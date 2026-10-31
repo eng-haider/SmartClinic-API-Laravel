@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Repositories\ClinicSettingRepository;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 
@@ -65,20 +66,40 @@ class PatientRequest extends FormRequest
             $data['birth_date'] = $data['birth_date'] . '-01-01';
         }
 
-        // Always calculate age from birth_date if birth_date is provided
-        // This ensures age is updated whenever birth_date changes
-        if (!empty($data['birth_date'])) {
-            try {
-                $birthDate = new \DateTime($data['birth_date']);
-                $today = new \DateTime('today');
-                $age = $birthDate->diff($today)->y;
-                $data['age'] = $age;
-            } catch (\Exception $e) {
-                // If date parsing fails, let validation handle it
+        // The field the clinic fills in (Settings → patient_age_input) wins
+        $birthDateAge = $this->ageFromBirthDate($data['birth_date'] ?? null);
+        $typedAge = $data['age'] ?? null;
+
+        if (app(ClinicSettingRepository::class)->patientAgeInput() === 'age' && is_numeric($typedAge)) {
+            // Staff typed the age. A birth date saved earlier that no longer matches
+            // it is out of date, so drop it rather than let it overwrite the age.
+            if ($birthDateAge !== null && $birthDateAge !== (int) $typedAge) {
+                $data['birth_date'] = null;
             }
+        } elseif ($birthDateAge !== null) {
+            // Always calculate age from birth_date if birth_date is provided
+            // This ensures age is updated whenever birth_date changes
+            $data['age'] = $birthDateAge;
         }
 
         $this->replace($data);
+    }
+
+    /**
+     * Whole years since the birth date, or null when there is none or it can't be
+     * parsed (validation reports a bad date).
+     */
+    private function ageFromBirthDate(?string $birthDate): ?int
+    {
+        if (empty($birthDate)) {
+            return null;
+        }
+
+        try {
+            return (new \DateTime($birthDate))->diff(new \DateTime('today'))->y;
+        } catch (\Exception) {
+            return null;
+        }
     }
 
     /**

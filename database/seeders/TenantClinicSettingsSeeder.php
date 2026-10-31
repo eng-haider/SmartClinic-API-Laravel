@@ -264,6 +264,13 @@ class TenantClinicSettingsSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'setting_key' => 'patient_age_input',
+                'setting_value' => 'birth_date',
+                'setting_type' => 'string',
+                'description' => 'What the patient form asks for: birth_date (the age is worked out from it) or age (a number of years)',
+                'is_active' => true,
+            ],
+            [
                 'setting_key' => 'tooth_colors',
                 'setting_value' => json_encode([
                     [

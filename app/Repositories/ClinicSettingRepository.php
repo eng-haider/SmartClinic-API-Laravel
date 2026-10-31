@@ -24,6 +24,15 @@ class ClinicSettingRepository extends BaseRepository
      */
     public const HIDE_DASHBOARD_NUMBERS_KEY = 'hide_dashboard_numbers';
 
+    /**
+     * What the patient form asks for: 'birth_date' (the age is worked out from it
+     * and stays current) or 'age' (a plain number of years). Both columns always
+     * exist - this only picks which one staff fill in.
+     */
+    public const PATIENT_AGE_INPUT_KEY = 'patient_age_input';
+    public const PATIENT_AGE_INPUTS = ['birth_date', 'age'];
+    public const DEFAULT_PATIENT_AGE_INPUT = 'birth_date';
+
     public function __construct(ClinicSetting $model)
     {
         parent::__construct($model);
@@ -195,6 +204,12 @@ class ClinicSettingRepository extends BaseRepository
                 : self::DEFAULT_BABY_TEETH_NOTATION;
         }
 
+        if ($key === self::PATIENT_AGE_INPUT_KEY) {
+            return in_array($value, self::PATIENT_AGE_INPUTS, true)
+                ? $value
+                : self::DEFAULT_PATIENT_AGE_INPUT;
+        }
+
         return $value;
     }
 
@@ -237,6 +252,18 @@ class ClinicSettingRepository extends BaseRepository
     public function hideDashboardNumbers(): bool
     {
         return (bool) $this->getByKey(self::HIDE_DASHBOARD_NUMBERS_KEY)?->getValue();
+    }
+
+    /**
+     * Whether patients are entered with a birth date or an age ('birth_date' when
+     * the setting is missing, e.g. a clinic whose migrations have not run yet).
+     */
+    public function patientAgeInput(): string
+    {
+        return $this->normalizeValue(
+            self::PATIENT_AGE_INPUT_KEY,
+            $this->getByKey(self::PATIENT_AGE_INPUT_KEY)?->getValue()
+        );
     }
 
     /**
@@ -362,7 +389,7 @@ class ClinicSettingRepository extends BaseRepository
         }
 
         // Display category
-        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY, self::HIDE_DASHBOARD_NUMBERS_KEY])) {
+        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY, self::HIDE_DASHBOARD_NUMBERS_KEY, self::PATIENT_AGE_INPUT_KEY])) {
             return 'display';
         }
 
@@ -424,6 +451,7 @@ class ClinicSettingRepository extends BaseRepository
             'tooth_colors' => 25,
             'baby_teeth_notation' => 26,
             'hide_dashboard_numbers' => 27,
+            'patient_age_input' => 28,
 
             // Social (26-28)
             'facebook_url' => 26,

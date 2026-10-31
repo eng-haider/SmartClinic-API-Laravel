@@ -103,18 +103,21 @@ class ReportsTableRepository
             ->whereNull('deleted_at')
             ->groupBy('billable_id');
 
-        $casesAgg = DB::table('cases')
-            ->leftJoinSub($paymentsByCase, 'payments', 'payments.billable_id', '=', 'cases.id')
+        $casesInPeriod = fn ($q) => $q
             ->whereNull('cases.deleted_at')
             ->when(! empty($filters['date_from']), fn ($q) => $q->where('cases.created_at', '>=', CarbonImmutable::parse($filters['date_from'])->startOfDay()))
-            ->when(! empty($filters['date_to']), fn ($q) => $q->where('cases.created_at', '<', CarbonImmutable::parse($filters['date_to'])->addDay()->startOfDay()))
+            ->when(! empty($filters['date_to']), fn ($q) => $q->where('cases.created_at', '<', CarbonImmutable::parse($filters['date_to'])->addDay()->startOfDay()));
+
+        // Case value and what is still owed stay with the doctor who owns the case
+        $casesAgg = DB::table('cases')
+            ->leftJoinSub($paymentsByCase, 'payments', 'payments.billable_id', '=', 'cases.id')
+            ->tap($casesInPeriod)
             ->select('cases.doctor_id')
             ->selectRaw('COUNT(*) as case_count')
             ->selectRaw('COUNT(DISTINCT cases.patient_id) as patient_count')
             ->selectRaw('SUM(CASE WHEN cases.status_id = ? THEN 1 ELSE 0 END) as completed_count', [CaseModel::COMPLETED_STATUS_ID])
             ->selectRaw('SUM(CASE WHEN cases.status_id IS NULL OR cases.status_id <> ? THEN 1 ELSE 0 END) as in_progress_count', [CaseModel::COMPLETED_STATUS_ID])
             ->selectRaw('SUM(COALESCE(cases.price, 0)) as total_value')
-            ->selectRaw('SUM(COALESCE(payments.paid_amount, 0)) as paid_amount')
             ->selectRaw('SUM(GREATEST(COALESCE(cases.price, 0) - COALESCE(payments.paid_amount, 0), 0)) as remaining_amount')
             ->selectRaw('MAX(cases.created_at) as last_case_at')
             ->groupBy('cases.doctor_id');
@@ -134,9 +137,33 @@ class ReportsTableRepository
             ->whereHas('roles', fn ($q) => $q->whereIn('name', ['doctor', 'clinic_super_doctor', 'super_admin']))
             ->pluck('id');
 
+        // A payment counts for the doctor who added the bill, even on another
+        // doctor's case. Bills added by a secretary (or with no doctor) count for
+        // the case's doctor. Same cases as $casesAgg, so the totals are unchanged.
+        $collector = $doctorIds->isEmpty()
+            ? 'cases.doctor_id'
+            : 'CASE WHEN bills.doctor_id IN ('.implode(',', array_fill(0, $doctorIds->count(), '?')).') THEN bills.doctor_id ELSE cases.doctor_id END';
+
+        $paymentsByDoctor = DB::query()
+            ->fromSub(
+                DB::table('bills')
+                    ->join('cases', 'cases.id', '=', 'bills.billable_id')
+                    ->whereIn('bills.billable_type', self::CASE_BILLABLE_TYPES)
+                    ->where('bills.is_paid', true)
+                    ->whereNull('bills.deleted_at')
+                    ->tap($casesInPeriod)
+                    ->select('bills.price')
+                    ->selectRaw("{$collector} as doctor_id", $doctorIds->all()),
+                'case_bills'
+            )
+            ->select('doctor_id')
+            ->selectRaw('SUM(price) as paid_amount')
+            ->groupBy('doctor_id');
+
         $query = DB::table('users')
             ->whereIn('users.id', $doctorIds)
             ->leftJoinSub($casesAgg, 'agg', 'agg.doctor_id', '=', 'users.id')
+            ->leftJoinSub($paymentsByDoctor, 'paid', 'paid.doctor_id', '=', 'users.id')
             ->leftJoinSub($reservationsAgg, 'resv', 'resv.doctor_id', '=', 'users.id')
             ->whereNull('users.deleted_at')
             ->select(
@@ -148,7 +175,7 @@ class ReportsTableRepository
                 DB::raw('COALESCE(agg.completed_count, 0) as completed_count'),
                 DB::raw('COALESCE(agg.in_progress_count, 0) as in_progress_count'),
                 DB::raw('COALESCE(agg.total_value, 0) as total_value'),
-                DB::raw('COALESCE(agg.paid_amount, 0) as paid_amount'),
+                DB::raw('COALESCE(paid.paid_amount, 0) as paid_amount'),
                 DB::raw('COALESCE(agg.remaining_amount, 0) as remaining_amount'),
                 'agg.last_case_at',
                 DB::raw('COALESCE(resv.reservation_count, 0) as reservation_count')
