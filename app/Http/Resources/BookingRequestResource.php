@@ -21,6 +21,7 @@ class BookingRequestResource extends JsonResource
             'preferred_date' => $this->preferred_date?->format('Y-m-d'),
             'preferred_time' => $this->preferred_time,
             'note' => $this->note,
+            'source' => $this->source ?? 'website',
             'status' => $this->status,
             'rejection_reason' => $this->rejection_reason,
 

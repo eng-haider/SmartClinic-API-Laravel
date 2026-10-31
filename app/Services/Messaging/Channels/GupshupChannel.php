@@ -31,6 +31,20 @@ class GupshupChannel implements ChannelDriver
                 return $this->sendTemplate($to, $options);
             }
 
+            // A list of choices. If Gupshup refuses it, the text below goes instead;
+            // senders put the same choices in it as a numbered menu.
+            if (!empty($options['list'])) {
+                $result = $this->post('/wa/api/v1/msg', $to, [
+                    'message' => json_encode($this->listMessage($options['list']), JSON_UNESCAPED_UNICODE),
+                ]);
+
+                if ($result['success']) {
+                    return $result;
+                }
+
+                Log::warning('Gupshup refused a list message, sending it as text', ['error' => $result['error']]);
+            }
+
             // Otherwise send a plain text message (only delivered inside WhatsApp's 24h window)
             return $this->post('/wa/api/v1/msg', $to, [
                 'message' => json_encode(['type' => 'text', 'text' => $body], JSON_UNESCAPED_UNICODE),
@@ -47,6 +61,33 @@ class GupshupChannel implements ChannelDriver
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Gupshup's list message, cut to WhatsApp's limits. A tapped row's id comes back
+     * as its postbackText.
+     *
+     * @param array{title: string, body: string, button: string, rows: list<array{id: string, title: string, description: string}>} $list
+     */
+    private function listMessage(array $list): array
+    {
+        return [
+            'type' => 'list',
+            'title' => mb_substr($list['title'], 0, 60),
+            'body' => mb_substr($list['body'], 0, 1024),
+            'msgid' => 'list',
+            'globalButtons' => [['type' => 'text', 'title' => mb_substr($list['button'], 0, 20)]],
+            'items' => [[
+                'title' => mb_substr($list['button'], 0, 24),
+                'subtitle' => mb_substr($list['button'], 0, 24),
+                'options' => array_map(fn (array $row) => [
+                    'type' => 'text',
+                    'title' => mb_substr($row['title'], 0, 24),
+                    'description' => mb_substr($row['description'], 0, 72),
+                    'postbackText' => $row['id'],
+                ], array_slice($list['rows'], 0, 10)),
+            ]],
+        ];
     }
 
     private function sendTemplate(string $to, array $options): array

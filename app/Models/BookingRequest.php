@@ -14,6 +14,9 @@ class BookingRequest extends Model
     public const STATUS_APPROVED = 'approved';
     public const STATUS_REJECTED = 'rejected';
 
+    public const SOURCE_WEBSITE = 'website';
+    public const SOURCE_WHATSAPP = 'whatsapp';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -25,6 +28,7 @@ class BookingRequest extends Model
         'preferred_date',
         'preferred_time',
         'note',
+        'source',
         'status',
         'rejection_reason',
         'patient_id',

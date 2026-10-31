@@ -34,6 +34,18 @@ class WhatsAppChannel implements ChannelDriver
                 return $this->sendTemplate($to, $options, $settings);
             }
 
+            // A list of choices. If Meta refuses it, the text below goes instead;
+            // senders put the same choices in it as a numbered menu.
+            if (!empty($options['list'])) {
+                $result = $this->sendList($to, $options['list'], $settings);
+
+                if ($result['success']) {
+                    return $result;
+                }
+
+                Log::warning('WhatsApp refused a list message, sending it as text', ['error' => $result['error']]);
+            }
+
             // Otherwise send a plain text message
             return $this->sendText($to, $body, $settings);
         } catch (\Throwable $e) {
@@ -74,6 +86,52 @@ class WhatsAppChannel implements ChannelDriver
             'success' => false,
             'external_id' => null,
             'error' => $error,
+        ];
+    }
+
+    /**
+     * An interactive list, cut to WhatsApp's limits. A tapped row comes back as
+     * interactive.list_reply with the row's id.
+     *
+     * @param array{title: string, body: string, button: string, rows: list<array{id: string, title: string, description: string}>} $list
+     */
+    private function sendList(string $to, array $list, MessagingSetting $settings): array
+    {
+        $response = Http::withToken($settings->whatsapp_access_token)
+            ->post("https://graph.facebook.com/v21.0/{$settings->whatsapp_phone_number_id}/messages", [
+                'messaging_product' => 'whatsapp',
+                'to' => $this->normalizePhone($to),
+                'type' => 'interactive',
+                'interactive' => [
+                    'type' => 'list',
+                    'header' => ['type' => 'text', 'text' => mb_substr($list['title'], 0, 60)],
+                    'body' => ['text' => mb_substr($list['body'], 0, 1024)],
+                    'action' => [
+                        'button' => mb_substr($list['button'], 0, 20),
+                        'sections' => [[
+                            'title' => mb_substr($list['button'], 0, 24),
+                            'rows' => array_map(fn (array $row) => [
+                                'id' => $row['id'],
+                                'title' => mb_substr($row['title'], 0, 24),
+                                'description' => mb_substr($row['description'], 0, 72),
+                            ], array_slice($list['rows'], 0, 10)),
+                        ]],
+                    ],
+                ],
+            ]);
+
+        if ($response->successful()) {
+            return [
+                'success' => true,
+                'external_id' => $response->json('messages.0.id'),
+                'error' => null,
+            ];
+        }
+
+        return [
+            'success' => false,
+            'external_id' => null,
+            'error' => $response->json('error.message', 'Unknown WhatsApp API error'),
         ];
     }
 

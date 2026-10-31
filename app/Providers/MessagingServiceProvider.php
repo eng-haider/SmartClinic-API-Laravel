@@ -11,6 +11,7 @@ use App\Services\Messaging\ChannelManager;
 use App\Services\Messaging\MessageService;
 use App\Services\Messaging\TemplateEngine;
 use App\Services\Messaging\WebhookService;
+use App\Services\Messaging\WhatsAppBookingBot;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -33,6 +34,7 @@ class MessagingServiceProvider extends ServiceProvider
         $this->app->singleton(WebhookService::class, function ($app) {
             return new WebhookService(
                 $app->make(MessageService::class),
+                $app->make(WhatsAppBookingBot::class),
             );
         });
     }

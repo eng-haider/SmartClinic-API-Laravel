@@ -63,6 +63,10 @@ class MessagingSettingController extends Controller
                 'nullable', 'string', 'max:255',
             ],
             'meta.booking_reminder_text' => 'nullable|string|max:1000',
+            // Patients book from WhatsApp (see WhatsAppBookingBot) and hear back there on approval
+            'meta.booking_bot_enabled' => 'nullable|boolean',
+            'meta.booking_approved_template' => 'nullable|string|max:255',
+            'meta.booking_approved_text' => 'nullable|string|max:1000',
         ]);
 
         // Gupshup's callback URL carries this secret (see webhookInfo), so make one if missing

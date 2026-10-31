@@ -15,6 +15,7 @@ class WebhookService
 {
     public function __construct(
         private MessageService $messageService,
+        private WhatsAppBookingBot $bookingBot,
     ) {}
 
     /**
@@ -125,10 +126,12 @@ class WebhookService
 
         foreach ($messages as $msg) {
             $fromNumber = $msg['from'] ?? null;
-            $body = $msg['text']['body'] ?? null;
+            // A tapped list row or button carries its title, and the id the sender gave it
+            $tapped = $msg['interactive']['list_reply'] ?? $msg['interactive']['button_reply'] ?? [];
+            $body = $msg['text']['body'] ?? $tapped['title'] ?? null;
             $messageId = $msg['id'] ?? null;
 
-            if (!$fromNumber) {
+            if (!$fromNumber || $this->alreadyReceived($messageId)) {
                 continue;
             }
 
@@ -139,14 +142,38 @@ class WebhookService
                 ->orWhere('phone2', '+' . $fromNumber)
                 ->first();
 
-            $this->recordInbound($patient, $fromNumber, $body, $messageId, $msg);
+            $conversationId = $this->recordInbound($patient, $fromNumber, $body, $messageId, $msg);
+            $this->answerBookingBot($fromNumber, $tapped['id'] ?? $body, $patient, $conversationId);
+        }
+    }
+
+    /**
+     * Providers retry a webhook they think failed. A message seen before is skipped,
+     * so the booking bot never takes the same answer twice.
+     */
+    private function alreadyReceived(?string $messageId): bool
+    {
+        return $messageId !== null && Message::where('external_id', $messageId)
+            ->where('direction', Message::DIRECTION_INBOUND)
+            ->exists();
+    }
+
+    /**
+     * Pass a customer's message to the booking bot. Messages without text
+     * (images, stickers, reactions) are not answers to it.
+     */
+    private function answerBookingBot(string $fromNumber, ?string $reply, ?Patient $patient, ?int $conversationId): void
+    {
+        if (trim((string) $reply) !== '') {
+            $this->bookingBot->handle($fromNumber, trim($reply), $patient, $conversationId);
         }
     }
 
     /**
      * Record an inbound WhatsApp message, in the patient's conversation when known.
+     * Returns that conversation's id.
      */
-    private function recordInbound(?Patient $patient, string $fromNumber, ?string $body, ?string $messageId, array $meta): void
+    private function recordInbound(?Patient $patient, string $fromNumber, ?string $body, ?string $messageId, array $meta): ?int
     {
         $conversationId = null;
         if ($patient) {
@@ -163,6 +190,8 @@ class WebhookService
             'external_id' => $messageId,
             'meta' => $meta,
         ]);
+
+        return $conversationId;
     }
 
     /**
@@ -272,15 +301,19 @@ class WebhookService
     {
         $fromNumber = $event['source'] ?? null;
 
-        if (!$fromNumber) {
+        if (!$fromNumber || $this->alreadyReceived($event['id'] ?? null)) {
             return;
         }
 
-        // Text messages and quick-reply button taps both carry their text here
-        $body = $event['payload']['text'] ?? null;
+        // Text messages and quick-reply button taps both carry their text here. Gupshup
+        // doesn't document a tapped list row in this format; its flat format gives the
+        // row's title and postbackText (the id the sender gave the row), so look for those.
+        $content = $event['payload'] ?? [];
+        $body = $content['text'] ?? $content['title'] ?? $content['reply'] ?? null;
         $patient = app(PatientRepository::class)->findByPhoneNumber($fromNumber);
 
-        $this->recordInbound($patient, $fromNumber, $body, $event['id'] ?? null, $event);
+        $conversationId = $this->recordInbound($patient, $fromNumber, $body, $event['id'] ?? null, $event);
+        $this->answerBookingBot($fromNumber, $content['postbackText'] ?? $body, $patient, $conversationId);
     }
 
     private function processGupshupStatus(array $event): void

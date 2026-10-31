@@ -7,6 +7,7 @@ use App\Models\Notification;
 use App\Models\Patient;
 use App\Models\Reservation;
 use App\Models\Status;
+use App\Services\Messaging\BookingRequestMessenger;
 use App\Services\NotificationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -18,7 +19,8 @@ class BookingRequestRepository
 {
     public function __construct(
         private NotificationService $notifications,
-        private PatientRepository $patients
+        private PatientRepository $patients,
+        private BookingRequestMessenger $messenger
     ) {
     }
 
@@ -101,7 +103,7 @@ class BookingRequestRepository
             throw new \Exception("Booking request has already been {$request->status}");
         }
 
-        return DB::transaction(function () use ($request, $overrides) {
+        $approved = DB::transaction(function () use ($request, $overrides) {
             $patient = $this->findOrCreatePatientByPhone($request);
 
             $date = $overrides['reservation_date']
@@ -137,6 +139,11 @@ class BookingRequestRepository
 
             return $request->fresh(['patient', 'reservation', 'reviewer']);
         });
+
+        // Customers who booked through the WhatsApp bot hear back there
+        $this->messenger->approved($approved);
+
+        return $approved;
     }
 
     /**
@@ -160,6 +167,8 @@ class BookingRequestRepository
             'reviewed_by' => Auth::id(),
             'reviewed_at' => now(),
         ]);
+
+        $this->messenger->rejected($request);
 
         return $request->fresh(['reviewer']);
     }
