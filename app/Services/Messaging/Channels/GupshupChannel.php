@@ -81,7 +81,8 @@ class GupshupChannel implements ChannelDriver
                 'src.name' => $this->meta('gupshup_app_name'),
             ], $fields));
 
-        if ($response->successful() && $response->json('status') === 'submitted') {
+        // Gupshup's docs show both "submitted" and "success" for an accepted message
+        if ($response->successful() && in_array($response->json('status'), ['submitted', 'success'], true)) {
             return [
                 'success' => true,
                 'external_id' => $response->json('messageId'),
