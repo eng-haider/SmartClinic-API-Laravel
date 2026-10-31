@@ -77,9 +77,10 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            // No PDO::ATTR_PERSISTENT here: one persistent socket per tenant DB user piles up
+            // and trips Hostinger's connection limit (see HostingerDatabaseManager).
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-                PDO::ATTR_PERSISTENT => (bool) env('DB_PERSISTENT', false),
             ]) : [],
         ],
 

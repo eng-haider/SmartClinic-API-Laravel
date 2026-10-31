@@ -100,15 +100,21 @@ class GupshupChannel implements ChannelDriver
      * Automations name templates the way Meta does (by name), but Gupshup sends
      * them by its own template id, so the id is looked up among the app's
      * approved templates. A miss refreshes the list once, for newly approved ones.
+     *
+     * Cache::store() rather than Cache::remember(): inside a tenant, stancl's cache
+     * manager tags every facade call, and the database store can't tag ("This cache
+     * store does not support tagging"), so every template send failed. The store is
+     * already on the tenant's connection and the key is per Gupshup app.
      */
     private function findTemplateId(string $name, string $language): ?string
     {
+        $cache = Cache::store();
         $cacheKey = 'gupshup_templates:' . $this->meta('gupshup_app_id');
 
-        $id = $this->pickTemplate(Cache::remember($cacheKey, 600, fn () => $this->fetchTemplates()), $name, $language);
+        $id = $this->pickTemplate($cache->remember($cacheKey, 600, fn () => $this->fetchTemplates()), $name, $language);
         if ($id === null) {
-            Cache::forget($cacheKey);
-            $id = $this->pickTemplate(Cache::remember($cacheKey, 600, fn () => $this->fetchTemplates()), $name, $language);
+            $cache->forget($cacheKey);
+            $id = $this->pickTemplate($cache->remember($cacheKey, 600, fn () => $this->fetchTemplates()), $name, $language);
         }
 
         return $id;

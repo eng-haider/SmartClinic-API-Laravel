@@ -81,6 +81,13 @@ class HostingerDatabaseManager extends MySQLDatabaseManager
         // so it is available here during the DatabaseTenancyBootstrapper bootstrap call.
         $tenant = app(\Stancl\Tenancy\Tenancy::class)->tenant ?? null;
 
+        // Never persist tenant connections. A persistent PDO is keyed by DSN + user, and every
+        // tenant has its own DB user, so each web worker would keep one idle socket open per
+        // tenant it has served (workers × tenants). Past ~20 of them Hostinger refuses new
+        // connections with "SQLSTATE[HY000] [2002] Operation not permitted". The central
+        // connection is a single DSN, so it can still honour DB_PERSISTENT.
+        unset($baseConfig['options'][\PDO::ATTR_PERSISTENT]);
+
         if ($tenant && !empty($tenant->db_name)) {
             // Pool system: use the exact credentials stored at registration time.
             return array_merge($baseConfig, [
