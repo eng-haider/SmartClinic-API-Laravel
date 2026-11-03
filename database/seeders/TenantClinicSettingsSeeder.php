@@ -264,6 +264,13 @@ class TenantClinicSettingsSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'setting_key' => 'enable_departments',
+                'setting_value' => '0',
+                'setting_type' => 'boolean',
+                'description' => 'When enabled, case categories can be put in departments (e.g. Orthodontics, Cosmetic) and cases and bills can be filtered by department',
+                'is_active' => true,
+            ],
+            [
                 'setting_key' => 'patient_age_input',
                 'setting_value' => 'birth_date',
                 'setting_type' => 'string',

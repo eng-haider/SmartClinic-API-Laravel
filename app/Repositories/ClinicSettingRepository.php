@@ -25,6 +25,13 @@ class ClinicSettingRepository extends BaseRepository
     public const HIDE_DASHBOARD_NUMBERS_KEY = 'hide_dashboard_numbers';
 
     /**
+     * When on, case categories can be put in departments (e.g. Orthodontics,
+     * Cosmetic) and the cases and bills pages can be filtered by department.
+     * Off (and missing) hides departments everywhere.
+     */
+    public const ENABLE_DEPARTMENTS_KEY = 'enable_departments';
+
+    /**
      * What the patient form asks for: 'birth_date' (the age is worked out from it
      * and stays current) or 'age' (a plain number of years). Both columns always
      * exist - this only picks which one staff fill in.
@@ -389,7 +396,7 @@ class ClinicSettingRepository extends BaseRepository
         }
 
         // Display category
-        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY, self::HIDE_DASHBOARD_NUMBERS_KEY, self::PATIENT_AGE_INPUT_KEY])) {
+        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY, self::HIDE_DASHBOARD_NUMBERS_KEY, self::PATIENT_AGE_INPUT_KEY, self::ENABLE_DEPARTMENTS_KEY])) {
             return 'display';
         }
 
@@ -452,6 +459,7 @@ class ClinicSettingRepository extends BaseRepository
             'baby_teeth_notation' => 26,
             'hide_dashboard_numbers' => 27,
             'patient_age_input' => 28,
+            'enable_departments' => 29,
 
             // Social (26-28)
             'facebook_url' => 26,

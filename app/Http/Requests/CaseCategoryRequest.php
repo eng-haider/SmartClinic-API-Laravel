@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class CaseCategoryRequest extends FormRequest
 {
@@ -31,6 +32,7 @@ class CaseCategoryRequest extends FormRequest
             // Inactive categories are hidden when picking one for a new case;
             // cases that already use them keep them. Omit to leave unchanged.
             'is_active' => 'sometimes|boolean',
+            'department_id' => ['nullable', 'integer', Rule::exists('departments', 'id')->whereNull('deleted_at')],
             'order' => 'nullable|integer|min:0',
             'item_cost' => 'nullable|integer|min:0',
             'without_detect_tooth' => 'nullable|boolean',
@@ -52,6 +54,7 @@ class CaseCategoryRequest extends FormRequest
             'category_type.in' => 'Category type must be dental, beauty, or general',
             'is_orthodontic.boolean' => 'Orthodontic flag must be true or false',
             'is_active.boolean' => 'Active flag must be true or false',
+            'department_id.exists' => 'Selected department does not exist',
             'order.integer' => 'Order must be an integer',
             'order.min' => 'Order must be at least 0',
             'item_cost.integer' => 'Item cost must be an integer',

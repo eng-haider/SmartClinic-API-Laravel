@@ -24,6 +24,7 @@ class BillingOverviewRequest extends FormRequest
         $rules = [
             'search' => ['nullable', 'string', 'max:255'],
             'doctor_id' => ['nullable', 'integer', 'min:1'],
+            'department_id' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:500'],
             'page' => ['sometimes', 'integer', 'min:1'],
             'sort' => ['nullable', 'string', Rule::in($sorts)],

@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\Bill;
+use App\Models\CaseCategory;
 use App\Models\Patient;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -66,6 +67,9 @@ class BillingOverviewRepository
 
         if (! empty($filters['doctor_id'])) {
             $caseBalances->where('cases.doctor_id', $filters['doctor_id']);
+        }
+        if (! empty($filters['department_id'])) {
+            $caseBalances->whereIn('cases.case_categores_id', CaseCategory::idsInDepartment((int) $filters['department_id']));
         }
         // Scope to cases created in a period (the Bills page statistic cards use this scope).
         // Balances stay lifetime per case: every payment recorded for the case counts.
@@ -181,6 +185,7 @@ class BillingOverviewRepository
         $balances = $this->patientBalances([
             'patient_id' => $patientId,
             'doctor_id' => $filters['doctor_id'] ?? null,
+            'department_id' => $filters['department_id'] ?? null,
             'per_page' => 1,
         ]);
 
@@ -217,6 +222,9 @@ class BillingOverviewRepository
         $this->applySearch($query, $filters);
         if (! empty($filters['doctor_id'])) {
             $query->where('cases.doctor_id', $filters['doctor_id']);
+        }
+        if (! empty($filters['department_id'])) {
+            $query->whereIn('cases.case_categores_id', CaseCategory::idsInDepartment((int) $filters['department_id']));
         }
         if (! empty($filters['patient_id'])) {
             $query->where('cases.patient_id', $filters['patient_id']);

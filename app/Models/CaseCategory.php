@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 
 class CaseCategory extends Model
 {
@@ -20,6 +22,7 @@ class CaseCategory extends Model
         'category_type',
         'is_orthodontic',
         'is_active',
+        'department_id',
         'order',
         'item_cost',
         'without_detect_tooth',
@@ -48,6 +51,7 @@ class CaseCategory extends Model
             'without_detect_tooth' => 'boolean',
             'is_orthodontic' => 'boolean',
             'is_active' => 'boolean',
+            'department_id' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
@@ -59,6 +63,26 @@ class CaseCategory extends Model
     public function cases()
     {
         return $this->hasMany(CaseModel::class, 'case_categores_id');
+    }
+
+    /**
+     * The department this category belongs to (e.g. Orthodontics), if any.
+     */
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    /**
+     * Subquery of the ids of the categories in a department, for whereIn() on
+     * cases.case_categores_id. Deleted categories are kept, so their old cases
+     * still count for the department.
+     */
+    public static function idsInDepartment(int $departmentId): QueryBuilder
+    {
+        return DB::table('case_categories')
+            ->select('id')
+            ->where('department_id', $departmentId);
     }
 
     /**

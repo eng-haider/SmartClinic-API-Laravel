@@ -6,6 +6,8 @@ use App\Traits\HasEmbeddings;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 
 class CaseModel extends Model
 {
@@ -51,6 +53,17 @@ class CaseModel extends Model
      * morph class (App\Models\Case), migrated ones the real class name.
      */
     public const BILLABLE_TYPES = ['Case', 'CaseModel', 'App\\Models\\Case', 'App\\Models\\CaseModel'];
+
+    /**
+     * Subquery of the ids of the cases whose category is in a department, for
+     * whereIn() on a column that points at a case (e.g. bills.billable_id).
+     */
+    public static function idsInDepartment(int $departmentId): QueryBuilder
+    {
+        return DB::table('cases')
+            ->select('id')
+            ->whereIn('case_categores_id', CaseCategory::idsInDepartment($departmentId));
+    }
 
     /**
      * The attributes that are mass assignable.

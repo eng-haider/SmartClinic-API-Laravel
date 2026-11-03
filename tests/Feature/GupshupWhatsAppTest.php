@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\MessagingSettingController;
+use App\Models\MessagingSetting;
 use App\Services\Messaging\ChannelManager;
 use App\Services\Messaging\Channels\GupshupChannel;
 use App\Services\Messaging\Channels\WhatsAppChannel;
@@ -178,6 +179,43 @@ class GupshupWhatsAppTest extends TestCase
 
         $api['meta'] += ['gupshup_app_name' => 'SmartClinicpluse', 'gupshup_app_id' => 'app-1', 'gupshup_source_number' => '9647700281899'];
         $this->assertSame(['meta.booking_reminder_template'], $this->settingsErrors($api));
+    }
+
+    public function test_settings_never_send_the_api_key_back(): void
+    {
+        $setting = app(MessagingSettingController::class)->index()->getData(true)['data'][0];
+
+        $this->assertArrayNotHasKey('whatsapp_access_token', $setting);
+        $this->assertTrue($setting['has_access_token']);
+        $this->assertSame('••••-123', $setting['access_token_hint']);
+    }
+
+    public function test_saving_without_a_key_keeps_the_saved_one_unless_the_driver_changed(): void
+    {
+        $gupshup = ['provider' => 'whatsapp', 'is_active' => true, 'meta' => [
+            'driver' => 'gupshup', 'send_mode' => 'api', 'booking_reminder_enabled' => false,
+            'gupshup_app_name' => 'SmartClinicpluse', 'gupshup_app_id' => 'app-1', 'gupshup_source_number' => '9647700281899',
+        ]];
+        $this->assertSame([], $this->settingsErrors($gupshup));
+        $this->assertSame('key-123', MessagingSetting::savedWhatsAppToken('gupshup'));
+
+        // Gupshup's key is no Meta token, so Meta needs its own
+        $meta = ['provider' => 'whatsapp', 'is_active' => true, 'meta' => [
+            'driver' => 'meta', 'send_mode' => 'api', 'booking_reminder_enabled' => false,
+        ]];
+        $this->assertSame(['whatsapp_access_token'], $this->settingsErrors($meta));
+    }
+
+    public function test_connection_test_uses_the_saved_key_when_none_is_typed(): void
+    {
+        Http::fake(['api.gupshup.io/*' => Http::response(['status' => 'success', 'templates' => []])]);
+
+        $response = app(MessagingSettingController::class)->testConnection(HttpRequest::create('/', 'POST', [
+            'meta' => ['driver' => 'gupshup', 'gupshup_app_id' => 'app-1'],
+        ]));
+
+        $this->assertTrue($response->getData(true)['success']);
+        Http::assertSent(fn (Request $request) => $request->header('apikey') === ['key-123']);
     }
 
     private function settingsErrors(array $data): array

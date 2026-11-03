@@ -2,6 +2,7 @@
 
 namespace App\Repositories;
 
+use App\Models\CaseCategory;
 use App\Models\CaseModel;
 use App\Services\SpecialtyManager;
 use App\Services\WarehouseService;
@@ -63,6 +64,8 @@ class CaseRepository
                 AllowedFilter::exact('patient_id'),
                 AllowedFilter::exact('doctor_id'),
                 AllowedFilter::exact('case_categores_id'),
+                AllowedFilter::callback('department_id', fn ($query, $value) =>
+                    $query->whereIn('case_categores_id', CaseCategory::idsInDepartment((int) $value))),
                 AllowedFilter::scope('paid'),
                 AllowedFilter::scope('unpaid'),
                 AllowedFilter::partial('notes'),

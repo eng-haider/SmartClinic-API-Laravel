@@ -29,6 +29,7 @@ class CaseCategoryRepository
                 'category_type',
                 'clinic_id',
                 AllowedFilter::exact('is_active'),
+                AllowedFilter::exact('department_id'),
             ])
             ->allowedSorts([
                 'id',

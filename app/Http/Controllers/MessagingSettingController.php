@@ -38,11 +38,18 @@ class MessagingSettingController extends Controller
         // Gupshup's details and the reminder template only matter while the clinic sends by API
         $sendsByApi = fn () => $request->boolean('is_active');
         $gupshupRequired = Rule::requiredIf(fn () => $sendsByApi() && $request->input('meta.driver') === 'gupshup');
+        // The token is write-only (the page never receives it), so an empty one keeps the saved token
+        $savedToken = $request->input('provider') === 'whatsapp'
+            ? MessagingSetting::savedWhatsAppToken($request->input('meta.driver'))
+            : null;
 
         $validated = $request->validate([
             'provider' => 'required|string|in:whatsapp,email,push',
             'whatsapp_phone_number_id' => 'nullable|string|max:255',
-            'whatsapp_access_token' => 'nullable|string|max:1000',
+            'whatsapp_access_token' => [
+                Rule::requiredIf(fn () => $sendsByApi() && $request->input('provider') === 'whatsapp' && ! $savedToken),
+                'nullable', 'string', 'max:1000',
+            ],
             'whatsapp_business_account_id' => 'nullable|string|max:255',
             'whatsapp_webhook_verify_token' => 'nullable|string|max:255',
             'is_active' => 'boolean',
@@ -68,6 +75,10 @@ class MessagingSettingController extends Controller
             'meta.booking_approved_template' => 'nullable|string|max:255',
             'meta.booking_approved_text' => 'nullable|string|max:1000',
         ]);
+
+        if (blank($validated['whatsapp_access_token'] ?? null)) {
+            $validated['whatsapp_access_token'] = $savedToken;
+        }
 
         // Gupshup's callback URL carries this secret (see webhookInfo), so make one if missing
         if (($validated['meta']['driver'] ?? null) === 'gupshup' && empty($validated['whatsapp_webhook_verify_token'])) {
@@ -97,12 +108,14 @@ class MessagingSettingController extends Controller
             return $this->testGupshupConnection($request);
         }
 
+        // Without a new token, the saved one is tested
+        $savedToken = MessagingSetting::savedWhatsAppToken('meta');
         $validated = $request->validate([
             'whatsapp_phone_number_id' => 'required|string',
-            'whatsapp_access_token' => 'required|string',
+            'whatsapp_access_token' => [Rule::requiredIf(! $savedToken), 'nullable', 'string'],
         ]);
 
-        $response = Http::withToken($validated['whatsapp_access_token'])
+        $response = Http::withToken(($validated['whatsapp_access_token'] ?? null) ?: $savedToken)
             ->get("https://graph.facebook.com/v21.0/{$validated['whatsapp_phone_number_id']}", [
                 'fields' => 'id,display_phone_number,verified_name,quality_rating',
             ]);
@@ -133,13 +146,14 @@ class MessagingSettingController extends Controller
      */
     private function testGupshupConnection(Request $request): JsonResponse
     {
+        $savedToken = MessagingSetting::savedWhatsAppToken('gupshup');
         $validated = $request->validate([
-            'whatsapp_access_token' => 'required|string',
+            'whatsapp_access_token' => [Rule::requiredIf(! $savedToken), 'nullable', 'string'],
             'meta.gupshup_app_id' => 'required|string',
         ]);
 
         $response = GupshupChannel::templatesRequest(
-            $validated['whatsapp_access_token'],
+            ($validated['whatsapp_access_token'] ?? null) ?: $savedToken,
             $validated['meta']['gupshup_app_id'],
             ['templateStatus' => 'APPROVED'],
         );

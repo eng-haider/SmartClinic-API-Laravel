@@ -2,12 +2,19 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class MessagingSetting extends Model
 {
     use HasFactory;
+
+    // The token (Meta access token or Gupshup API key) is write-only: it is never
+    // sent back to the browser, only whether one is saved and its last characters.
+    protected $hidden = ['whatsapp_access_token'];
+
+    protected $appends = ['has_access_token', 'access_token_hint'];
 
     protected $fillable = [
         'provider',
@@ -28,6 +35,18 @@ class MessagingSetting extends Model
         ];
     }
 
+    protected function hasAccessToken(): Attribute
+    {
+        return Attribute::get(fn () => filled($this->whatsapp_access_token));
+    }
+
+    protected function accessTokenHint(): Attribute
+    {
+        return Attribute::get(fn () => filled($this->whatsapp_access_token)
+            ? '••••' . substr($this->whatsapp_access_token, -4)
+            : null);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
@@ -46,5 +65,20 @@ class MessagingSetting extends Model
     public function usesGupshup(): bool
     {
         return $this->provider === 'whatsapp' && ($this->meta['driver'] ?? null) === 'gupshup';
+    }
+
+    /**
+     * The saved WhatsApp token, if it belongs to the given driver: Meta's token and
+     * Gupshup's key share one column, so after switching driver the old one is useless.
+     */
+    public static function savedWhatsAppToken(?string $driver): ?string
+    {
+        $setting = static::where('provider', 'whatsapp')->first();
+
+        if (! $setting || ($setting->meta['driver'] ?? 'meta') !== ($driver ?: 'meta')) {
+            return null;
+        }
+
+        return $setting->whatsapp_access_token ?: null;
     }
 }

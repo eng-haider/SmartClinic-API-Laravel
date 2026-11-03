@@ -312,11 +312,13 @@ class BillController extends Controller
             'date_from' => 'nullable|date',
             'date_to'   => 'nullable|date|after_or_equal:date_from',
             'doctor_id' => 'nullable|integer|exists:users,id',
+            'department_id' => 'nullable|integer|min:1',
         ]);
 
         $filters = [
             'date_from' => $request->input('date_from'),
             'date_to'   => $request->input('date_to'),
+            'department_id' => $request->input('department_id'),
         ];
 
         // Respects the clinic's doctor_bills_isolation setting

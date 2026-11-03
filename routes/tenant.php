@@ -14,6 +14,7 @@ use App\Http\Controllers\BillController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\CaseController;
 use App\Http\Controllers\CaseCategoryController;
+use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\ClinicExpenseController;
 use App\Http\Controllers\ClinicExpenseCategoryController;
 use App\Http\Controllers\WarehouseItemController;
@@ -137,6 +138,7 @@ Route::middleware([
     // Case category routes
     Route::middleware('jwt')->group(function () {
         Route::apiResource('case-categories', CaseCategoryController::class);
+        Route::apiResource('departments', DepartmentController::class);
     });
 
     // Reservation routes

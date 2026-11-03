@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\Bill;
+use App\Models\CaseCategory;
 use App\Models\CaseModel;
 use App\Models\ClinicExpense;
 use Carbon\CarbonImmutable;
@@ -50,6 +51,9 @@ class BillRepository
                 AllowedFilter::scope('unpaid'),
                 AllowedFilter::scope('by_patient', 'byPatient'),
                 AllowedFilter::scope('by_doctor', 'byDoctor'),
+                AllowedFilter::callback('department_id', fn ($query, $value) => $query
+                    ->whereIn('billable_type', CaseModel::BILLABLE_TYPES)
+                    ->whereIn('billable_id', CaseModel::idsInDepartment((int) $value))),
                 AllowedFilter::callback('date_from', function ($query, $value) {
                     $filters = request('filter');
                     if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
@@ -259,6 +263,7 @@ class BillRepository
      * - date_from (Y-m-d or Y-m-d H:i:s)
      * - date_to (Y-m-d or Y-m-d H:i:s)
      * - doctor_id
+     * - department_id (cases whose category is in the department; expenses are not split by department)
      */
     public function getStatisticsWithFilters(array $filters, int $perPage = 15, $doctorId = null): array
     {
@@ -289,10 +294,15 @@ class BillRepository
             }
         };
 
+        $departmentId = ! empty($filters['department_id']) ? (int) $filters['department_id'] : null;
+
         $casesQuery = CaseModel::query();
 
         if ($doctorId !== null) {
             $casesQuery->where('cases.doctor_id', $doctorId);
+        }
+        if ($departmentId !== null) {
+            $casesQuery->whereIn('cases.case_categores_id', CaseCategory::idsInDepartment($departmentId));
         }
         $applyCreatedRange($casesQuery, 'cases.created_at');
 
@@ -307,6 +317,9 @@ class BillRepository
 
         if ($doctorId !== null) {
             $paidCaseBillsQuery->where('doctor_id', $doctorId);
+        }
+        if ($departmentId !== null) {
+            $paidCaseBillsQuery->whereIn('billable_id', CaseModel::idsInDepartment($departmentId));
         }
         $applyCreatedRange($paidCaseBillsQuery, 'bills.created_at');
 

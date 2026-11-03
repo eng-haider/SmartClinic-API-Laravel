@@ -277,6 +277,15 @@ class SettingDefinitionsSeeder extends Seeder
                 'display_order' => 7,
                 'is_required' => false,
             ],
+            [
+                'setting_key' => 'enable_departments',
+                'setting_type' => 'boolean',
+                'default_value' => '0',
+                'description' => 'Put case categories in departments (e.g. Orthodontics, Cosmetic) and filter cases and bills by department',
+                'category' => 'display',
+                'display_order' => 8,
+                'is_required' => false,
+            ],
 
             // ========================
             // SOCIAL CATEGORY
