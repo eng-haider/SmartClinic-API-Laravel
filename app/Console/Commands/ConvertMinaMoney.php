@@ -33,6 +33,8 @@ class ConvertMinaMoney extends Command
             '--doctor' => '8',
             '--before' => '2025-01-01',
             '--round' => true,
+            // A payment on an old case typed in thousands on 2026-09-03: 1300 is 1.3 million
+            '--keep' => 'bills:40801',
             '--apply' => $this->option('apply'),
         ]));
     }

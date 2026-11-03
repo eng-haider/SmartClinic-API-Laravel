@@ -42,6 +42,7 @@ class ConvertMoneyToThousands extends Command
                             {--doctor= : Only this doctor\'s cases (dated before --before) and every payment on them}
                             {--skip= : Amounts to leave alone, comma separated (e.g. warehouse_items.cost_price)}
                             {--round : Round amounts that are not exact thousands to the nearest thousand (12,500 -> 13)}
+                            {--keep= : Rows to leave alone, comma separated table:id (e.g. bills:40801, already typed in thousands)}
                             {--apply : Change the data; without it only a report is printed}
                             {--restore= : Put back the amounts saved in this backup file}';
 
@@ -122,6 +123,7 @@ class ConvertMoneyToThousands extends Command
 
         $skip = array_filter(array_map('trim', explode(',', (string) $this->option('skip'))));
         $round = (bool) $this->option('round');
+        $keep = array_filter(array_map('trim', explode(',', (string) $this->option('keep'))));
         $rows = [];
         $changes = [];
         $inexact = [];
@@ -140,7 +142,9 @@ class ConvertMoneyToThousands extends Command
             if ($table === 'bills') {
                 $select = [...$select, 'billable_type', 'billable_id'];
             }
-            $found = $this->candidates($table, $column, $dateColumn, $before, $doctorCases)->get($select);
+            $found = $this->candidates($table, $column, $dateColumn, $before, $doctorCases)->get($select)
+                ->reject(fn ($row) => in_array("{$table}:{$row->id}", $keep, true))
+                ->values();
 
             // Whole-number columns need an exact thousand; 2-decimal columns a multiple of 10
             $step = $decimals === 0 ? 1000 : 10;
@@ -176,6 +180,10 @@ class ConvertMoneyToThousands extends Command
         }
 
         $this->table(['Amount', 'Will change', 'Not exact', 'Already small (1-999)', 'Total now', 'Total after'], $rows);
+
+        if ($keep) {
+            $this->line('Left alone: ' . implode(', ', $keep));
+        }
 
         if ($firstSmall) {
             $this->line("The first small amount (1-999) was typed on {$firstSmall}. That is probably when the doctor switched; use it as --before.");
