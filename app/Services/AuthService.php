@@ -214,6 +214,7 @@ class AuthService
             'tenant_id'   => $tenantId,
             'clinic_name' => $data['clinic_name'],
             'has_ai_bot'  => false,
+            'can_merge_patients' => false,
             'specialty'   => $data['specialty'],
             'message'     => 'Clinic registered successfully.',
         ];
@@ -324,6 +325,7 @@ class AuthService
             'tenant_id'   => $clinic->id,
             'clinic_name' => $clinic->name,
             'has_ai_bot'  => $clinic->has_ai_bot,
+            'can_merge_patients' => (bool) $clinic->can_merge_patients,
             'specialty'   => $clinic->specialty ?? 'dental',
             'message'     => 'Login successful',
         ];
@@ -477,6 +479,7 @@ class AuthService
             'tenant_id' => $clinic->id,
             'clinic_name' => $clinic->name,
             'has_ai_bot' => $clinic->has_ai_bot,
+            'can_merge_patients' => (bool) $clinic->can_merge_patients,
             'specialty' => $clinic->specialty ?? 'dental',
             'user_name' => $user->name,
             'message' => 'Credentials verified. Please proceed with tenant login.',

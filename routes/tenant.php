@@ -12,6 +12,7 @@ use App\Http\Middleware\InitializeTenancyByPatientToken;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillController;
 use App\Http\Controllers\PatientController;
+use App\Http\Controllers\PatientMergeController;
 use App\Http\Controllers\CaseController;
 use App\Http\Controllers\CaseCategoryController;
 use App\Http\Controllers\DepartmentController;
@@ -122,6 +123,9 @@ Route::middleware([
         Route::put('patients/{id}/tooth-details', [PatientController::class, 'updateToothDetails']);
         Route::post('patients/{id}/photo', [PatientController::class, 'uploadPhoto']);
         Route::delete('patients/{id}/photo', [PatientController::class, 'deletePhoto']);
+        // Merge a duplicate patient into this one (clinics with can_merge_patients)
+        Route::get('patients/{id}/merge/{otherId}', [PatientMergeController::class, 'preview'])->whereNumber(['id', 'otherId']);
+        Route::post('patients/{id}/merge', [PatientMergeController::class, 'merge'])->whereNumber('id');
         
         // Public Profile Management
         Route::get('patients/{id}/public-profile', [PatientPublicProfileController::class, 'getPublicProfile']);

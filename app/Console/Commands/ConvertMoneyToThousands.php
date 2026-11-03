@@ -16,9 +16,13 @@ use Illuminate\Support\Facades\Schema;
  * Every money column is converted together. Converting bills alone would leave each
  * case at 25000 with 25 paid, owing 24975.
  *
- * Only amounts of 1000 or more change, so the doctor's new entries (25) are never
- * divided again, and running it twice is harmless. --before limits it to records
- * typed before the switch, which also protects new large amounts (2500 = 2.5M).
+ * Only amounts of 1000 or more change, so the doctor's new entries (25) are left alone.
+ * --before limits it to records typed before the switch, which also protects new
+ * large amounts (2500 = 2.5M).
+ *
+ * It must run once per clinic: an amount of a million or more is still 1000+ after
+ * converting (2,500,000 -> 2500) and a second pass would divide it again. So it
+ * refuses while the clinic has a conversion backup, unless --again.
  *
  * Usage:
  *   php artisan money:thousands _clinic                               # report only, changes nothing
@@ -43,6 +47,7 @@ class ConvertMoneyToThousands extends Command
                             {--skip= : Amounts to leave alone, comma separated (e.g. warehouse_items.cost_price)}
                             {--round : Round amounts that are not exact thousands to the nearest thousand (12,500 -> 13)}
                             {--keep= : Rows to leave alone, comma separated table:id (e.g. bills:40801, already typed in thousands)}
+                            {--again : Run although this clinic was converted before (only for a different doctor or date)}
                             {--apply : Change the data; without it only a report is printed}
                             {--restore= : Put back the amounts saved in this backup file}';
 
@@ -113,6 +118,16 @@ class ConvertMoneyToThousands extends Command
         }
 
         $this->info("Clinic: {$tenant->id} ({$tenant->name})");
+
+        $previous = glob(storage_path("app/money-backups/{$tenant->id}-*.json")) ?: [];
+        if ($previous && !$this->option('again')) {
+            $this->error('This clinic was already converted (' . basename(end($previous)) . ').');
+            $this->line('Running it again would divide amounts of a million or more a second time (2500 -> 3).');
+            $this->line('Use --again only for a different doctor or date that was not converted.');
+
+            return self::FAILURE;
+        }
+
         if ($doctorCases) {
             $this->line("Doctor #{$doctor}: cases dated " . ($before ? "before {$before}" : 'any time') . ' and every payment on them, amounts of 1000 or more.');
             $this->line('The clinic\'s other amounts (expenses, credit, stock) are left alone.');
@@ -276,6 +291,9 @@ class ConvertMoneyToThousands extends Command
         });
 
         $this->syncPaid();
+
+        // Undone, so it no longer counts as a conversion of this clinic
+        rename($file, "{$file}.restored");
         $this->info("Restored {$count} amount(s) from {$file}.");
 
         return self::SUCCESS;

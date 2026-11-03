@@ -410,6 +410,8 @@ class TenantController extends Controller
             'logo' => 'nullable|string',
             'api_whatsapp' => 'nullable|boolean',
             'has_ai_bot' => 'nullable|boolean',
+            // Lets the clinic merge two patient records into one (PatientMergeService)
+            'can_merge_patients' => 'nullable|boolean',
         ]);
 
         $tenant->update($validated);

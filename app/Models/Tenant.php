@@ -71,6 +71,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'logo',
         'api_whatsapp',
         'has_ai_bot',
+        'can_merge_patients',
         'data',
         // Hostinger database credentials (one user per database)
         'db_name',
@@ -132,6 +133,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             'show_rx_id' => 'boolean',
             'api_whatsapp' => 'boolean',
             'has_ai_bot' => 'boolean',
+            'can_merge_patients' => 'boolean',
             'data' => 'array',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
@@ -162,6 +164,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             'logo',
             'api_whatsapp',
             'has_ai_bot',
+            'can_merge_patients',
             // Stored in real columns, not the `data` JSON blob — otherwise the
             // model silently drops them and tenant connections get wrong creds.
             'db_name',

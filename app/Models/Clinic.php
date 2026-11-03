@@ -60,6 +60,7 @@ class Clinic extends Model
         'logo',
         'api_whatsapp',
         'has_ai_bot',
+        'can_merge_patients',
     ];
 
     /**
@@ -78,6 +79,7 @@ class Clinic extends Model
             'show_rx_id' => 'boolean',
             'api_whatsapp' => 'boolean',
             'has_ai_bot' => 'boolean',
+            'can_merge_patients' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
