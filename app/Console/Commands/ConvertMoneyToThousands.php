@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\CaseModel;
 use App\Models\Tenant;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -23,14 +24,24 @@ use Illuminate\Support\Facades\Schema;
  *   php artisan money:thousands _clinic                               # report only, changes nothing
  *   php artisan money:thousands _clinic --before=2026-10-15           # report for records before that day
  *   php artisan money:thousands _clinic --before=2026-10-15 --apply   # convert (saves a backup first)
+ *   php artisan money:thousands _clinic --doctor=8 --before=2025-01-01 # one doctor's cases dated before 2025
  *   php artisan money:thousands _clinic --restore=storage/app/money-backups/....json
+ *
+ * With --doctor, only that doctor's cases (by case date) and every payment on them
+ * change, whatever the payment's date or who took it, so each case stays in one unit.
+ * The clinic's other amounts (expenses, credit, stock) are left alone.
+ *
+ * Amounts that aren't exact thousands (12,500) block the conversion unless --round is
+ * given, which rounds them to the nearest thousand (12,500 -> 13).
  */
 class ConvertMoneyToThousands extends Command
 {
     protected $signature = 'money:thousands
                             {tenant : The clinic (tenant ID) to convert}
                             {--before= : Only records created before this date or time ("YYYY-MM-DD" or "YYYY-MM-DD HH:MM:SS"), when the doctor started typing in thousands}
+                            {--doctor= : Only this doctor\'s cases (dated before --before) and every payment on them}
                             {--skip= : Amounts to leave alone, comma separated (e.g. warehouse_items.cost_price)}
+                            {--round : Round amounts that are not exact thousands to the nearest thousand (12,500 -> 13)}
                             {--apply : Change the data; without it only a report is printed}
                             {--restore= : Put back the amounts saved in this backup file}';
 
@@ -84,35 +95,67 @@ class ConvertMoneyToThousands extends Command
             return self::FAILURE;
         }
 
+        $doctor = $this->option('doctor');
+        $doctorCases = null;
+
+        if ($doctor !== null) {
+            if (!ctype_digit((string) $doctor)) {
+                $this->error('--doctor must be the doctor\'s user ID, like 8.');
+
+                return self::FAILURE;
+            }
+
+            // The case's own date: created_at can be when old records were imported
+            $caseDate = Schema::hasColumn('cases', 'case_date') ? 'COALESCE(case_date, created_at)' : 'created_at';
+            $doctorCases = DB::table('cases')->select('id')->where('doctor_id', (int) $doctor)
+                ->when($before !== null, fn ($q) => $q->whereRaw("{$caseDate} < ?", [$before]));
+        }
+
         $this->info("Clinic: {$tenant->id} ({$tenant->name})");
-        $this->line($before ? "Records created before {$before}, amounts of 1000 or more." : 'All amounts of 1000 or more (no --before date given).');
+        if ($doctorCases) {
+            $this->line("Doctor #{$doctor}: cases dated " . ($before ? "before {$before}" : 'any time') . ' and every payment on them, amounts of 1000 or more.');
+            $this->line('The clinic\'s other amounts (expenses, credit, stock) are left alone.');
+        } else {
+            $this->line($before ? "Records created before {$before}, amounts of 1000 or more." : 'All amounts of 1000 or more (no --before date given).');
+        }
         $this->newLine();
 
         $skip = array_filter(array_map('trim', explode(',', (string) $this->option('skip'))));
+        $round = (bool) $this->option('round');
         $rows = [];
         $changes = [];
         $inexact = [];
+        $rounded = 0;
         $firstSmall = null;
 
         foreach (self::COLUMNS as [$table, $column, $dateColumn, $decimals]) {
             if (in_array("{$table}.{$column}", $skip, true) || !Schema::hasColumn($table, $column)) {
                 continue;
             }
+            if ($doctorCases && !in_array($table, ['cases', 'bills'], true)) {
+                continue;
+            }
 
-            $found = $this->candidates($table, $column, $dateColumn, $before)->get(array_filter(['id', $column, $dateColumn]));
+            $select = array_filter(['id', $column, $dateColumn]);
+            if ($table === 'bills') {
+                $select = [...$select, 'billable_type', 'billable_id'];
+            }
+            $found = $this->candidates($table, $column, $dateColumn, $before, $doctorCases)->get($select);
 
             // Whole-number columns need an exact thousand; 2-decimal columns a multiple of 10
             $step = $decimals === 0 ? 1000 : 10;
             $bad = $found->filter(fn ($row) => fmod((float) $row->{$column}, $step) != 0);
 
-            $small = DB::table($table)->whereRaw("ABS({$column}) BETWEEN 1 AND 999");
+            $small = $this->scope($table, $doctorCases)->whereRaw("ABS({$column}) BETWEEN 1 AND 999");
             $smallCount = (clone $small)->count();
 
             // The doctor's own entries show when the switch happened; stock costs can be small anyway
-            if ($column === 'price' && in_array($table, ['cases', 'bills'], true) && $smallCount) {
+            if (!$doctorCases && $column === 'price' && in_array($table, ['cases', 'bills'], true) && $smallCount) {
                 $first = (clone $small)->min($dateColumn);
                 $firstSmall = $firstSmall === null || $first < $firstSmall ? $first : $firstSmall;
             }
+
+            $changes["{$table}.{$column}"] = $this->newValues($table, $column, $decimals, $found);
 
             $rows[] = [
                 "{$table}.{$column}",
@@ -120,12 +163,15 @@ class ConvertMoneyToThousands extends Command
                 $bad->count(),
                 $smallCount,
                 number_format((float) $found->sum($column)),
-                number_format((float) $found->sum($column) / 1000, $decimals),
+                number_format(array_sum(array_column($changes["{$table}.{$column}"], 'new')), $decimals),
             ];
 
-            $changes["{$table}.{$column}"] = $found->map(fn ($row) => ['id' => $row->id, 'old' => $row->{$column}])->values()->all();
-            foreach ($bad->take(10) as $row) {
-                $inexact[] = "{$table}.{$column} #{$row->id} = {$row->{$column}}" . ($dateColumn ? " (typed {$row->{$dateColumn}})" : '');
+            if ($round) {
+                $rounded += $bad->count();
+            } else {
+                foreach ($bad->take(10) as $row) {
+                    $inexact[] = "{$table}.{$column} #{$row->id} = {$row->{$column}}" . ($dateColumn ? " (typed {$row->{$dateColumn}})" : '');
+                }
             }
         }
 
@@ -146,8 +192,13 @@ class ConvertMoneyToThousands extends Command
             if ($before === null) {
                 $this->line('If these were typed after the switch (2500 meaning 2.5 million), add --before=<switch date> to leave them out.');
             }
+            $this->line('Or add --round to round them to the nearest thousand (12,500 -> 13).');
 
             return self::FAILURE;
+        }
+
+        if ($rounded) {
+            $this->line("{$rounded} amount(s) are not exact thousands and will be rounded to the nearest thousand (12,500 -> 13).");
         }
 
         if (!$this->option('apply')) {
@@ -168,18 +219,24 @@ class ConvertMoneyToThousands extends Command
         if (!is_dir(dirname($backup))) {
             mkdir(dirname($backup), 0755, true);
         }
-        file_put_contents($backup, json_encode(['tenant' => $tenant->id, 'before' => $before, 'changes' => $changes], JSON_PRETTY_PRINT), LOCK_EX);
+        file_put_contents($backup, json_encode(['tenant' => $tenant->id, 'doctor' => $doctor, 'before' => $before, 'changes' => $changes], JSON_PRETTY_PRINT), LOCK_EX);
 
         DB::transaction(function () use ($changes) {
             foreach ($changes as $key => $list) {
                 [$table, $column] = explode('.', $key);
-                foreach (array_chunk(array_column($list, 'id'), 500) as $ids) {
+
+                // Exact ones in bulk; rounded ones one by one with their own value
+                $exact = array_filter($list, fn ($change) => abs($change['new'] * 1000 - $change['old']) < 0.001);
+                foreach (array_chunk(array_column($exact, 'id'), 500) as $ids) {
                     DB::table($table)->whereIn('id', $ids)->update([$column => DB::raw("{$column} / 1000")]);
+                }
+                foreach (array_diff_key($list, $exact) as $change) {
+                    DB::table($table)->where('id', $change['id'])->update([$column => $change['new']]);
                 }
             }
         });
 
-        $this->syncPaid();
+        $this->syncPaid($doctorCases);
 
         $this->info("Converted {$total} amount(s).");
         $this->line("Backup: {$backup}");
@@ -216,13 +273,61 @@ class ConvertMoneyToThousands extends Command
         return self::SUCCESS;
     }
 
-    private function candidates(string $table, string $column, ?string $dateColumn, ?string $before)
+    /**
+     * Each amount divided by 1000, rounded when it doesn't divide exactly (only reached
+     * with --round). A case's payments are rounded on their running total, so they still
+     * add up to the rounded total: 12,500 + 12,500 become 13 + 12, not 13 + 13.
+     *
+     * @return list<array{id: int, old: mixed, new: int|float}>
+     */
+    private function newValues(string $table, string $column, int $decimals, Collection $found): array
+    {
+        $divide = fn (float $amount) => $decimals === 0 ? (int) round($amount / 1000) : round($amount / 1000, 2);
+
+        if ($table !== 'bills') {
+            return $found->map(fn ($row) => ['id' => $row->id, 'old' => $row->{$column}, 'new' => $divide((float) $row->{$column})])->values()->all();
+        }
+
+        $changes = [];
+        $payments = $found->sortBy('id')->groupBy(fn ($row) => $row->billable_id ? "{$row->billable_type}:{$row->billable_id}" : "bill:{$row->id}");
+
+        foreach ($payments as $bills) {
+            $sum = 0.0;
+            foreach ($bills as $row) {
+                $before = $divide($sum);
+                $sum += (float) $row->{$column};
+                $changes[] = ['id' => $row->id, 'old' => $row->{$column}, 'new' => $divide($sum) - $before];
+            }
+        }
+
+        return $changes;
+    }
+
+    private function candidates(string $table, string $column, ?string $dateColumn, ?string $before, $doctorCases)
     {
         // ABS: a patient's credit balance can be negative
-        $query = DB::table($table)->whereRaw("ABS({$column}) >= 1000");
+        $query = $this->scope($table, $doctorCases)->whereRaw("ABS({$column}) >= 1000");
 
-        if ($before !== null && $dateColumn !== null) {
+        // A doctor's cases are already picked by date; their payments go with them whatever their date
+        if (!$doctorCases && $before !== null && $dateColumn !== null) {
             $query->where($dateColumn, '<', $before);
+        }
+
+        return $query;
+    }
+
+    /**
+     * The rows a run may touch: the whole table, or with --doctor, the doctor's cases and their payments.
+     */
+    private function scope(string $table, $doctorCases)
+    {
+        $query = DB::table($table);
+
+        if ($doctorCases) {
+            match ($table) {
+                'cases' => $query->whereIn('id', $doctorCases),
+                'bills' => $query->whereIn('billable_type', CaseModel::BILLABLE_TYPES)->whereIn('billable_id', $doctorCases),
+            };
         }
 
         return $query;
@@ -231,8 +336,10 @@ class ConvertMoneyToThousands extends Command
     /**
      * Prices and payments changed, so recheck which cases are fully paid.
      */
-    private function syncPaid(): void
+    private function syncPaid($onlyCases = null): void
     {
-        CaseModel::withTrashed()->chunkById(200, fn ($cases) => $cases->each->syncIsPaid());
+        CaseModel::withTrashed()
+            ->when($onlyCases, fn ($q) => $q->whereIn('id', $onlyCases))
+            ->chunkById(200, fn ($cases) => $cases->each->syncIsPaid());
     }
 }
