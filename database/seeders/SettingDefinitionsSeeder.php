@@ -286,6 +286,15 @@ class SettingDefinitionsSeeder extends Seeder
                 'display_order' => 8,
                 'is_required' => false,
             ],
+            [
+                'setting_key' => 'waiting_list_style',
+                'setting_type' => 'string',
+                'default_value' => 'table',
+                'description' => 'How the waiting list shows today\'s reservations: table (the original data table) or cards',
+                'category' => 'display',
+                'display_order' => 9,
+                'is_required' => false,
+            ],
 
             // ========================
             // SOCIAL CATEGORY

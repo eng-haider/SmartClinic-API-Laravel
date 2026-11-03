@@ -278,6 +278,13 @@ class TenantClinicSettingsSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'setting_key' => 'waiting_list_style',
+                'setting_value' => 'table',
+                'setting_type' => 'string',
+                'description' => 'How the waiting list shows today\'s reservations: table (the original data table) or cards',
+                'is_active' => true,
+            ],
+            [
                 'setting_key' => 'tooth_colors',
                 'setting_value' => json_encode([
                     [

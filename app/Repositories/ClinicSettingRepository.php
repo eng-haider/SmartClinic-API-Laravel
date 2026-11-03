@@ -40,6 +40,14 @@ class ClinicSettingRepository extends BaseRepository
     public const PATIENT_AGE_INPUTS = ['birth_date', 'age'];
     public const DEFAULT_PATIENT_AGE_INPUT = 'birth_date';
 
+    /**
+     * How the waiting list shows today's reservations: 'table' (the original
+     * data table) or 'cards' (queue numbers, next patient highlighted).
+     */
+    public const WAITING_LIST_STYLE_KEY = 'waiting_list_style';
+    public const WAITING_LIST_STYLES = ['table', 'cards'];
+    public const DEFAULT_WAITING_LIST_STYLE = 'table';
+
     public function __construct(ClinicSetting $model)
     {
         parent::__construct($model);
@@ -215,6 +223,12 @@ class ClinicSettingRepository extends BaseRepository
             return in_array($value, self::PATIENT_AGE_INPUTS, true)
                 ? $value
                 : self::DEFAULT_PATIENT_AGE_INPUT;
+        }
+
+        if ($key === self::WAITING_LIST_STYLE_KEY) {
+            return in_array($value, self::WAITING_LIST_STYLES, true)
+                ? $value
+                : self::DEFAULT_WAITING_LIST_STYLE;
         }
 
         return $value;
@@ -396,7 +410,7 @@ class ClinicSettingRepository extends BaseRepository
         }
 
         // Display category
-        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY, self::HIDE_DASHBOARD_NUMBERS_KEY, self::PATIENT_AGE_INPUT_KEY, self::ENABLE_DEPARTMENTS_KEY])) {
+        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY, self::HIDE_DASHBOARD_NUMBERS_KEY, self::PATIENT_AGE_INPUT_KEY, self::ENABLE_DEPARTMENTS_KEY, self::WAITING_LIST_STYLE_KEY])) {
             return 'display';
         }
 
@@ -460,6 +474,7 @@ class ClinicSettingRepository extends BaseRepository
             'hide_dashboard_numbers' => 27,
             'patient_age_input' => 28,
             'enable_departments' => 29,
+            'waiting_list_style' => 30,
 
             // Social (26-28)
             'facebook_url' => 26,
