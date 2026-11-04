@@ -130,20 +130,10 @@ class ReportsTableRepository
             ->selectRaw('COUNT(*) as reservation_count')
             ->groupBy('doctor_id');
 
-        // Resolve doctor-like user IDs via Eloquent/Spatie (mirrors
-        // ReportsRepository::getDoctorPerformance) rather than hand-rolling
-        // the permission package's pivot table schema.
-        $doctorIds = User::query()
-            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['doctor', 'clinic_super_doctor', 'super_admin']))
-            ->pluck('id');
+        $doctorIds = $this->doctorIds();
+        [$collector, $collectorBindings] = $this->collector($doctorIds);
 
-        // A payment counts for the doctor who added the bill, even on another
-        // doctor's case. Bills added by a secretary (or with no doctor) count for
-        // the case's doctor. Same cases as $casesAgg, so the totals are unchanged.
-        $collector = $doctorIds->isEmpty()
-            ? 'cases.doctor_id'
-            : 'CASE WHEN bills.doctor_id IN ('.implode(',', array_fill(0, $doctorIds->count(), '?')).') THEN bills.doctor_id ELSE cases.doctor_id END';
-
+        // Same cases as $casesAgg, so the totals are unchanged
         $paymentsByDoctor = DB::query()
             ->fromSub(
                 DB::table('bills')
@@ -153,7 +143,7 @@ class ReportsTableRepository
                     ->whereNull('bills.deleted_at')
                     ->tap($casesInPeriod)
                     ->select('bills.price')
-                    ->selectRaw("{$collector} as doctor_id", $doctorIds->all()),
+                    ->selectRaw("{$collector} as doctor_id", $collectorBindings),
                 'case_bills'
             )
             ->select('doctor_id')
@@ -238,22 +228,35 @@ class ReportsTableRepository
         ];
     }
 
-    /** Drill-down: a single doctor's cases within the selected period. */
+    /**
+     * Drill-down: the doctor's own cases within the selected period, plus other
+     * doctors' cases from the period where this doctor took a payment, so the
+     * rows add up to the report's paid_amount. paid_amount is everything paid on
+     * the case; collected_amount is the part this doctor took.
+     */
     public function getDoctorCases(int $doctorId, array $filters): array
     {
+        [$collector, $collectorBindings] = $this->collector($this->doctorIds());
+
         $paymentsByCase = DB::table('bills')
-            ->select('billable_id')
-            ->selectRaw('SUM(price) as paid_amount')
-            ->whereIn('billable_type', self::CASE_BILLABLE_TYPES)
-            ->where('is_paid', true)
-            ->whereNull('deleted_at')
-            ->groupBy('billable_id');
+            ->join('cases', 'cases.id', '=', 'bills.billable_id')
+            ->whereIn('bills.billable_type', self::CASE_BILLABLE_TYPES)
+            ->where('bills.is_paid', true)
+            ->whereNull('bills.deleted_at')
+            ->select('bills.billable_id')
+            ->selectRaw('SUM(bills.price) as paid_amount')
+            ->selectRaw("SUM(CASE WHEN {$collector} = ? THEN bills.price ELSE 0 END) as collected_amount", [...$collectorBindings, $doctorId])
+            ->groupBy('bills.billable_id');
 
         $query = CaseModel::query()
-            ->where('doctor_id', $doctorId)
             ->leftJoinSub($paymentsByCase, 'payments', 'payments.billable_id', '=', 'cases.id')
-            ->with(['patient:id,name', 'category:id,name', 'status:id,name_ar,name_en,color'])
-            ->select('cases.*', DB::raw('COALESCE(payments.paid_amount, 0) as paid_amount'));
+            ->where(fn ($q) => $q->where('cases.doctor_id', $doctorId)->orWhere('payments.collected_amount', '>', 0))
+            ->with(['patient:id,name', 'category:id,name', 'status:id,name_ar,name_en,color', 'doctor:id,name'])
+            ->select(
+                'cases.*',
+                DB::raw('COALESCE(payments.paid_amount, 0) as paid_amount'),
+                DB::raw('COALESCE(payments.collected_amount, 0) as collected_amount')
+            );
 
         if (! empty($filters['date_from'])) {
             $query->where('cases.created_at', '>=', CarbonImmutable::parse($filters['date_from'])->startOfDay());
@@ -266,7 +269,7 @@ class ReportsTableRepository
 
         $query->orderByDesc('cases.created_at');
         $paginator = $query->paginate($filters['per_page'] ?? 15, ['*'], 'page', $filters['page'] ?? 1);
-        $paginator->getCollection()->transform(function (CaseModel $case) {
+        $paginator->getCollection()->transform(function (CaseModel $case) use ($doctorId) {
             $paid = (int) $case->paid_amount;
             $price = (int) ($case->price ?? 0);
 
@@ -277,7 +280,12 @@ class ReportsTableRepository
                 'tooth_num' => $case->tooth_num,
                 'price' => $price,
                 'paid_amount' => $paid,
+                'collected_amount' => (int) $case->collected_amount,
                 'remaining_amount' => max($price - $paid, 0),
+                // Set when this is another doctor's case and this doctor only took a payment on it
+                'case_doctor' => (int) $case->doctor_id !== $doctorId && $case->doctor
+                    ? ['id' => $case->doctor->id, 'name' => $case->doctor->name]
+                    : null,
                 'status' => $case->status ? ['name_ar' => $case->status->name_ar, 'name_en' => $case->status->name_en, 'color' => $case->status->color] : null,
                 'case_date' => $case->case_date ?? $case->created_at,
             ];
@@ -287,6 +295,37 @@ class ReportsTableRepository
             'doctor' => ['id' => $doctor->id, 'name' => $doctor->name, 'phone' => $doctor->phone],
             'records' => $paginator,
         ];
+    }
+
+    /**
+     * Doctor-like user IDs, resolved via Eloquent/Spatie (mirrors
+     * ReportsRepository::getDoctorPerformance) rather than hand-rolling the
+     * permission package's pivot table schema.
+     */
+    private function doctorIds(): \Illuminate\Support\Collection
+    {
+        return User::query()
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['doctor', 'clinic_super_doctor', 'super_admin']))
+            ->pluck('id');
+    }
+
+    /**
+     * SQL for the doctor a case payment counts for, and its bindings. A payment
+     * counts for the doctor who added the bill, even on another doctor's case;
+     * bills added by a secretary (or with no doctor) count for the case's doctor.
+     * Needs bills joined to cases.
+     *
+     * @return array{0: string, 1: array}
+     */
+    private function collector(\Illuminate\Support\Collection $doctorIds): array
+    {
+        if ($doctorIds->isEmpty()) {
+            return ['cases.doctor_id', []];
+        }
+
+        $placeholders = implode(',', array_fill(0, $doctorIds->count(), '?'));
+
+        return ["CASE WHEN bills.doctor_id IN ({$placeholders}) THEN bills.doctor_id ELSE cases.doctor_id END", $doctorIds->all()];
     }
 
     /**
