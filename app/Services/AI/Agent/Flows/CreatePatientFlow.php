@@ -35,6 +35,10 @@ class CreatePatientFlow extends Flow
             }
         }
 
+        if (!$phone) {
+            $notes[] = $this->t($s, 'add_phone_hint');
+        }
+
         return $this->confirm($s, 'create_patient',
             ['name' => $name, 'phone' => $phone, 'age' => $age ? (int) $age : null],
             $this->t($s, 'confirm_create_patient_title'), 'confirm_create_patient_question', 'confirm_create_patient_btn',

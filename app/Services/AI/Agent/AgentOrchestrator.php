@@ -143,6 +143,12 @@ class AgentOrchestrator
             };
         }
 
+        // "نعم" to a yes/no question that offered exactly one thing (e.g. "add them
+        // as a new patient?"): that thing. It only prepares a card; nothing runs.
+        if ($verdict === ConfirmationMatcher::CONFIRM && ($yes = collect($offered)->firstWhere('on_yes', true))) {
+            return $this->pick($s, $yes['id'], $offered);
+        }
+
         if ($verdict === ConfirmationMatcher::CONFIRM || $verdict === ConfirmationMatcher::AMBIGUOUS) {
             // A "yes" with nothing waiting is never applied to anything
             return $expired ? $this->expiredReply($s) : $this->reply($s, AgentReply::INFO, 'no_pending');
@@ -275,7 +281,8 @@ class AgentOrchestrator
 
     private function understand(AgentSession $s, string $text, ?AiAgentAction $pending, array $options): AgentReply
     {
-        $choosing = $s->awaiting() === 'choice';
+        // A one- or two-digit reply is an option number, except where a number is the answer itself
+        $choosing = in_array($s->awaiting(), ['choice', 'patient_name', 'name'], true);
 
         // 2. A pick from the options on screen ("2", "الثاني")
         if ($options && ($option = $this->selection($text, $options, $choosing))) {
@@ -292,6 +299,13 @@ class AgentOrchestrator
         $selection = $parsed->entity('selection');
         if ($selection && $options && ($choosing || !preg_match('/\d/', $text)) && isset($options[$selection - 1])) {
             return $this->pick($s, $options[$selection - 1]['id'], $options);
+        }
+
+        // "ضيفه كمراجع جديد" right after "not found": the offered add-patient
+        // option, which keeps the name and returns to the request afterwards
+        if ($parsed->intent === Intent::CREATE_PATIENT && !$parsed->entity('name') && !$parsed->entity('patient_name')
+            && ($add = collect($options)->firstWhere('intent', Intent::CREATE_PATIENT))) {
+            return $this->pick($s, $add['id'], $options);
         }
 
         // A yes/no the LLM found inside a longer message is not acted on

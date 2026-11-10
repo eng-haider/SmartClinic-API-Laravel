@@ -761,3 +761,4 @@ Manual checks, against staging after `tenants:migrate`:
 | 11 | Secretary without payment permission asks to record a payment | Red "ما عندك صلاحية تسجيل الدفعات." |
 | 12 | A general question | A normal text answer, as before. |
 | 13 | Card shown → "new chat" → type "نعم" | "ما كو عملية بانتظار تأكيدك"; nothing is booked. |
+| 14 | Book for a name that doesn't exist → نعم → نعم → نعم | Add-patient card, then the patient is added and the booking card follows, then booked. Also works in the released app by typing. |

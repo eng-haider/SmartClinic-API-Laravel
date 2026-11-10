@@ -48,6 +48,10 @@ class Messages
         'validation_error' => ['النظام رفض الطلب: {message}', 'The system rejected the request: {message}'],
         'forbidden' => ['النظام رفض الطلب لأن ما عندك صلاحية.', 'The system refused because you lack permission.'],
         'refresh_option' => ['🔄 جهز التأكيد من جديد', '🔄 Prepare it again'],
+        'not_ready' => [
+            'المساعد ما گدر يجهز نفسه لهذي العيادة، فما أكدر أنفذ حجوزات أو دفعات هسه. تواصل مع الدعم الفني حتى يشغلون تحديث قاعدة البيانات (tenants:migrate).',
+            "The assistant couldn't set itself up for this clinic, so it can't book or record payments yet. Please contact support to run the database update (tenants:migrate).",
+        ],
         'permissions_unavailable' => ['ما گدرت أتحقق من صلاحياتك هسه، فما راح أنفذ شي.', "I couldn't verify your permissions, so I won't do anything."],
         'injection_refused' => [
             'ما أكدر أتجاوز خطوة التأكيد أو أغير الصلاحيات. كل عملية تحتاج تأكيدك بالزر أو بكلمة «نعم».',
@@ -57,6 +61,14 @@ class Messages
         // Patients
         'ask_patient' => ['باسم أي مراجع؟', 'Which patient?'],
         'patient_not_found' => ['ما لقيت مراجع باسم «{name}». تأكد من الاسم أو اكتب رقم الهاتف.', "I couldn't find a patient named “{name}”. Check the name or send their phone number."],
+        'patient_not_found_can_add' => [
+            'ما لقيت مراجع باسم «{name}». تريد أضيفه كمراجع جديد؟ اكتب «نعم» أو اضغط الزر، أو اكتب الاسم الصحيح أو رقم الهاتف.',
+            "I couldn't find a patient named “{name}”. Add them as a new patient? Reply “yes” or tap the button, or send the correct name or phone number.",
+        ],
+        'add_phone_hint' => [
+            'تگدر تضيف رقم الهاتف قبل التأكيد، مثلاً: «رقمه 07701234567».',
+            'You can add a phone number before confirming, e.g. “phone 07701234567”.',
+        ],
         'patient_create_option' => ['➕ أضف «{name}» كمراجع جديد', '➕ Add “{name}” as a new patient'],
         'choose_patient' => ['لقيت أكثر من مراجع باسم «{name}». أي واحد تقصد؟', 'I found more than one patient matching “{name}”. Which one?'],
         'patients_found' => ['لقيت {count} مراجع:', 'Found {count} patient(s):'],

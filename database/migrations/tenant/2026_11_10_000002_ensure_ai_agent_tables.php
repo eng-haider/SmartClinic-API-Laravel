@@ -12,7 +12,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        AgentSchema::ensure();
+        (new AgentSchema())->ensure();
     }
 
     public function down(): void

@@ -102,15 +102,30 @@ class ChatbotEndpointTest extends AgentTestCase
         $this->assertSame([], $this->api->writes());
     }
 
-    public function test_a_clinic_with_half_created_tables_keeps_answering_questions(): void
+    public function test_a_clinic_with_half_created_tables_repairs_itself_on_first_message(): void
     {
         // As on a clinic where the migration stopped after two of the three tables
         \Illuminate\Support\Facades\Schema::drop('ai_agent_actions');
 
-        $this->postJson('/api/tenant/ai/chat', ['message' => 'احجز لأحمد علي باچر الساعة 5'])->assertOk()
-            ->assertJsonPath('data.answer', 'general answer');
-        $this->postJson('/api/tenant/ai/chat/actions/' . \Illuminate\Support\Str::uuid() . '/confirm')->assertStatus(503)
-            ->assertJsonPath('message_ar', 'المساعد الذكي غير مهيأ لهذه العيادة بعد. يرجى التواصل مع الدعم الفني.');
+        $this->say('احجز لأحمد علي باچر الساعة 5')->assertJsonPath('data.reply.kind', 'confirmation');
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasTable('ai_agent_actions'));
+        $this->say('نعم')->assertJsonPath('data.reply.kind', 'success');
+    }
+
+    public function test_when_the_tables_cannot_be_created_it_says_so_instead_of_guessing(): void
+    {
+        \Illuminate\Support\Facades\Schema::drop('ai_agent_actions');
+        $this->app->instance(\App\Services\AI\Agent\AgentSchema::class, new class extends \App\Services\AI\Agent\AgentSchema {
+            public function ensure(): void
+            {
+                throw new \RuntimeException('CREATE command denied');
+            }
+        });
+
+        $this->postJson('/api/tenant/ai/chat', ['message' => 'حجز موعد جديد للمراجع حسين علي راضي'])->assertOk()
+            ->assertJsonPath('data.reply.kind', 'error')
+            ->assertJsonPath('data.answer', 'المساعد ما گدر يجهز نفسه لهذي العيادة، فما أكدر أنفذ حجوزات أو دفعات هسه. تواصل مع الدعم الفني حتى يشغلون تحديث قاعدة البيانات (tenants:migrate).');
+        $this->postJson('/api/tenant/ai/chat/actions/' . \Illuminate\Support\Str::uuid() . '/confirm')->assertStatus(503);
         $this->assertSame([], $this->api->writes());
     }
 

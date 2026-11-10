@@ -11,11 +11,12 @@ use Illuminate\Support\Facades\Schema;
  *
  * ensure() creates only what is missing, so it can run again on a clinic
  * whose earlier migration stopped half-way (e.g. a dropped connection on
- * shared hosting left two of the three tables).
+ * shared hosting left two of the three tables). The chatbot also calls it on
+ * first use, so a clinic the migration missed sets itself up.
  */
 class AgentSchema
 {
-    public static function ensure(): void
+    public function ensure(): void
     {
         if (!Schema::hasTable('ai_agent_conversations')) {
             Schema::create('ai_agent_conversations', function (Blueprint $table) {
@@ -86,7 +87,7 @@ class AgentSchema
     }
 
     /** True when this clinic's database has everything the chatbot's actions need. */
-    public static function ready(): bool
+    public function ready(): bool
     {
         try {
             return Schema::hasTable('ai_agent_actions')
@@ -97,7 +98,24 @@ class AgentSchema
         }
     }
 
-    public static function drop(): void
+    /** Ready, creating whatever is missing first. False only when that fails. */
+    public function prepare(): bool
+    {
+        if ($this->ready()) {
+            return true;
+        }
+
+        try {
+            $this->ensure();
+        } catch (\Throwable $e) {
+            // Another request may have created a table at the same moment: check again
+            report($e);
+        }
+
+        return $this->ready();
+    }
+
+    public function drop(): void
     {
         Schema::dropIfExists('ai_agent_actions');
         Schema::dropIfExists('ai_agent_messages');

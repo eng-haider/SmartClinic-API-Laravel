@@ -12,6 +12,8 @@ use App\Services\AI\Agent\AgentSession;
 use App\Services\AI\Agent\Api\ApiContext;
 use App\Services\AI\Agent\CurrentTenant;
 use App\Services\AI\Agent\GeneralAnswerer;
+use App\Services\AI\Agent\Language\LanguageDetector;
+use App\Services\AI\Agent\Language\Messages;
 use App\Services\AI\Agent\PendingActions;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -44,6 +46,7 @@ class AIAgentController extends Controller
         private PendingActions $actions,
         private CurrentTenant $tenant,
         private GeneralAnswerer $general,
+        private AgentSchema $schema,
     ) {
     }
 
@@ -70,12 +73,13 @@ class AIAgentController extends Controller
             return $this->answerOnly($tenantId, $text);
         }
 
-        // A clinic whose chatbot tables are not (fully) migrated keeps the
-        // question-answering chatbot instead of failing with a database error
-        if (!AgentSchema::ready()) {
-            report(new \RuntimeException("AI chatbot tables missing for tenant [{$tenantId}]: run the tenant migrations"));
+        // A clinic the migration missed (or left half-done) sets its chatbot
+        // tables up now. If even that fails, say so plainly: never hand an
+        // action request to the question-only answerer, which can't do it.
+        if (!$this->schema->prepare()) {
+            report(new \RuntimeException("AI chatbot tables missing for tenant [{$tenantId}] and could not be created"));
 
-            return $text !== '' ? $this->answerOnly($tenantId, $text) : $this->notReady();
+            return $this->notReadyReply($text);
         }
 
         $conversation = $this->conversationFor($input, $userId, $tenantId);
@@ -179,7 +183,7 @@ class AIAgentController extends Controller
         if (!$tenantId) {
             return $this->noTenant();
         }
-        if (!AgentSchema::ready()) {
+        if (!$this->schema->prepare()) {
             return $this->notReady();
         }
 
@@ -197,7 +201,7 @@ class AIAgentController extends Controller
         if (!$tenantId) {
             return $this->noTenant();
         }
-        if (!AgentSchema::ready()) {
+        if (!$this->schema->prepare()) {
             return $this->notReady();
         }
 
@@ -232,7 +236,7 @@ class AIAgentController extends Controller
         if (!$tenantId) {
             return $this->noTenant();
         }
-        if (!AgentSchema::ready()) {
+        if (!$this->schema->prepare()) {
             return $this->notReady();
         }
         $userId = (int) Auth::id();
@@ -387,6 +391,21 @@ class AIAgentController extends Controller
     private function noTenant(): JsonResponse
     {
         return response()->json(['success' => false, 'message' => 'Clinic context not found.', 'message_ar' => 'لم يتم تحديد العيادة.'], 400);
+    }
+
+    /** A normal chat reply (so every chat UI shows it) saying the chatbot can't act yet. */
+    private function notReadyReply(string $text): JsonResponse
+    {
+        $language = (new LanguageDetector())->detect($text);
+        $reply = AgentReply::make(AgentReply::ERROR, Messages::t('not_ready', $language), $language)->toArray();
+
+        return response()->json(['success' => true, 'data' => [
+            'reply' => $reply,
+            'question' => $text,
+            'answer' => $reply['plain_text'],
+            'sources' => [],
+            'answered_at' => now()->toDateTimeString(),
+        ]]);
     }
 
     private function notReady(): JsonResponse

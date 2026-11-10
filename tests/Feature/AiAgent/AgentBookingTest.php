@@ -128,6 +128,25 @@ class AgentBookingTest extends AgentTestCase
         $this->assertSame([], $this->api->writes());
     }
 
+    /** The production conversation, with what the real model returned for each message. */
+    public function test_booking_for_a_full_name_then_a_typed_date(): void
+    {
+        $this->api->addPatient('حسين علي راضي', '07709999999');
+        $this->nlu->on('حجز موعد جديد للمراجع حسين علي راضي', Intent::BOOK_APPOINTMENT, ['patient_name' => 'حسين علي راضي'])
+            ->on('20-11-2026', Intent::PROVIDE_INFO, ['patient_name' => 'حسين علي راضي', 'patient_ref' => 'previous', 'date_text' => '20-11-2026', 'date' => '2026-11-20'])
+            ->on('19-11-2026', Intent::PROVIDE_INFO, ['date_text' => '19-11-2026', 'date' => '2026-11-19']);
+
+        $this->say('حجز موعد جديد للمراجع حسين علي راضي')->assertJsonPath('data.reply.text', 'أي يوم تحب الموعد؟');
+
+        // 20/11/2026 is a Friday, when this clinic is closed: say so and offer open days
+        $this->say('20-11-2026')->assertJsonPath('data.reply.text', 'العيادة مسدودة يوم 20/11/2026 (الجمعة).');
+        $this->assertNotEmpty($this->lastReply['options']);
+
+        $this->say('19-11-2026')->assertJsonPath('data.reply.kind', 'clarification');
+        $this->assertStringStartsWith('شنو الوقت المناسب؟ هاي الأوقات الفارغة يوم 19/11/2026 (الخميس):', $this->lastReply['text']);
+        $this->assertSame([], $this->api->writes());
+    }
+
     public function test_free_time_offered_as_an_option_can_be_clicked(): void
     {
         $this->nlu->on('احجز لأحمد علي باچر', Intent::BOOK_APPOINTMENT, ['patient_name' => 'أحمد علي', 'date_text' => 'باچر']);
@@ -149,7 +168,8 @@ class AgentBookingTest extends AgentTestCase
         $this->say('احجز لمحمد باچر الساعة 6 العصر')
             ->assertJsonPath('data.reply.kind', 'clarification')
             ->assertJsonPath('data.reply.text', 'لقيت أكثر من مراجع باسم «محمد». أي واحد تقصد؟')
-            ->assertJsonCount(2, 'data.reply.options');
+            ->assertJsonCount(3, 'data.reply.options')
+            ->assertJsonPath('data.reply.options.2.label', '➕ أضف «محمد» كمراجع جديد');
 
         $this->say('2')->assertJsonPath('data.reply.kind', 'confirmation');
         $this->assertSame('محمد كاظم (07704444444)', $this->field('المراجع'));
@@ -164,7 +184,7 @@ class AgentBookingTest extends AgentTestCase
         ]);
 
         $this->say('احجز لزينب باچر الساعة 5')
-            ->assertJsonPath('data.reply.text', 'ما لقيت مراجع باسم «زينب». تأكد من الاسم أو اكتب رقم الهاتف.');
+            ->assertJsonPath('data.reply.text', 'ما لقيت مراجع باسم «زينب». تريد أضيفه كمراجع جديد؟ اكتب «نعم» أو اضغط الزر، أو اكتب الاسم الصحيح أو رقم الهاتف.');
 
         $this->choose('زينب')->assertJsonPath('data.reply.kind', 'confirmation');
         $this->assertSame('زينب', $this->field('الاسم'));

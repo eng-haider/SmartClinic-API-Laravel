@@ -283,18 +283,24 @@ abstract class Flow
             }
         }
 
+        // Adding the name as a new patient (then carrying on with the request)
+        $canAdd = !$phone && $name && $this->tools->can($s, 'create_patient');
+        $addOption = fn (bool $onYes) => $this->option($this->t($s, 'patient_create_option', ['name' => $name]), [], [
+            'intent' => Intent::CREATE_PATIENT,
+            'with' => ['name' => $name],
+            'resume' => true,
+            // A plain "نعم" picks it only when it is the one thing offered
+            'on_yes' => $onYes,
+        ]);
+
         if ($found === []) {
             $s->forget('patient_name', 'patient_phone', 'patient_ref');
-            $options = [];
-            if (!$phone && $this->tools->can($s, 'create_patient')) {
-                $options[] = $this->option($this->t($s, 'patient_create_option', ['name' => $name]), [], [
-                    'intent' => Intent::CREATE_PATIENT,
-                    'with' => ['name' => $name],
-                    'resume' => true,
-                ]);
+
+            if ($canAdd) {
+                throw new Halt($this->ask($s, 'patient_name', $this->t($s, 'patient_not_found_can_add', ['name' => $name]), [$addOption(true)]));
             }
 
-            throw new Halt($this->ask($s, 'patient_name', $this->t($s, 'patient_not_found', ['name' => $query]), $options));
+            throw new Halt($this->ask($s, 'patient_name', $this->t($s, 'patient_not_found', ['name' => $query])));
         }
 
         if (count($found) === 1) {
@@ -308,6 +314,11 @@ abstract class Flow
             $p['name'] . (!empty($p['phone']) ? ' — ' . $p['phone'] : ''),
             ['patient_id' => $p['id'], 'patient_label' => $p['name'], 'patient_phone_display' => $p['phone'] ?? null],
         ), array_slice(array_values($found), 0, 8));
+
+        // None of them may be the right person: let the user add a new one
+        if ($canAdd) {
+            $options[] = $addOption(false);
+        }
 
         throw new Halt($this->ask($s, 'choice', $this->t($s, 'choose_patient', ['name' => $query]), $options));
     }
