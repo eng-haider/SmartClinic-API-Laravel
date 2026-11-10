@@ -72,7 +72,8 @@ class AuthService
                 'name'        => $data['clinic_name'],
                 'specialty'   => $data['specialty'],
                 'address'     => $data['clinic_address'] ?? null,
-                'has_ai_bot'  => false,
+                // New clinics start with the AI chatbot turned on
+                'has_ai_bot'  => true,
                 'db_name'     => $databaseName,
                 'db_username' => $databaseUsername,
                 'db_password' => $databasePassword,
@@ -83,6 +84,7 @@ class AuthService
                 'name'       => $data['clinic_name'],
                 'specialty'  => $data['specialty'],
                 'address'    => $data['clinic_address'] ?? null,
+                'has_ai_bot' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -213,7 +215,7 @@ class AuthService
             'token'       => $token,
             'tenant_id'   => $tenantId,
             'clinic_name' => $data['clinic_name'],
-            'has_ai_bot'  => false,
+            'has_ai_bot'  => true,
             'can_merge_patients' => false,
             'specialty'   => $data['specialty'],
             'message'     => 'Clinic registered successfully.',
