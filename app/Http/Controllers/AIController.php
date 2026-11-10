@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Services\AIService;
 use App\Services\AI\ImageAnalysisFactory;
-use App\Services\VectorSearchService;
 use App\Services\EmbeddingService;
 use App\Models\Patient;
 use App\Models\Reservation;
@@ -16,67 +15,10 @@ use Illuminate\Http\Request;
 class AIController extends Controller
 {
     private AIService $aiService;
-    private VectorSearchService $vectorSearchService;
 
-    public function __construct(AIService $aiService, VectorSearchService $vectorSearchService)
+    public function __construct(AIService $aiService)
     {
         $this->aiService = $aiService;
-        $this->vectorSearchService = $vectorSearchService;
-    }
-
-    /**
-     * AI Chat - Ask questions about clinic data using RAG.
-     *
-     * Flow:
-     * 1. Convert question to embedding
-     * 2. Search embeddings filtered by clinic_id
-     * 3. Find top 5 nearest vectors
-     * 4. Retrieve original records
-     * 5. Send context to GPT for final answer
-     */
-    public function chat(Request $request)
-    {
-        $request->validate([
-            'question' => 'required|string|max:1000',
-        ]);
-
-        $clinicId = tenant('id');
-
-        if (!$clinicId || !tenant()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Clinic context not found. Please ensure tenant is initialized.',
-            ], 400);
-        }
-
-        // if (!tenant('has_ai_bot')) {
-        //     return response()->json([
-        //         'success' => false,
-        //         'message' => 'AI Chatbot is not enabled for this clinic. Please contact support.',
-        //         'message_ar' => 'خدمة الذكاء الاصطناعي غير مفعلة لهذه العيادة. يرجى التواصل مع الدعم الفني.',
-        //     ], 403);
-        // }
-
-        $result = $this->vectorSearchService->chat($clinicId, $request->input('question'));
-
-        if (!$result['success']) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to process your question',
-                'error' => $result['error'],
-            ], 500);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Question answered successfully',
-            'data' => [
-                'question' => $result['question'],
-                'answer' => $result['answer'],
-                'sources' => $result['sources'],
-                'answered_at' => $result['answered_at'],
-            ],
-        ]);
     }
 
     /**

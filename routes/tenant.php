@@ -48,6 +48,8 @@ use App\Http\Controllers\Report\ExpenseReportController;
 use App\Http\Controllers\Report\AppointmentReportController;
 use App\Http\Controllers\Report\OutstandingBalanceReportController;
 use App\Http\Controllers\AIController;
+use App\Http\Controllers\AIAgentController;
+use App\Http\Middleware\EnsureTokenMatchesTenant;
 use App\Http\Controllers\AutomationRuleController;
 use App\Http\Controllers\AutomationTargetController;
 use App\Http\Controllers\MessageTemplateController;
@@ -147,6 +149,8 @@ Route::middleware([
 
     // Reservation routes
     Route::middleware('jwt')->group(function () {
+        // Before apiResource so {reservation} does not swallow it
+        Route::get('reservations/available-slots', [ReservationController::class, 'availableSlots']);
         Route::apiResource('reservations', ReservationController::class);
         Route::patch('reservations/{reservation}/status', [ReservationController::class, 'changeStatus']);
     });
@@ -258,6 +262,7 @@ Route::middleware([
     // Clinic settings routes
     Route::middleware('jwt')->prefix('clinic-settings')->group(function () {
         Route::get('/', [ClinicSettingController::class, 'index']);
+        Route::get('/display', [ClinicSettingController::class, 'display']);
         Route::get('/{key}', [ClinicSettingController::class, 'show']);
         Route::put('/{key}', [ClinicSettingController::class, 'update']);
         Route::post('/bulk-update', [ClinicSettingController::class, 'updateBulk']);
@@ -267,10 +272,17 @@ Route::middleware([
 
     // ============================================
     // AI CHATBOT ROUTES (JWT required)
-    // Uses pgvector RAG for context-aware answers
+    // One chatbot: answers questions and, only after the user confirms,
+    // performs actions (bookings, payments...) through this API
     // ============================================
     Route::middleware('jwt')->prefix('ai')->group(function () {
-        Route::post('chat', [AIController::class, 'chat']);
+        Route::middleware(EnsureTokenMatchesTenant::class)->group(function () {
+            Route::post('chat', [AIAgentController::class, 'message']);
+            Route::get('chat/conversations/{conversation}', [AIAgentController::class, 'conversation']);
+            Route::get('chat/actions/{action}', [AIAgentController::class, 'showAction']);
+            Route::post('chat/actions/{action}/confirm', [AIAgentController::class, 'confirm']);
+            Route::post('chat/actions/{action}/cancel', [AIAgentController::class, 'cancel']);
+        });
         Route::post('analyze-xray', [AIController::class, 'analyzeXray']);
         Route::post('sync-embeddings', [AIController::class, 'syncEmbeddings']);
         Route::post('sync-medical-knowledge', [AIController::class, 'syncMedicalKnowledge']);

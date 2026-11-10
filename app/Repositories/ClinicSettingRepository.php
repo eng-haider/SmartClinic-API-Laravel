@@ -129,6 +129,14 @@ class ClinicSettingRepository extends BaseRepository
     }
 
     /**
+     * The 'display' category alone, in the same shape as getAllByClinicGrouped().
+     */
+    public function getDisplaySettingsGrouped(): array
+    {
+        return array_intersect_key($this->getAllByClinicGrouped(), ['display' => true]);
+    }
+
+    /**
      * Get a specific setting by key for a clinic.
      */
     public function getByKey( string $key): ?ClinicSetting

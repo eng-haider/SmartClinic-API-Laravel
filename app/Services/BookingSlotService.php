@@ -99,6 +99,24 @@ class BookingSlotService
     }
 
     /**
+     * Opening and closing time ("H:i") on the day, or null when the clinic is closed.
+     *
+     * @return array{from: string, to: string}|null
+     */
+    public function openingHours(CarbonInterface $day): ?array
+    {
+        $hours = $this->hoursFor($day);
+
+        return $hours ? ['from' => $hours[0]->format('H:i'), 'to' => $hours[1]->format('H:i')] : null;
+    }
+
+    /** Minutes per appointment (appointment_duration setting, at least 5, default 30). */
+    public function duration(): int
+    {
+        return max(5, (int) $this->setting('appointment_duration') ?: 30);
+    }
+
+    /**
      * Opening and closing time on the day, or null when the clinic is closed.
      * Settings saves "09:00 - 17:00" (older clinics have "9:00 AM - 5:00 PM") or "Closed".
      *

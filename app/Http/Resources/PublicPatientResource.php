@@ -12,6 +12,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * representation intentionally small: no database IDs, notes, identifiers,
  * permanent image links, or clinician-only prescription/document content.
  * Case photos are exposed only as short-lived signed URLs.
+ *
+ * The one note shared on purpose is diagnosis_plan: the "diagnosis and treatment
+ * plan" box on the patient's page (the `note` column), written for the patient.
  */
 class PublicPatientResource extends JsonResource
 {
@@ -34,6 +37,7 @@ class PublicPatientResource extends JsonResource
             // A greeting needs a name, but nothing else from the patient identity.
             'name' => $this->name,
             'clinic' => $this->clinic ?: null,
+            'diagnosis_plan' => $this->resource->getAttributes()['note'] ?? null,
             'next_appointment' => $this->appointment($reservations->first()),
             'appointments' => $reservations
                 ->map(fn ($reservation) => $this->appointment($reservation))

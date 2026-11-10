@@ -13,6 +13,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Chatbot action agent: how it reaches the REST API, and which LLM reads messages
+        $this->app->bind(\App\Services\AI\Agent\Api\ApiClient::class, fn ($app) => config('ai_agent.api_transport') === 'http'
+            ? $app->make(\App\Services\AI\Agent\Api\HttpApiClient::class)
+            : $app->make(\App\Services\AI\Agent\Api\KernelApiClient::class));
+        $this->app->bind(\App\Services\AI\Agent\Nlu\IntentParser::class, \App\Services\AI\Agent\Nlu\OpenAIIntentParser::class);
+        $this->app->singleton(\App\Services\AI\Agent\Tools\ToolRegistry::class);
+
         // Persistent PDO connections survive DB::purge() until the process exits, so a console
         // process that walks tenants (tenants:migrate, queue workers, the scheduler) keeps one
         // open socket per tenant DB. Past ~20 of them Hostinger refuses new connections with

@@ -167,6 +167,7 @@ Route::middleware('jwt')->group(function () {
 
 // Protected reservation routes (JWT required)
 Route::middleware('jwt')->group(function () {
+    Route::get('reservations/available-slots', [ReservationController::class, 'availableSlots'])->name('reservations.available-slots');
     Route::apiResource('reservations', ReservationController::class);
     Route::patch('reservations/{reservation}/status', [ReservationController::class, 'changeStatus']);
 });
@@ -246,6 +247,7 @@ Route::middleware('jwt')->prefix('setting-definitions')->group(function () {
 // ============================================
 Route::middleware('jwt')->prefix('clinic-settings')->group(function () {
     Route::get('/', [ClinicSettingController::class, 'index'])->name('clinic-settings.index');
+    Route::get('/display', [ClinicSettingController::class, 'display'])->name('clinic-settings.display');
     Route::get('/{key}', [ClinicSettingController::class, 'show'])->name('clinic-settings.show');
     Route::put('/{key}', [ClinicSettingController::class, 'update'])->name('clinic-settings.update');
     Route::post('/bulk-update', [ClinicSettingController::class, 'updateBulk'])->name('clinic-settings.bulk-update');

@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ReservationRequest;
 use App\Http\Resources\ReservationResource;
 use App\Repositories\ReservationRepository;
+use App\Services\BookingSlotService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -181,6 +183,74 @@ class ReservationController extends Controller
 
 
 
+
+    /**
+     * Free appointment times for staff (the chatbot agent checks a time here
+     * before it offers to book it).
+     *
+     * GET reservations/available-slots?date=YYYY-MM-DD
+     *   -> the day's opening hours, appointment length and free start times.
+     * GET reservations/available-slots[?days=7]
+     *   -> the next days that still have a free time.
+     *
+     * Times are clinic-wide: working_hours, appointment_duration and
+     * max_appointments_per_day settings minus booked reservations and pending
+     * booking requests (BookingSlotService, shared with the WhatsApp bot).
+     */
+    public function availableSlots(Request $request, BookingSlotService $slots): JsonResponse
+    {
+        $user = Auth::user();
+        $allowed = collect(['create-reservation', 'view-clinic-reservations', 'view-own-reservations', 'view-all-reservations'])
+            ->contains(fn ($permission) => $user->hasPermissionTo($permission));
+
+        if (!$allowed) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to perform this action',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'date' => 'nullable|date_format:Y-m-d',
+            'days' => 'nullable|integer|min:1|max:14',
+        ]);
+
+        if (!empty($validated['date'])) {
+            $day = Carbon::createFromFormat('Y-m-d', $validated['date'])->startOfDay();
+            $hours = $slots->openingHours($day);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'date' => $day->toDateString(),
+                    'is_open' => $hours !== null,
+                    'opening_hours' => $hours,
+                    'duration' => $slots->duration(),
+                    'free_times' => $slots->freeTimes($day),
+                    'timezone' => config('app.timezone'),
+                ],
+            ]);
+        }
+
+        $days = array_map(function ($day) use ($slots) {
+            $times = $slots->freeTimes($day);
+
+            return [
+                'date' => $day->toDateString(),
+                'free_times_count' => count($times),
+                'first_free_time' => $times[0] ?? null,
+            ];
+        }, $slots->availableDays((int) ($validated['days'] ?? 7)));
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'days' => $days,
+                'duration' => $slots->duration(),
+                'timezone' => config('app.timezone'),
+            ],
+        ]);
+    }
 
     public function changeStatus(Request $request, int $id): JsonResponse
     {

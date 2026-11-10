@@ -55,6 +55,32 @@ class PublicPatientResourceTest extends TestCase
         $this->assertSame([], $payload['documents']);
     }
 
+    public function test_it_shares_only_the_diagnosis_and_treatment_plan_note(): void
+    {
+        $patient = new Patient([
+            'name' => 'Sara Ahmed',
+            'note' => 'Root canal on 16, then a crown',
+            'notes' => 'Older internal note',
+        ]);
+        $patient->setRelation('cases', new Collection());
+
+        $payload = (new PublicPatientResource($patient))->toArray(Request::create('/'));
+
+        $this->assertSame('Root canal on 16, then a crown', $payload['diagnosis_plan']);
+        $this->assertArrayNotHasKey('note', $payload);
+        $this->assertArrayNotHasKey('notes', $payload);
+    }
+
+    public function test_a_patient_without_a_plan_serializes_null(): void
+    {
+        $patient = new Patient(['name' => 'Sara Ahmed']);
+        $patient->setRelation('cases', new Collection());
+
+        $payload = (new PublicPatientResource($patient))->toArray(Request::create('/'));
+
+        $this->assertNull($payload['diagnosis_plan']);
+    }
+
     public function test_it_serializes_case_images_without_paths_or_ids(): void
     {
         $case = $this->bareCase(['id' => 99, 'status_id' => 1, 'case_date' => '2026-10-01']);

@@ -46,6 +46,20 @@ class ClinicSettingController extends Controller
     }
 
     /**
+     * The display settings, for every signed-in staff member. They decide how
+     * screens behave (the patient form, the waiting list...), and staff without
+     * view-clinic-settings, like secretaries, use those screens too.
+     */
+    public function display(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'message' => 'Display settings retrieved successfully',
+            'data' => $this->clinicSettingRepository->getDisplaySettingsGrouped(),
+        ]);
+    }
+
+    /**
      * Display the specified clinic setting.
      */
     public function show(string $key): JsonResponse

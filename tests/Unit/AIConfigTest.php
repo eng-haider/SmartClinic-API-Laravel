@@ -65,13 +65,15 @@ class AIConfigTest extends TestCase
     }
 
     /**
-     * Test AIController has chat method.
+     * Test the chatbot endpoint (POST ai/chat) has its handler. It moved from
+     * AIController::chat to AIAgentController::message when the chatbot
+     * learned to perform confirmed actions.
      */
-    public function test_ai_controller_has_chat_method(): void
+    public function test_ai_chatbot_has_chat_handler(): void
     {
         $this->assertTrue(
-            method_exists(\App\Http\Controllers\AIController::class, 'chat'),
-            'AIController must have chat() method'
+            method_exists(\App\Http\Controllers\AIAgentController::class, 'message'),
+            'The chatbot controller must handle POST ai/chat'
         );
     }
 
