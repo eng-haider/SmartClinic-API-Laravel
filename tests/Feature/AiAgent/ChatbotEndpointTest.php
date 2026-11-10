@@ -102,6 +102,32 @@ class ChatbotEndpointTest extends AgentTestCase
         $this->assertSame([], $this->api->writes());
     }
 
+    public function test_a_clinic_with_half_created_tables_keeps_answering_questions(): void
+    {
+        // As on a clinic where the migration stopped after two of the three tables
+        \Illuminate\Support\Facades\Schema::drop('ai_agent_actions');
+
+        $this->postJson('/api/tenant/ai/chat', ['message' => 'احجز لأحمد علي باچر الساعة 5'])->assertOk()
+            ->assertJsonPath('data.answer', 'general answer');
+        $this->postJson('/api/tenant/ai/chat/actions/' . \Illuminate\Support\Str::uuid() . '/confirm')->assertStatus(503)
+            ->assertJsonPath('message_ar', 'المساعد الذكي غير مهيأ لهذه العيادة بعد. يرجى التواصل مع الدعم الفني.');
+        $this->assertSame([], $this->api->writes());
+    }
+
+    public function test_running_the_migrations_again_finishes_a_half_created_clinic(): void
+    {
+        \Illuminate\Support\Facades\Schema::drop('ai_agent_actions');
+
+        // Both tenant migrations are safe to run on what is already there
+        (require base_path('database/migrations/tenant/2026_11_10_000001_create_ai_agent_tables.php'))->up();
+        (require base_path('database/migrations/tenant/2026_11_10_000002_ensure_ai_agent_tables.php'))->up();
+        (require base_path('database/migrations/tenant/2026_11_10_000002_ensure_ai_agent_tables.php'))->up();
+
+        $this->say('احجز لأحمد علي باچر الساعة 5')->assertJsonPath('data.reply.kind', 'confirmation');
+        $this->say('نعم')->assertJsonPath('data.reply.kind', 'success');
+        $this->assertCount(1, $this->api->calls('POST', 'reservations'));
+    }
+
     public function test_a_message_is_required(): void
     {
         $this->postJson('/api/tenant/ai/chat', [])->assertUnprocessable();

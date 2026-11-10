@@ -7,6 +7,7 @@ use App\Models\AiAgentConversation;
 use App\Models\AiAgentMessage;
 use App\Services\AI\Agent\AgentOrchestrator;
 use App\Services\AI\Agent\AgentReply;
+use App\Services\AI\Agent\AgentSchema;
 use App\Services\AI\Agent\AgentSession;
 use App\Services\AI\Agent\Api\ApiContext;
 use App\Services\AI\Agent\CurrentTenant;
@@ -67,6 +68,14 @@ class AIAgentController extends Controller
 
         if (!empty($input['answer_only'])) {
             return $this->answerOnly($tenantId, $text);
+        }
+
+        // A clinic whose chatbot tables are not (fully) migrated keeps the
+        // question-answering chatbot instead of failing with a database error
+        if (!AgentSchema::ready()) {
+            report(new \RuntimeException("AI chatbot tables missing for tenant [{$tenantId}]: run the tenant migrations"));
+
+            return $text !== '' ? $this->answerOnly($tenantId, $text) : $this->notReady();
         }
 
         $conversation = $this->conversationFor($input, $userId, $tenantId);
@@ -170,6 +179,9 @@ class AIAgentController extends Controller
         if (!$tenantId) {
             return $this->noTenant();
         }
+        if (!AgentSchema::ready()) {
+            return $this->notReady();
+        }
 
         $found = $this->actions->find($action, (int) Auth::id(), $tenantId);
         if (!$found) {
@@ -184,6 +196,9 @@ class AIAgentController extends Controller
         $tenantId = $this->tenant->id();
         if (!$tenantId) {
             return $this->noTenant();
+        }
+        if (!AgentSchema::ready()) {
+            return $this->notReady();
         }
 
         $found = $this->ownedConversation($conversation, (int) Auth::id(), $tenantId);
@@ -216,6 +231,9 @@ class AIAgentController extends Controller
         $tenantId = $this->tenant->id();
         if (!$tenantId) {
             return $this->noTenant();
+        }
+        if (!AgentSchema::ready()) {
+            return $this->notReady();
         }
         $userId = (int) Auth::id();
 
@@ -369,6 +387,15 @@ class AIAgentController extends Controller
     private function noTenant(): JsonResponse
     {
         return response()->json(['success' => false, 'message' => 'Clinic context not found.', 'message_ar' => 'لم يتم تحديد العيادة.'], 400);
+    }
+
+    private function notReady(): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'The chatbot is not set up for this clinic yet. Please contact support.',
+            'message_ar' => 'المساعد الذكي غير مهيأ لهذه العيادة بعد. يرجى التواصل مع الدعم الفني.',
+        ], 503);
     }
 
     private function stillProcessing(): JsonResponse
