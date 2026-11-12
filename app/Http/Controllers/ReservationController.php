@@ -6,6 +6,7 @@ use App\Http\Requests\ReservationRequest;
 use App\Http\Resources\ReservationResource;
 use App\Repositories\ReservationRepository;
 use App\Services\BookingSlotService;
+use App\Services\Messaging\BookingRequestMessenger;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,8 +17,10 @@ class ReservationController extends Controller
     /**
      * Create a new controller instance
      */
-    public function __construct(private ReservationRepository $reservationRepository)
-    {
+    public function __construct(
+        private ReservationRepository $reservationRepository,
+        private BookingRequestMessenger $bookingMessenger,
+    ) {
         // $this->middleware('permission:view-clinic-reservations')->only(['index', 'show']);
         // $this->middleware('permission:create-reservation')->only(['store']);
         // $this->middleware('permission:edit-reservation')->only(['update']);
@@ -68,6 +71,11 @@ class ReservationController extends Controller
     {
         try {
             $reservation = $this->reservationRepository->create($request->validated());
+
+            // With WhatsApp booking on, the patient gets a WhatsApp confirmation.
+            // This endpoint also serves the AI assistant's bookings. Sent after the
+            // response so a slow WhatsApp provider never holds up the booking.
+            app()->terminating(fn () => $this->bookingMessenger->reservationBooked($reservation));
 
             return response()->json([
                 'success' => true,
