@@ -32,6 +32,13 @@ class ClinicSettingRepository extends BaseRepository
     public const ENABLE_DEPARTMENTS_KEY = 'enable_departments';
 
     /**
+     * When on, picking a case category on the patient's dental chart opens the
+     * add-case dialog (to enter price, status, notes) instead of creating the
+     * case straight away. Off (and missing) keeps the direct create.
+     */
+    public const CASE_DIALOG_ON_CATEGORY_KEY = 'case_dialog_on_category';
+
+    /**
      * What the patient form asks for: 'birth_date' (the age is worked out from it
      * and stays current) or 'age' (a plain number of years). Both columns always
      * exist - this only picks which one staff fill in.
@@ -418,7 +425,7 @@ class ClinicSettingRepository extends BaseRepository
         }
 
         // Display category
-        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY, self::HIDE_DASHBOARD_NUMBERS_KEY, self::PATIENT_AGE_INPUT_KEY, self::ENABLE_DEPARTMENTS_KEY, self::WAITING_LIST_STYLE_KEY])) {
+        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY, self::HIDE_DASHBOARD_NUMBERS_KEY, self::PATIENT_AGE_INPUT_KEY, self::ENABLE_DEPARTMENTS_KEY, self::WAITING_LIST_STYLE_KEY, self::CASE_DIALOG_ON_CATEGORY_KEY])) {
             return 'display';
         }
 
@@ -483,6 +490,7 @@ class ClinicSettingRepository extends BaseRepository
             'patient_age_input' => 28,
             'enable_departments' => 29,
             'waiting_list_style' => 30,
+            'case_dialog_on_category' => 31,
 
             // Social (26-28)
             'facebook_url' => 26,
