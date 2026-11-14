@@ -58,6 +58,18 @@ return [
         ],
     ],
 
+    // Moyers mixed-dentition probability table. Deliberately empty: enter the
+    // rows from a verified printed source (and say which) before enabling it.
+    // Format:
+    //   'moyers_table' => [
+    //       'level' => 75,
+    //       'source' => 'Moyers, Handbook of Orthodontics, 4th ed. (1988), p. ...',
+    //       // [sum of 4 mandibular incisors, maxillary C+P1+P2, mandibular C+P1+P2] in mm, ascending
+    //       'rows' => [[19.5, ..., ...], [20.0, ..., ...], ...],
+    //   ],
+    // Predictions are interpolated between rows and never extrapolated.
+    'moyers_table' => null,
+
     // Optional automated cephalometric landmark detection. Nothing is detected
     // unless a provider is configured; manual tracing always works on its own.
     // 'http' posts the radiograph to ORTHODONTICS_LANDMARK_URL and expects
