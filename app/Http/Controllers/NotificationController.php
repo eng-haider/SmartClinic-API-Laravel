@@ -341,7 +341,34 @@ class NotificationController extends Controller
     }
 
     /**
-     * Update OneSignal player ID for authenticated user.
+     * The deterministic OneSignal external ID for the signed-in user.
+     *
+     * The native app passes this value to OneSignal.login() after its own login;
+     * it never needs to send a device-specific subscription/player ID to this API.
+     */
+    public function oneSignalExternalId(): JsonResponse
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        // Once a current mobile build has claimed its stable OneSignal user,
+        // stop preferring the single, legacy subscription ID. Otherwise an old
+        // player ID prevents the same account's TestFlight/production phone
+        // from receiving a notification through the external-ID target.
+        if ($user->getOneSignalPlayerId() !== null) {
+            $user->setOneSignalPlayerId(null);
+        }
+
+        return response()->json([
+            'success' => true,
+            'external_id' => $this->notificationService->oneSignalExternalIdFor($user),
+        ]);
+    }
+
+    /**
+     * Legacy endpoint for app versions that still send a OneSignal subscription ID.
+     * New native clients use GET notifications/onesignal/external-id followed by
+     * OneSignal.login(external_id), and no longer need this endpoint.
      *
      * @param Request $request
      * @return JsonResponse

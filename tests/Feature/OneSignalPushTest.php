@@ -47,6 +47,28 @@ class OneSignalPushTest extends TestCase
         $this->assertNull(User::find($previous)->onesignal_player_id);
     }
 
+    public function test_an_installed_legacy_app_can_register_its_phone_at_the_original_endpoint(): void
+    {
+        $this->actingAs(User::find($this->user()));
+
+        $this->postJson('/api/notifications/player-id', ['player_id' => 'existing-phone'])
+            ->assertOk();
+
+        $this->assertSame('existing-phone', auth()->user()->fresh()->onesignal_player_id);
+    }
+
+    public function test_the_app_can_get_a_stable_external_id_without_saving_a_phone_subscription(): void
+    {
+        $user = User::find($this->user(playerId: 'legacy-phone'));
+        $this->actingAs($user);
+
+        $this->getJson('/api/tenant/notifications/onesignal/external-id')
+            ->assertOk()
+            ->assertJsonPath('external_id', 'central:' . $user->id);
+
+        $this->assertNull($user->fresh()->onesignal_player_id);
+    }
+
     public function test_sign_out_unlinks_only_the_phone_it_came_from(): void
     {
         $this->actingAs(User::find($this->user(playerId: 'newer-phone')));
@@ -60,7 +82,7 @@ class OneSignalPushTest extends TestCase
         $this->assertNull(auth()->user()->fresh()->onesignal_player_id);
     }
 
-    public function test_push_reaches_the_phone_in_both_languages_without_a_browser_link(): void
+    public function test_push_targets_the_user_external_id_in_both_languages_without_a_device_link(): void
     {
         Http::fake(['api.onesignal.com/*' => Http::response(['id' => 'os-1'])]);
 
@@ -69,15 +91,27 @@ class OneSignalPushTest extends TestCase
         Http::assertSent(fn (Request $request) => $request->url() === 'https://api.onesignal.com/notifications'
             && $request->hasHeader('Authorization', 'Key os_v2_app_test')
             && $request['app_id'] === 'app-1'
-            && $request['include_subscription_ids'] === ['phone-1']
+            && $request['include_aliases'] === ['external_id' => ['central:1']]
             && $request['headings'] === ['en' => 'New booking request', 'ar' => 'طلب حجز جديد']
             && $request['contents'] === ['en' => 'Ali requested a visit.', 'ar' => 'طلب علي موعداً.']
             && $request['data']['action_url'] === '/booking-requests/5'
             && $request['priority'] === 10
             && !isset($request['url'])
+            && !isset($request['include_subscription_ids'])
             && !isset($request['android_channel_id']));
         $this->assertSame('os-1', $notification->fresh()->onesignal_notification_id);
         $this->assertSame(Notification::ONESIGNAL_SENT, $notification->fresh()->onesignal_status);
+    }
+
+    public function test_push_prefers_the_existing_phone_subscription_for_an_installed_app(): void
+    {
+        Http::fake(['api.onesignal.com/*' => Http::response(['id' => 'os-legacy'])]);
+        $user = User::find($this->user(playerId: 'existing-phone'));
+
+        app(NotificationService::class)->send($user, 'Legacy', 'Works without an app update');
+
+        Http::assertSent(fn (Request $request) => $request['include_subscription_ids'] === ['existing-phone']
+            && !isset($request['include_aliases']));
     }
 
     public function test_a_rejected_push_is_recorded_and_the_notification_kept(): void
@@ -92,7 +126,7 @@ class OneSignalPushTest extends TestCase
 
     private function sendBookingRequest(): Notification
     {
-        $user = User::find($this->user(playerId: 'phone-1'));
+        $user = User::find($this->user());
 
         return app(NotificationService::class)->send($user, 'New booking request', 'Ali requested a visit.', [
             'type' => Notification::TYPE_APPOINTMENT,

@@ -34,8 +34,10 @@ class NotificationService
             // Create notification in database
             $notification = $this->createNotification($notifiable, $title, $body, $options);
 
-            // Send via OneSignal if player ID exists
-            if ($notifiable->getOneSignalPlayerId()) {
+            // Native apps identify the signed-in user with OneSignal's external_id.
+            // This lets one user receive pushes on every signed-in device without
+            // persisting a device-specific subscription/player ID in our database.
+            if ($notifiable instanceof User) {
                 $this->sendViaOneSignal($notification, $notifiable);
             }
 
@@ -161,27 +163,22 @@ class NotificationService
      * Send notification via OneSignal.
      *
      * @param Notification $notification
-     * @param Model $notifiable
+     * @param User $notifiable
      * @return void
      */
-    protected function sendViaOneSignal(Notification $notification, Model $notifiable): void
+    protected function sendViaOneSignal(Notification $notification, User $notifiable): void
     {
         try {
-            $playerId = $notifiable->getOneSignalPlayerId();
-            
-            if (!$playerId) {
-                return;
-            }
-
             $data = $notification->data ?? [];
 
-            // The player ID is the mobile app's OneSignal subscription ID.
-            // The table has one (English) title/body; the Arabic copy rides
-            // along in data, and OneSignal shows the phone's language.
+            // Existing Android releases registered their OneSignal subscription
+            // ID with this API. Prefer it so those installs work without an app
+            // update. Newer releases can use the deterministic external ID below.
+            $playerId = $notifiable->getOneSignalPlayerId();
+
             $params = [
                 'app_id' => config('onesignal.app_id'),
                 'target_channel' => 'push',
-                'include_subscription_ids' => [$playerId],
                 'headings' => array_filter(['en' => $notification->title, 'ar' => $data['title_ar'] ?? null]),
                 'contents' => array_filter(['en' => $notification->body, 'ar' => $data['body_ar'] ?? null]),
                 // The app opens the page from action_url itself; a 'url' here
@@ -192,6 +189,17 @@ class NotificationService
                     'action_url' => $notification->action_url,
                 ]),
             ];
+
+            if ($playerId) {
+                $params['include_subscription_ids'] = [$playerId];
+            } else {
+                // The Android app calls OneSignal.login() with this exact value
+                // after its own login. The tenant prefix prevents User #1 in two
+                // clinics from being treated as the same OneSignal user.
+                $params['include_aliases'] = [
+                    'external_id' => [$this->oneSignalExternalIdFor($notifiable)],
+                ];
+            }
 
             // Add priority-based settings
             $params = $this->addPrioritySettings($params, $notification->priority);
@@ -227,6 +235,19 @@ class NotificationService
                 'onesignal_error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * The OneSignal external ID for a user. This is intentionally deterministic:
+     * the Android client can ask the API for it after login and pass it directly
+     * to OneSignal.login().
+     */
+    public function oneSignalExternalIdFor(User $user): string
+    {
+        $tenant = function_exists('tenant') ? tenant() : null;
+        $tenantId = $tenant?->getTenantKey() ?? 'central';
+
+        return $tenantId . ':' . $user->getKey();
     }
 
     /**

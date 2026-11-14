@@ -217,6 +217,7 @@ Route::middleware([
         Route::get('notifications/push/public-key', [NotificationController::class, 'pushPublicKey'])->name('notifications.push.public-key');
         Route::post('notifications/push/subscribe', [NotificationController::class, 'pushSubscribe'])->name('notifications.push.subscribe');
         Route::post('notifications/push/unsubscribe', [NotificationController::class, 'pushUnsubscribe'])->name('notifications.push.unsubscribe');
+        Route::get('notifications/onesignal/external-id', [NotificationController::class, 'oneSignalExternalId'])->name('notifications.onesignal.external-id');
         Route::post('notifications/onesignal/subscribe', [NotificationController::class, 'updatePlayerID'])->name('notifications.onesignal.subscribe');
         Route::post('notifications/onesignal/unsubscribe', [NotificationController::class, 'removePlayerID'])->name('notifications.onesignal.unsubscribe');
         Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
@@ -410,6 +411,19 @@ Route::middleware([
         // Legacy bill report (kept for backward compatibility)
         Route::get('bills', [BillReportController::class, 'index']);
     });
+});
+
+// Compatibility for installed Android releases. Older clients post their
+// OneSignal subscription ID here, before the tenant API was moved under
+// /api/tenant. The tenant is resolved from their JWT's tenant_id claim (or the
+// usual X-Tenant-ID header), so this remains isolated to the correct clinic.
+Route::middleware([
+    'api',
+    InitializeTenancyByHeader::class,
+    'jwt',
+])->prefix('api')->group(function () {
+    Route::post('notifications/player-id', [NotificationController::class, 'updatePlayerID'])
+        ->name('notifications.legacy-player-id');
 });
 
 // ============================================
