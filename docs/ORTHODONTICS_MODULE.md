@@ -286,6 +286,8 @@ Frontend env: `VITE_FACE_LANDMARKER_MODEL_URL` (optional) self-hosts the MediaPi
 ## 8. Deployment
 
 1. Run the backend migrations for every clinic: `php artisan tenants:migrate`. This adds the setting (off), the permissions and the tables.
+   - Without artisan (for example, in phpMyAdmin on shared hosting), run `database/sql/orthodontics_module.sql` in **each clinic database**. It is the same as the three migrations, and it records them in `migrations`. Then clear the cache.
+   - `database/sql/orthodontics_module_rollback.sql` removes the module and **deletes its data**. To hide the module instead, switch the setting off.
 2. Schedule `php artisan orthodontics:cleanup-cbct` daily.
 3. Deploy the frontend build. It emits `cornerstone-wasm/` and `mediapipe/wasm/` next to `assets/`.
 4. Clinic admin: Settings › Display › «وحدة تقويم الأسنان», then flag the orthodontic category under Case Categories.
