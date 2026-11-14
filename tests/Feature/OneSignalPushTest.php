@@ -6,6 +6,9 @@ use App\Http\Middleware\InitializeTenancyByHeader;
 use App\Http\Middleware\JwtMiddleware;
 use App\Models\Notification;
 use App\Models\User;
+use App\Repositories\BookingRequestRepository;
+use App\Repositories\PatientRepository;
+use App\Services\Messaging\BookingRequestMessenger;
 use App\Services\NotificationService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Client\Request;
@@ -114,6 +117,46 @@ class OneSignalPushTest extends TestCase
             && !isset($request['include_aliases']));
     }
 
+    public function test_a_public_booking_request_pushes_every_active_clinic_user(): void
+    {
+        Http::fake(['api.onesignal.com/*' => Http::response(['id' => 'os-booking'])]);
+
+        $first = $this->user();
+        $second = $this->user();
+        $this->user(active: false);
+
+        $patients = \Mockery::mock(PatientRepository::class);
+        $patients->shouldNotReceive('findByPhoneNumber');
+        $messenger = \Mockery::mock(BookingRequestMessenger::class);
+        $messenger->shouldNotReceive('approved');
+        $messenger->shouldNotReceive('rejected');
+
+        $booking = (new BookingRequestRepository(
+            app(NotificationService::class),
+            $patients,
+            $messenger,
+        ))->create([
+            'name' => 'Ali',
+            'phone' => '07701234567',
+            'preferred_date' => '2026-11-16',
+            'preferred_time' => '10:30:00',
+            'source' => 'website',
+        ]);
+
+        $this->assertDatabaseCount('notifications', 2);
+        $this->assertSame(Notification::ONESIGNAL_SENT, Notification::where('notifiable_id', $first)->value('onesignal_status'));
+        $this->assertSame(Notification::ONESIGNAL_SENT, Notification::where('notifiable_id', $second)->value('onesignal_status'));
+
+        foreach ([$first, $second] as $userId) {
+            Http::assertSent(fn (Request $request) => $request['include_aliases'] === [
+                'external_id' => ['central:' . $userId],
+            ]
+                && $request['data']['booking_request_id'] === $booking->id
+                && $request['data']['action_url'] === '/booking-requests/' . $booking->id
+                && $request['priority'] === 10);
+        }
+    }
+
     public function test_a_rejected_push_is_recorded_and_the_notification_kept(): void
     {
         Http::fake(['api.onesignal.com/*' => Http::response(['errors' => ['Access denied']], 403)]);
@@ -136,13 +179,13 @@ class OneSignalPushTest extends TestCase
         ]);
     }
 
-    private function user(?string $playerId = null): int
+    private function user(?string $playerId = null, bool $active = true): int
     {
         return DB::table('users')->insertGetId([
             'name' => 'User',
             'phone' => '0770' . random_int(1000000, 9999999),
             'password' => 'x',
-            'is_active' => true,
+            'is_active' => $active,
             'onesignal_player_id' => $playerId,
         ]);
     }
@@ -174,6 +217,23 @@ class OneSignalPushTest extends TestCase
             $table->unsignedBigInteger('sender_id')->nullable();
             $table->string('priority')->default('medium');
             $table->string('action_url')->nullable();
+            $table->timestamps();
+            $table->softDeletes();
+        });
+        Schema::create('booking_requests', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('phone');
+            $table->date('preferred_date');
+            $table->time('preferred_time')->nullable();
+            $table->text('note')->nullable();
+            $table->string('source')->default('website');
+            $table->string('status')->default('pending');
+            $table->text('rejection_reason')->nullable();
+            $table->unsignedBigInteger('patient_id')->nullable();
+            $table->unsignedBigInteger('reservation_id')->nullable();
+            $table->unsignedBigInteger('reviewed_by')->nullable();
+            $table->timestamp('reviewed_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });
