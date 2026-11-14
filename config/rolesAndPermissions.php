@@ -87,6 +87,10 @@ return [
                 'edit-image',
                 'delete-image',
 
+                // Orthodontics module (only used when the clinic enables it)
+                'view-orthodontics',
+                'manage-orthodontics',
+
                 // Reports
                 'view-reports',
 
@@ -208,6 +212,10 @@ return [
                 'edit-image',
                 'delete-image',
 
+                // Orthodontics module (only used when the clinic enables it)
+                'view-orthodontics',
+                'manage-orthodontics',
+
                 // Reports
                 'view-reports',
 
@@ -307,6 +315,10 @@ return [
                 'create-image',
                 'edit-image',
                 'delete-image',
+
+                // Orthodontics module (only used when the clinic enables it)
+                'view-orthodontics',
+                'manage-orthodontics',
 
                 // Reports
                 'view-reports',

@@ -287,6 +287,15 @@ class SettingDefinitionsSeeder extends Seeder
                 'is_required' => false,
             ],
             [
+                'setting_key' => 'enable_orthodontics',
+                'setting_type' => 'boolean',
+                'default_value' => '0',
+                'description' => 'Orthodontics module: cephalometric, 3D model, CBCT and facial analysis tools inside orthodontic cases',
+                'category' => 'display',
+                'display_order' => 10,
+                'is_required' => false,
+            ],
+            [
                 'setting_key' => 'waiting_list_style',
                 'setting_type' => 'string',
                 'default_value' => 'table',

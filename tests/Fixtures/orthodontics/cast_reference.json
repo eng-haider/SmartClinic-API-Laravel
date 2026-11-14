@@ -1,0 +1,207 @@
+{
+  "description": "Synthetic cast analysis input (caliper widths in mm, model points scaled 0.5 mm/unit) with hand-computed expectations.",
+  "input": {
+    "scale_to_mm": 0.5,
+    "teeth": {
+      "16": {
+        "manual_mm": 10
+      },
+      "15": {
+        "manual_mm": 7
+      },
+      "14": {
+        "manual_mm": 7
+      },
+      "13": {
+        "manual_mm": 8
+      },
+      "12": {
+        "manual_mm": 7
+      },
+      "11": {
+        "manual_mm": 9
+      },
+      "21": {
+        "manual_mm": 9
+      },
+      "22": {
+        "manual_mm": 7
+      },
+      "23": {
+        "manual_mm": 8
+      },
+      "24": {
+        "manual_mm": 7
+      },
+      "25": {
+        "manual_mm": 7
+      },
+      "26": {
+        "manual_mm": 14
+      },
+      "46": {
+        "manual_mm": 11
+      },
+      "45": {
+        "manual_mm": 7.5
+      },
+      "44": {
+        "manual_mm": 7.5
+      },
+      "43": {
+        "manual_mm": 7
+      },
+      "42": {
+        "manual_mm": 5.5
+      },
+      "41": {
+        "manual_mm": 6
+      },
+      "31": {
+        "manual_mm": 5.5
+      },
+      "32": {
+        "manual_mm": 6
+      },
+      "33": {
+        "manual_mm": 7
+      },
+      "34": {
+        "manual_mm": 7.5
+      },
+      "35": {
+        "manual_mm": 7.5
+      },
+      "36": {
+        "manual_mm": 14
+      }
+    },
+    "arch_perimeter": {
+      "lower": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          60,
+          80,
+          0
+        ],
+        [
+          60,
+          80,
+          40
+        ]
+      ]
+    },
+    "spee": {
+      "incisal": [
+        0,
+        0,
+        0
+      ],
+      "molar_right": [
+        10,
+        -20,
+        0
+      ],
+      "molar_left": [
+        -10,
+        -20,
+        0
+      ],
+      "cusps_right": [
+        [
+          5,
+          -10,
+          -5
+        ],
+        [
+          7,
+          -15,
+          -2
+        ]
+      ],
+      "cusps_left": [
+        [
+          -5,
+          -10,
+          -3
+        ]
+      ]
+    },
+    "points": {
+      "upper": {
+        "canine_right": [
+          0,
+          0,
+          0
+        ],
+        "canine_left": [
+          60,
+          0,
+          0
+        ],
+        "incisal": [
+          30,
+          20,
+          0
+        ],
+        "molar_mesial_right": [
+          0,
+          -40,
+          0
+        ],
+        "molar_mesial_left": [
+          60,
+          -40,
+          0
+        ],
+        "pont_premolar_right": [
+          0,
+          0,
+          0
+        ],
+        "pont_premolar_left": [
+          80,
+          0,
+          0
+        ],
+        "pont_molar_right": [
+          0,
+          0,
+          0
+        ],
+        "pont_molar_left": [
+          96,
+          0,
+          0
+        ]
+      }
+    }
+  },
+  "tolerance": 0.01,
+  "expected": {
+    "bolton_overall_ratio": 92.0,
+    "bolton_overall_excess_arch": "mandibular",
+    "bolton_overall_excess": 0.7,
+    "bolton_anterior_ratio": 77.08,
+    "bolton_anterior_excess_arch": "maxillary",
+    "bolton_anterior_excess": 0.07,
+    "lower_required": 67.0,
+    "lower_available": 70.0,
+    "lower_discrepancy": 3.0,
+    "upper_intercanine": 30.0,
+    "upper_arch_depth": 30.0,
+    "pont_predicted_premolar": 40.0,
+    "pont_predicted_molar": 50.0,
+    "pont_premolar_difference": 0.0,
+    "pont_molar_difference": -2.0,
+    "tj_upper": 22.5,
+    "tj_lower": 22.0,
+    "spee_right": 2.5,
+    "spee_left": 1.5,
+    "spee_mean": 2.0
+  }
+}

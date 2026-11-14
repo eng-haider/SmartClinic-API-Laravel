@@ -260,6 +260,9 @@ Route::middleware([
         Route::patch('/{secretary}/toggle-status', [SecretaryController::class, 'toggleStatus']);
     });
 
+    // Orthodontics module (optional, per clinic) - see app/Modules/Orthodontics
+    require base_path('app/Modules/Orthodontics/routes.php');
+
     // Clinic settings routes
     Route::middleware('jwt')->prefix('clinic-settings')->group(function () {
         Route::get('/', [ClinicSettingController::class, 'index']);

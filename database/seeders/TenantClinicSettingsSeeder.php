@@ -271,6 +271,13 @@ class TenantClinicSettingsSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'setting_key' => 'enable_orthodontics',
+                'setting_value' => '0',
+                'setting_type' => 'boolean',
+                'description' => 'Orthodontics module: cephalometric, 3D model, CBCT and facial analysis tools inside orthodontic cases',
+                'is_active' => true,
+            ],
+            [
                 'setting_key' => 'patient_age_input',
                 'setting_value' => 'birth_date',
                 'setting_type' => 'string',
