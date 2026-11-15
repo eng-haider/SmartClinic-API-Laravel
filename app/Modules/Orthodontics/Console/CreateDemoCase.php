@@ -30,8 +30,9 @@ use ZipArchive;
  *
  * It creates (or reuses) a patient marked as demo data, a new orthodontic case
  * for that patient, a lateral ceph with every landmark placed and the ruler
- * calibrated, the two synthetic 3D models with their units confirmed, a
- * synthetic CBCT study, and a treatment plan. Everything goes through the
+ * calibrated, the two synthetic 3D models with their units confirmed and a
+ * cast analysis from caliper widths, a synthetic CBCT study, and a treatment
+ * plan. Everything goes through the
  * module's own services, so measurements are computed exactly as they are for
  * a real case. The assets live in database/demo/orthodontics (see its README).
  */
@@ -59,6 +60,19 @@ class CreateDemoCase extends Command
         'U1T' => [1892, 1237], 'U1A' => [1795, 1035], 'L1T' => [1876, 1250], 'L1A' => [1805, 1440],
         'U6' => [1597, 1192], 'L6' => [1597, 1210], 'Prn' => [2054, 932], 'Sn' => [1954, 1028],
         'Ls' => [1994, 1159], 'Li' => [1982, 1272], 'PogS' => [1928, 1455],
+    ];
+
+    /**
+     * Typical mesiodistal widths (mm, FDI), entered as caliper readings. They
+     * give a Bolton overall ratio of 83.6 / 92 = 90.87 % (inside the norm) and
+     * an anterior ratio of 33.6 / 45 = 74.67 % (below it), so the demo shows
+     * both cases.
+     */
+    public const TOOTH_WIDTHS_MM = [
+        '16' => 10.0, '15' => 6.5, '14' => 7.0, '13' => 7.5, '12' => 6.5, '11' => 8.5,
+        '21' => 8.5, '22' => 6.5, '23' => 7.5, '24' => 7.0, '25' => 6.5, '26' => 10.0,
+        '46' => 11.0, '45' => 7.0, '44' => 7.0, '43' => 6.5, '42' => 5.3, '41' => 5.0,
+        '31' => 5.0, '32' => 5.3, '33' => 6.5, '34' => 7.0, '35' => 7.0, '36' => 11.0,
     ];
 
     /** The 10 mm ruler printed at the top right of the radiograph. */
@@ -148,7 +162,9 @@ class CreateDemoCase extends Command
         ]);
         $this->line('  Ceph analysis #' . $ceph->id . ' (draft, so the doctor can review and approve it during the demo)');
 
-        // 2. Upper and lower 3D models, exported in millimetres.
+        // 2. Upper and lower 3D models, exported in millimetres, with a cast
+        //    analysis from caliper widths so Bolton shows results at once.
+        $modelIds = [];
         foreach (['model_upper', 'model_lower'] as $kind) {
             $model = $files->store($case, $this->upload("$assets/$kind.stl", "{$kind}_demo.stl", 'model/stl'), $kind, [
                 'label' => 'Synthetic demo model',
@@ -161,8 +177,20 @@ class CreateDemoCase extends Command
                 'units_confirmed_at' => now()->toIso8601String(),
             ]);
             $model->save();
+            $modelIds[$kind === 'model_upper' ? 'upper' : 'lower'] = $model->id;
         }
-        $this->line('  3D models: upper and lower (units confirmed as mm)');
+        $cast = $analyses->create($case, [
+            'type' => 'cast',
+            'title' => 'قياسات الأسنان بالمسماك (تجريبي)',
+            'file_id' => $modelIds['upper'],
+            'data' => [
+                'scale_to_mm' => 1.0,
+                'model_file_ids' => $modelIds,
+                'teeth' => collect(self::TOOTH_WIDTHS_MM)->map(fn ($mm) => ['manual_mm' => $mm])->all(),
+            ],
+            'notes' => 'عروض أسنان نموذجية مُدخلة يدوياً للعرض فقط.',
+        ]);
+        $this->line('  3D models: upper and lower (units confirmed as mm), cast analysis #' . $cast->id);
 
         // 3. Synthetic CBCT phantom.
         $study = $this->importCbct($cbct, $case, "$assets/cbct_phantom.zip");

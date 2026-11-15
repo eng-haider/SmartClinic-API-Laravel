@@ -78,6 +78,16 @@ class DemoCaseCommandTest extends TestCase
         $this->assertSame('mm', $meta['units']);
         $this->assertSame('binary', $meta['encoding']);
 
+        // The cast analysis uses both models and gives the documented Bolton ratios.
+        $cast = DB::table('orthodontic_analyses')->where('type', 'cast')->first();
+        $castData = json_decode($cast->data, true);
+        $this->assertSame(['upper' => (int) $files['model_upper']->id, 'lower' => (int) $files['model_lower']->id], $castData['model_file_ids']);
+        $bolton = json_decode($cast->results, true)['bolton'];
+        $this->assertEqualsWithDelta(90.87, $bolton['overall']['ratio'], 0.01);
+        $this->assertSame('within', $bolton['overall']['comparison']['status']);
+        $this->assertEqualsWithDelta(74.67, $bolton['anterior']['ratio'], 0.01);
+        $this->assertSame('below', $bolton['anterior']['comparison']['status']);
+
         // The CBCT phantom is a finished study with every slice.
         $study = DB::table('orthodontic_cbct_studies')->where('case_id', $case->id)->first();
         $this->assertSame('ready', $study->status);

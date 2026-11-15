@@ -307,7 +307,7 @@ It works in one clinic and does the following:
 - Creates or reuses a patient marked `ORTHO-DEMO`, and adds a new case for it. The case belongs to the first doctor, or to `--doctor=<user id>`.
 - Fills the case with:
   - a lateral ceph with all 27 landmarks placed and the ruler calibrated, left as a draft so it can be approved during the demo;
-  - the two synthetic STL models, with their units confirmed as mm;
+  - the two synthetic STL models, with their units confirmed as mm, and a cast analysis from caliper tooth widths (one Bolton ratio inside the norm, one below it);
   - a synthetic CBCT phantom of 80 slices;
   - a treatment plan.
 
