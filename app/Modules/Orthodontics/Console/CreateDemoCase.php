@@ -12,6 +12,7 @@ use App\Modules\Orthodontics\Cbct\CbctService;
 use App\Modules\Orthodontics\Models\OrthodonticFile;
 use App\Modules\Orthodontics\Services\AnalysisService;
 use App\Modules\Orthodontics\Services\OrthodonticFileStorage;
+use App\Modules\Orthodontics\Services\OrthodonticsException;
 use App\Modules\Orthodontics\Services\TreatmentPlanService;
 use Illuminate\Console\Command;
 use Illuminate\Http\UploadedFile;
@@ -31,8 +32,9 @@ use ZipArchive;
  * It creates (or reuses) a patient marked as demo data, a new orthodontic case
  * for that patient, a lateral ceph with every landmark placed and the ruler
  * calibrated, the two synthetic 3D models with their units confirmed and a
- * cast analysis from caliper widths, a synthetic CBCT study, and a treatment
- * plan. Everything goes through the
+ * cast analysis from caliper widths, a synthetic CBCT study, the face and
+ * intraoral photos found in the photos folder, and a treatment plan.
+ * Everything goes through the
  * module's own services, so measurements are computed exactly as they are for
  * a real case. The assets live in database/demo/orthodontics (see its README).
  */
@@ -42,11 +44,24 @@ class CreateDemoCase extends Command
         {--tenant= : Clinic (tenant) id, from php artisan tenants:list}
         {--doctor= : User id that owns the demo case (default: the first doctor)}
         {--category= : Case category id to use; it is flagged as orthodontic}
+        {--photos= : Folder with the face and intraoral photos (default: database/demo/orthodontics/photos)}
         {--no-enable : Leave the enable_orthodontics setting as it is}';
 
-    protected $description = 'Create an orthodontics demo case (traced ceph, 3D models, CBCT, plan) in one clinic';
+    protected $description = 'Create an orthodontics demo case (traced ceph, 3D models, CBCT, photos, plan) in one clinic';
 
     public const PATIENT_IDENTIFIER = 'ORTHO-DEMO';
+
+    /**
+     * Photos are matched by the start of their file name, e.g. face_frontal.jpg
+     * or intraoral_upper.png. They are uploaded without landmarks: the doctor
+     * runs the face detection live during the demo.
+     */
+    public const PHOTO_PREFIXES = [
+        'face_frontal' => 'face_frontal',
+        'face_smile' => 'face_smile',
+        'face_profile' => 'face_profile',
+        'intraoral' => 'intraoral_photo',
+    ];
 
     /**
      * Landmarks placed by eye on ceph_lateral.jpg (2272 x 1818 px, patient
@@ -87,6 +102,12 @@ class CreateDemoCase extends Command
         $tenantId = $this->option('tenant');
         if (!$tenantId) {
             $this->error('Pass the clinic id: --tenant=<id>. List them with: php artisan tenants:list');
+
+            return self::FAILURE;
+        }
+        $photos = $this->option('photos');
+        if ($photos && !is_dir($photos)) {
+            $this->error("No folder at '{$photos}'. Pass the folder that holds the photos, or leave --photos out.");
 
             return self::FAILURE;
         }
@@ -198,7 +219,10 @@ class CreateDemoCase extends Command
             $this->line('  CBCT study #' . $study->id . ': ' . $study->instances_count . ' slices');
         }
 
-        // 4. Treatment plan.
+        // 4. Face and intraoral photos supplied by the presenter.
+        $this->storePhotos($files, $case, $this->option('photos') ?: "$assets/photos");
+
+        // 5. Treatment plan.
         $plans->save($case, $this->plan(), null);
         $this->line('  Treatment plan saved');
 
@@ -367,6 +391,58 @@ class CreateDemoCase extends Command
         } finally {
             File::deleteDirectory($dir);
         }
+    }
+
+    /**
+     * Uploads every image in the folder whose name starts with one of
+     * PHOTO_PREFIXES. A file it can't use is skipped with a warning, and the
+     * rest of the case is still built.
+     */
+    private function storePhotos(OrthodonticFileStorage $files, CaseModel $case, string $dir): void
+    {
+        $counts = [];
+        foreach (is_dir($dir) ? File::files($dir) : [] as $photo) {
+            $name = $photo->getFilename();
+            $ext = strtolower($photo->getExtension());
+            if (!in_array($ext, OrthodonticFile::IMAGE_EXTENSIONS, true)) {
+                continue;
+            }
+            $kind = $this->photoKind($name);
+            if (!$kind) {
+                $this->warn("  Photo '{$name}' skipped: start its name with " . implode(', ', array_keys(self::PHOTO_PREFIXES)));
+
+                continue;
+            }
+            $mime = $ext === 'jpg' ? 'image/jpeg' : 'image/' . $ext;
+            try {
+                $files->store($case, $this->upload($photo->getPathname(), $name, $mime), $kind, ['label' => "Demo photo ({$name})"]);
+                $counts[$kind] = ($counts[$kind] ?? 0) + 1;
+            } catch (OrthodonticsException $e) {
+                $this->warn("  Photo '{$name}' skipped: {$e->getMessage()}");
+            }
+        }
+
+        if (!$counts) {
+            $this->line("  Photos: none found in {$dir} (add face_frontal.jpg, face_smile.jpg, face_profile.jpg or intraoral_*.jpg)");
+
+            return;
+        }
+        $this->line('  Photos: ' . collect(self::PHOTO_PREFIXES)
+            ->filter(fn ($kind) => isset($counts[$kind]))
+            ->map(fn ($kind) => "{$counts[$kind]} {$kind}")
+            ->implode(', '));
+    }
+
+    private function photoKind(string $fileName): ?string
+    {
+        $name = strtolower($fileName);
+        foreach (self::PHOTO_PREFIXES as $prefix => $kind) {
+            if (str_starts_with($name, $prefix)) {
+                return $kind;
+            }
+        }
+
+        return null;
     }
 
     private function plan(): array

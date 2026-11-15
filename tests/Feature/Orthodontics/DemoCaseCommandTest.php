@@ -5,8 +5,10 @@ namespace Tests\Feature\Orthodontics;
 use App\Modules\Orthodontics\Console\CreateDemoCase;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -15,6 +17,18 @@ use Tests\TestCase;
  */
 class DemoCaseCommandTest extends TestCase
 {
+    /** @var list<string> */
+    private array $photoFolders = [];
+
+    protected function tearDown(): void
+    {
+        foreach ($this->photoFolders as $dir) {
+            File::deleteDirectory($dir);
+        }
+
+        parent::tearDown();
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -44,7 +58,9 @@ class DemoCaseCommandTest extends TestCase
 
     public function test_it_builds_a_complete_demo_case(): void
     {
-        $this->artisan('orthodontics:demo', ['--tenant' => 'demo'])->assertSuccessful();
+        $this->artisan('orthodontics:demo', ['--tenant' => 'demo', '--photos' => $this->photosFolder()])
+            ->expectsOutputToContain('Photos: none found')
+            ->assertSuccessful();
 
         $this->assertSame('1', DB::table('clinic_settings')->where('setting_key', 'enable_orthodontics')->value('setting_value'));
 
@@ -101,6 +117,68 @@ class DemoCaseCommandTest extends TestCase
         $this->assertFileExists(database_path('demo/orthodontics/ceph_lateral.jpg'));
     }
 
+    public function test_it_uploads_the_face_and_intraoral_photos_in_the_photos_folder(): void
+    {
+        $dir = $this->photosFolder([
+            'face_frontal.jpg' => [40, 50],
+            'face_smile.png' => [40, 50],
+            'face_profile.jpg' => [50, 40],
+            'intraoral_upper.jpg' => [60, 30],
+            'Intraoral_lower.JPG' => [60, 30],
+            'notes.txt' => 'not a photo, ignored',
+        ]);
+
+        $this->artisan('orthodontics:demo', ['--tenant' => 'demo', '--photos' => $dir])
+            ->expectsOutputToContain('Photos: 1 face_frontal, 1 face_smile, 1 face_profile, 2 intraoral_photo')
+            ->assertSuccessful();
+
+        $photos = DB::table('orthodontic_files')->whereNotIn('kind', ['ceph_xray', 'model_upper', 'model_lower'])->get();
+        $this->assertSame(
+            ['face_frontal' => 1, 'face_profile' => 1, 'face_smile' => 1, 'intraoral_photo' => 2],
+            $photos->countBy('kind')->sortKeys()->all()
+        );
+        foreach ($photos as $photo) {
+            Storage::disk('local')->assertExists($photo->path);
+        }
+        $frontal = $photos->firstWhere('kind', 'face_frontal');
+        $this->assertSame('face_frontal.jpg', $frontal->original_name);
+        $this->assertSame([40, 50], [(int) $frontal->width, (int) $frontal->height]);
+
+        // The doctor runs the face detection live, so no face analysis is made.
+        $this->assertSame(0, DB::table('orthodontic_analyses')->where('type', 'face')->count());
+
+        // The photos are copied, never moved.
+        $this->assertFileExists("$dir/face_frontal.jpg");
+    }
+
+    public function test_it_skips_a_photo_it_cannot_use_and_still_builds_the_case(): void
+    {
+        $dir = $this->photosFolder([
+            'face_frontal.jpg' => 'this is not an image',
+            'holiday.jpg' => [40, 50],
+            'face_smile.jpg' => [40, 50],
+        ]);
+
+        $this->artisan('orthodontics:demo', ['--tenant' => 'demo', '--photos' => $dir])
+            ->expectsOutputToContain("Photo 'face_frontal.jpg' skipped: The file is not a readable image.")
+            ->expectsOutputToContain("Photo 'holiday.jpg' skipped: start its name with face_frontal, face_smile, face_profile, intraoral")
+            ->assertSuccessful();
+
+        $kinds = DB::table('orthodontic_files')->pluck('kind')->all();
+        $this->assertNotContains('face_frontal', $kinds);
+        $this->assertContains('face_smile', $kinds);
+        $this->assertSame(1, DB::table('orthodontic_treatment_plans')->count());
+    }
+
+    public function test_it_refuses_a_photos_folder_that_does_not_exist(): void
+    {
+        $this->artisan('orthodontics:demo', ['--tenant' => 'demo', '--photos' => '/no/such/demo/photos'])
+            ->expectsOutputToContain("No folder at '/no/such/demo/photos'")
+            ->assertFailed();
+
+        $this->assertSame(0, DB::table('cases')->count());
+    }
+
     public function test_running_it_again_reuses_the_patient_and_adds_a_case(): void
     {
         $this->artisan('orthodontics:demo', ['--tenant' => 'demo'])->assertSuccessful();
@@ -125,6 +203,33 @@ class DemoCaseCommandTest extends TestCase
         $this->artisan('orthodontics:demo', ['--tenant' => 'nope'])->assertFailed();
         $this->artisan('orthodontics:demo')->assertFailed();
         $this->assertSame(0, DB::table('cases')->count());
+    }
+
+    /**
+     * A temporary photos folder. Each entry is a generated image of
+     * [width, height] pixels (PNG or JPEG by its extension), or a string
+     * written as the file's content.
+     *
+     * @param array<string, array{0: int, 1: int}|string> $files
+     */
+    private function photosFolder(array $files = []): string
+    {
+        $dir = sys_get_temp_dir() . '/ortho-demo-photos-' . Str::random(8);
+        File::ensureDirectoryExists($dir);
+        $this->photoFolders[] = $dir;
+
+        foreach ($files as $name => $content) {
+            $path = "$dir/$name";
+            if (is_string($content)) {
+                file_put_contents($path, $content);
+
+                continue;
+            }
+            $image = imagecreatetruecolor($content[0], $content[1]);
+            str_ends_with(strtolower($name), '.png') ? imagepng($image, $path) : imagejpeg($image, $path);
+        }
+
+        return $dir;
     }
 
     private function createClinicSchema(): void
