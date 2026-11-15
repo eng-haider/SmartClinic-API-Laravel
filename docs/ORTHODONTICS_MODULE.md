@@ -292,6 +292,27 @@ Frontend env: `VITE_FACE_LANDMARKER_MODEL_URL` (optional) self-hosts the MediaPi
 3. Deploy the frontend build. It emits `cornerstone-wasm/` and `mediapipe/wasm/` next to `assets/`.
 4. Clinic admin: Settings › Display › «وحدة تقويم الأسنان», then flag the orthodontic category under Case Categories.
 
+### Demo case
+
+To present the module without tracing a radiograph first, run:
+
+```bash
+php artisan orthodontics:demo --tenant=<clinic id>
+```
+
+It works in one clinic and does the following:
+
+- Switches the module on. Pass `--no-enable` to leave the setting as it is.
+- Uses the first orthodontic category. Pass `--category=<id>` to flag a specific one instead. If the clinic has no orthodontic category, it creates «تقويم».
+- Creates or reuses a patient marked `ORTHO-DEMO`, and adds a new case for it. The case belongs to the first doctor, or to `--doctor=<user id>`.
+- Fills the case with:
+  - a lateral ceph with all 27 landmarks placed and the ruler calibrated, left as a draft so it can be approved during the demo;
+  - the two synthetic STL models, with their units confirmed as mm;
+  - a synthetic CBCT phantom of 80 slices;
+  - a treatment plan.
+
+Everything goes through the module's own services. It skips patient and case model events, so no embeddings or automation messages are triggered. The assets and their licences are listed in `database/demo/orthodontics/README.md`. The landmarks were placed by eye for demonstration, so they aren't a clinical tracing. Delete the demo patient when you no longer need it.
+
 ## 9. External components
 
 **Frontend** (browser bundle, loaded lazily only inside the workspace):
