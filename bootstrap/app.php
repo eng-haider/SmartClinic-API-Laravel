@@ -15,6 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // CORS - run first on every request (handles OPTIONS preflight)
         $middleware->prepend(\App\Http\Middleware\CorsMiddleware::class);
 
+        // One line per request in storage/logs/requests-*.log (php artisan requests:report)
+        $middleware->append(\App\Http\Middleware\LogRequest::class);
+
         // Enable CORS for API routes
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,

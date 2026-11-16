@@ -20,6 +20,9 @@ return [
 
     'default' => env('LOG_CHANNEL', 'stack'),
 
+    // Write every request to the 'requests' channel (App\Http\Middleware\LogRequest).
+    'request_log' => (bool) env('REQUEST_LOG', true),
+
     /*
     |--------------------------------------------------------------------------
     | Deprecations Log Channel
@@ -71,6 +74,17 @@ return [
             'level' => env('LOG_LEVEL', 'debug'),
             'days' => env('LOG_DAILY_DAYS', 14),
             'replace_placeholders' => true,
+        ],
+
+        // One JSON line per request (App\Http\Middleware\LogRequest), read by
+        // `php artisan requests:report`. Daily files, kept 7 days.
+        'requests' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/requests.log'),
+            'level' => 'info',
+            'days' => env('REQUEST_LOG_DAYS', 7),
+            'formatter' => Monolog\Formatter\LineFormatter::class,
+            'formatter_with' => ['format' => "%message%\n"],
         ],
 
         'slack' => [

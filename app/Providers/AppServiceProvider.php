@@ -20,6 +20,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(\App\Services\AI\Agent\Nlu\IntentParser::class, \App\Services\AI\Agent\Nlu\OpenAIIntentParser::class);
         $this->app->singleton(\App\Services\AI\Agent\Tools\ToolRegistry::class);
 
+        // Wait and connect again when Hostinger refuses a new MySQL connection
+        // (20 a second per account) instead of failing the request.
+        $this->app->bind('db.connector.mysql', \App\Database\RetryingMySqlConnector::class);
+
         // Persistent PDO connections survive DB::purge() until the process exits, so a console
         // process that walks tenants (tenants:migrate, queue workers, the scheduler) keeps one
         // open socket per tenant DB. Past ~20 of them Hostinger refuses new connections with
