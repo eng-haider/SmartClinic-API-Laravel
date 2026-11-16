@@ -31,7 +31,7 @@ class OldDatabaseMigrationSeeder extends Seeder
      * Set the old clinic ID to migrate data for.
      * Each clinic becomes a tenant in the new system.
      */
-    private int $oldClinicId = 106; // <-- CHANGE THIS to the clinic ID you want to migrate
+    private int $oldClinicId = 121; // <-- CHANGE THIS to the clinic ID you want to migrate
 
     /**
      * The tenant ID to use (will be generated from clinic name)

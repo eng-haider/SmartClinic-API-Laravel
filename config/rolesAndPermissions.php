@@ -152,6 +152,9 @@ return [
               
                 // Bill permissions
                 'view-all-bills',
+                // Listed here so it shows in the secretary permissions dialog: it lets
+                // a secretary see a patient's bills and totals.
+                'view-clinic-bills',
                 'create-bill',
                 'edit-bill',
                 'delete-bill',
@@ -359,10 +362,10 @@ return [
                 // per secretary from the permissions dialog; create-bill alone still
                 // lists a patient's cases in the bill form (see CaseController::index).
 
-                // Bill permissions - view and create
-                'view-clinic-bills',
-                'create-bill',
-                'mark-bill-paid',
+                // Bill permissions - none on the role, so the clinic can take them
+                // away. 'view-clinic-bills', 'create-bill' and 'mark-bill-paid' are
+                // granted per secretary from the permissions dialog (ticked by default
+                // when adding one).
 
                 // Clinic permissions
                 'view-own-clinic',
