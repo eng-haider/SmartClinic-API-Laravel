@@ -88,6 +88,14 @@ class CaseRepository
                 'notes',
                 // Bills always carry who registered them (shown in the case drawer).
                 AllowedInclude::callback('bills', fn ($query) => $query->with('creator:id,name')),
+                // The patient page loads every case's notes and images with the case list
+                // instead of two requests per case: each request opens a new MySQL
+                // connection, and Hostinger refuses more than 20 new ones per second.
+                AllowedInclude::callback('caseNotes', fn ($query) => $query->with('creator')->latest()),
+                // GET images/by-imageable needs view-images, so the include does too.
+                AllowedInclude::callback('caseImages', fn ($query) => auth()->user()?->checkPermissionTo('view-images')
+                    ? $query->ordered()
+                    : $query->whereRaw('1 = 0')),
                 'warehouseItems',
                 'ophthalmologyEncounterDetails',
             ])

@@ -253,6 +253,26 @@ class CaseModel extends Model
     }
 
     /**
+     * The case's notes as they are stored. notes() keys on getMorphClass() ('App\Models\Case'),
+     * but NoteRequest saves case notes as 'App\Models\CaseModel', so notes() misses them.
+     * Same rows as GET notes/case/{id}.
+     */
+    public function caseNotes()
+    {
+        return $this->hasMany(Note::class, 'noteable_id')->where('noteable_type', self::class);
+    }
+
+    /**
+     * Images uploaded for the case. The app saves them with the short type 'Case'
+     * (ImageRequest), which images() does not match either.
+     * Same rows as GET images/by-imageable?imageable_type=Case.
+     */
+    public function caseImages()
+    {
+        return $this->hasMany(Image::class, 'imageable_id')->where('imageable_type', 'Case');
+    }
+
+    /**
      * Convert case data to embedding content string.
      */
     public function toEmbeddingContent(): string

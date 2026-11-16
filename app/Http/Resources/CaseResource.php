@@ -46,6 +46,9 @@ class CaseResource extends JsonResource
                 'color'   => $this->status?->color ?? null,
             ]),
             'notes'          => $this->notes,
+            // Only present with include=caseNotes / include=caseImages.
+            'case_notes'     => NoteResource::collection($this->whenLoaded('caseNotes')),
+            'case_images'    => ImageResource::collection($this->whenLoaded('caseImages')),
             'price'          => $showPrice ? $this->price : null,
             'item_cost'      => $showPrice ? $this->item_cost : null,
             'is_paid'        => $showPrice ? $this->is_paid : null,
