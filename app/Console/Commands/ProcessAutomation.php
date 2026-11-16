@@ -13,6 +13,8 @@ class ProcessAutomation extends Command
 
     protected $description = 'Process pending automation targets across all tenants and dispatch message jobs';
 
+    private const PAUSE_BETWEEN_TENANTS_US = 100_000;
+
     public function handle(): int
     {
         $specificTenant = $this->option('tenant');
@@ -31,7 +33,15 @@ class ProcessAutomation extends Command
 
         $this->info("Processing automation for {$tenants->count()} tenant(s)...");
 
-        foreach ($tenants as $tenant) {
+        foreach ($tenants->values() as $i => $tenant) {
+            // Every tenant opens a new MySQL connection, and Hostinger refuses more than
+            // 20 new connections a second for the whole account, web requests included.
+            // Opened back to back, this every-minute run made requests fail in the first
+            // seconds of each minute, so it stays at about 10 a second.
+            if ($i > 0) {
+                usleep(self::PAUSE_BETWEEN_TENANTS_US);
+            }
+
             try {
                 $tenant->run(function () use ($tenant) {
                     ProcessAutomationTargetsJob::dispatch($tenant->id);
