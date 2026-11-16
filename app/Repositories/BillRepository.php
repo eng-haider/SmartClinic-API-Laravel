@@ -188,7 +188,15 @@ class BillRepository
     {
         $query = $this->query()
             ->with(['patient', 'doctor', 'billable.patient', 'billable.doctor', 'billable.category', 'billable.status'])
-            ->byPatient($patientId);
+            ->byPatient($patientId)
+            // Deleting a case keeps its bills. The patient page sums this list as "paid"
+            // against the non-deleted cases' prices, so a deleted case's payments must
+            // drop out too or the remaining goes negative. Matches the Bills page
+            // balance and the old app, which both ignore bills of deleted cases.
+            ->where(function ($q) {
+                $q->whereNotIn('billable_type', CaseModel::BILLABLE_TYPES)
+                    ->orWhereIn('billable_id', CaseModel::query()->select('id'));
+            });
 
         if ($doctorId !== null) {
             $query->where('doctor_id', $doctorId);

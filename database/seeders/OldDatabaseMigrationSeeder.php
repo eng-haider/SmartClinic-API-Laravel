@@ -31,7 +31,7 @@ class OldDatabaseMigrationSeeder extends Seeder
      * Set the old clinic ID to migrate data for.
      * Each clinic becomes a tenant in the new system.
      */
-    private int $oldClinicId = 1; // <-- CHANGE THIS to the clinic ID you want to migrate
+    private int $oldClinicId = 106; // <-- CHANGE THIS to the clinic ID you want to migrate
 
     /**
      * The tenant ID to use (will be generated from clinic name)
@@ -966,8 +966,10 @@ class OldDatabaseMigrationSeeder extends Seeder
                 });
 
                 // is_paid is not fillable on Bill, so it is set after create.
-                // Prefer the old is_paid column; older dumps only have PaymentDate.
-                $bill->is_paid = (bool) ($oldBill->is_paid ?? $oldBill->PaymentDate);
+                // Every old bill is a payment: the old app sums all bills as "paid" and has
+                // no is_paid column. PaymentDate is NULL on the payment entered together with
+                // the case, so it must not decide is_paid (that marked ~45% of payments unpaid).
+                $bill->is_paid = (bool) ($oldBill->is_paid ?? true);
 
                 // Preserve timestamps and soft delete status
                 $bill->created_at = $oldBill->created_at;
