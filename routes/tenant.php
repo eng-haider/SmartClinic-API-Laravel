@@ -139,6 +139,8 @@ Route::middleware([
     // Case routes
     Route::middleware('jwt')->group(function () {
         Route::apiResource('cases', CaseController::class);
+        // Root canal record (Access Opening / Obturation canals) of a dental case
+        Route::put('cases/{id}/root-stuffing', [CaseController::class, 'updateRootStuffing'])->whereNumber('id');
     });
 
     // Case category routes

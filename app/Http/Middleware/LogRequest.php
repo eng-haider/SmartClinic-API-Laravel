@@ -42,6 +42,9 @@ class LogRequest
                 'm'  => $request->method(),
                 // The route pattern (patients/{id}) so the same endpoint adds up.
                 'p'  => $request->route()?->uri() ?? $request->path(),
+                // The real path and query (patients/474?include=...), so a page asking for
+                // the same thing over and over shows up as a loop.
+                'q'  => mb_substr($request->getRequestUri(), 0, 160),
                 'tn' => function_exists('tenant') && tenant() ? tenant('id') : $request->header('X-Tenant-ID'),
                 // hasUser() so logging never looks the user up (that would need a connection).
                 'u'  => $auth->hasUser() ? $auth->id() : null,

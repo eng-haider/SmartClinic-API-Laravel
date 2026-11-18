@@ -4,10 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\CaseRequest;
 use App\Http\Resources\CaseResource;
+use App\Models\DentalEncounterDetail;
+use App\Modules\Dental\RootStuffing;
 use App\Repositories\CaseRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class CaseController extends Controller
 {
@@ -19,7 +22,7 @@ class CaseController extends Controller
         // index method will check permissions inside the method
         $this->middleware('permission:create-case')->only(['store']);
         // $this->middleware('permission:view-clinic-cases')->only(['show']);
-        $this->middleware('permission:edit-case')->only(['update']);
+        $this->middleware('permission:edit-case')->only(['update', 'updateRootStuffing']);
         // $this->middleware('permission:delete-case')->only(['destroy']);
     }
 
@@ -157,6 +160,49 @@ class CaseController extends Controller
                 'message' => $e->getMessage(),
             ], 422);
         }
+    }
+
+    /**
+     * Save a case's root canal record (Access Opening and Obturation canals).
+     *
+     * Only root_stuffing changes. A full case update is not used for this because
+     * CaseRequest fills in a default status and date for fields that are not sent.
+     */
+    public function updateRootStuffing(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate(RootStuffing::rules());
+
+        $case = $this->caseRepository->getById($id, $this->getDoctorIdFilter());
+
+        if (!$case) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Case not found',
+            ], 404);
+        }
+
+        $rootStuffing = RootStuffing::encode($validated);
+
+        DB::transaction(function () use ($case, $rootStuffing) {
+            $case->root_stuffing = $rootStuffing;
+            $case->save();
+
+            // Keep the normalized dental table in step with the cases column.
+            if ($rootStuffing !== null) {
+                DentalEncounterDetail::updateOrCreate(['case_id' => $case->id], ['root_stuffing' => $rootStuffing]);
+            } else {
+                DentalEncounterDetail::where('case_id', $case->id)->update(['root_stuffing' => null]);
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Root canal record saved',
+            'data' => [
+                'id' => $case->id,
+                'root_stuffing' => $rootStuffing,
+            ],
+        ]);
     }
 
     /**
