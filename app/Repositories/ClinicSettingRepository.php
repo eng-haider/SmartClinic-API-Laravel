@@ -47,6 +47,13 @@ class ClinicSettingRepository extends BaseRepository
     public const CASE_DIALOG_ON_CATEGORY_KEY = 'case_dialog_on_category';
 
     /**
+     * When on, the add-patient dialog has a field for a second phone number
+     * (patients.phone2). Off (and missing) hides the field; a second number
+     * already saved is kept and still shown on the patient's page.
+     */
+    public const SHOW_PATIENT_PHONE2_KEY = 'show_patient_phone2';
+
+    /**
      * What the patient form asks for: 'birth_date' (the age is worked out from it
      * and stays current) or 'age' (a plain number of years). Both columns always
      * exist - this only picks which one staff fill in.
@@ -433,7 +440,7 @@ class ClinicSettingRepository extends BaseRepository
         }
 
         // Display category
-        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY, self::HIDE_DASHBOARD_NUMBERS_KEY, self::PATIENT_AGE_INPUT_KEY, self::ENABLE_DEPARTMENTS_KEY, self::ENABLE_ORTHODONTICS_KEY, self::WAITING_LIST_STYLE_KEY, self::CASE_DIALOG_ON_CATEGORY_KEY])) {
+        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY, self::HIDE_DASHBOARD_NUMBERS_KEY, self::PATIENT_AGE_INPUT_KEY, self::ENABLE_DEPARTMENTS_KEY, self::ENABLE_ORTHODONTICS_KEY, self::WAITING_LIST_STYLE_KEY, self::CASE_DIALOG_ON_CATEGORY_KEY, self::SHOW_PATIENT_PHONE2_KEY])) {
             return 'display';
         }
 
@@ -500,6 +507,7 @@ class ClinicSettingRepository extends BaseRepository
             'waiting_list_style' => 30,
             'case_dialog_on_category' => 31,
             'enable_orthodontics' => 32,
+            'show_patient_phone2' => 33,
 
             // Social (26-28)
             'facebook_url' => 26,
