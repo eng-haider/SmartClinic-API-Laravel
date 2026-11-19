@@ -3,6 +3,7 @@
 namespace App\Services\Messaging;
 
 use App\Models\BookingRequest;
+use App\Models\Message;
 use App\Models\MessagingSetting;
 use App\Models\Patient;
 use App\Models\WhatsAppBookingSession;
@@ -12,8 +13,8 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Lets a customer book from WhatsApp: any message to the clinic's number starts
- * it, they pick a day, then a time, then give their name (skipped when the
+ * Lets a customer book from WhatsApp: the first message of a conversation (or one
+ * asking to book) starts it, they pick a day, then a time, then give their name (skipped when the
  * number belongs to a known patient), and a pending booking request is made for
  * staff to approve on the Booking Requests page. BookingRequestMessenger tells
  * them the outcome.
@@ -32,6 +33,14 @@ class WhatsAppBookingBot
     private const LIST_ROWS = 10;
 
     private const CANCEL_WORDS = ['0', 'الغاء', 'إلغاء', 'cancel', 'stop'];
+
+    // Outside a booking the bot only greets a conversation's first message, i.e. one
+    // after this long without hearing from the customer, so it doesn't answer every
+    // message while staff are chatting with them...
+    private const CONVERSATION_GAP_HOURS = 24;
+
+    // ...or a message asking to book
+    private const BOOK_WORDS = ['حجز', 'احجز', 'أحجز', 'موعد', 'book', 'appointment'];
 
     private const MORE = 'more';
 
@@ -68,20 +77,26 @@ class WhatsAppBookingBot
         try {
             $session = WhatsAppBookingSession::firstWhere('phone', $phone);
 
-            if ($session && $session->updated_at->lt(now()->subMinutes(self::SESSION_MINUTES))) {
+            $expired = $session && $session->updated_at->lt(now()->subMinutes(self::SESSION_MINUTES));
+
+            if ($expired) {
                 $session->delete();
                 $session = null;
             }
 
             if (!$session) {
-                $this->askDay(null, $patient?->name, true);
+                // A customer who went quiet mid-booking starts over; anyone else only
+                // at the start of a conversation or when asking to book
+                if ($expired || $this->startsConversation() || $this->asksToBook($reply)) {
+                    $this->askDay(null, $patient?->name, true);
+                }
 
                 return;
             }
 
             if (in_array(mb_strtolower(trim($this->digits($reply))), self::CANCEL_WORDS, true)) {
                 $session->delete();
-                $this->send('تم إلغاء الحجز. أرسل أي رسالة متى أردت حجز موعد.');
+                $this->send('تم إلغاء الحجز. أرسل كلمة «حجز» متى أردت حجز موعد.');
 
                 return;
             }
@@ -272,7 +287,34 @@ class WhatsAppBookingBot
             '📅 ' . $this->dayLabel($day) . ' ' . $day->format('Y'),
             '🕐 ' . $this->timeLabel($data['time']),
             'سنرسل لك رسالة هنا عند تأكيد الموعد.',
+            'لحجز موعد آخر أرسل كلمة «حجز».',
         ]));
+    }
+
+    /**
+     * Whether this message opens a conversation: nothing else came from the customer
+     * in the last CONVERSATION_GAP_HOURS. The message itself is already recorded.
+     */
+    private function startsConversation(): bool
+    {
+        return Message::where('direction', Message::DIRECTION_INBOUND)
+            ->where('channel', 'whatsapp')
+            ->where('from_number', $this->phone)
+            ->where('created_at', '>=', now()->subHours(self::CONVERSATION_GAP_HOURS))
+            ->count() <= 1;
+    }
+
+    private function asksToBook(string $reply): bool
+    {
+        $text = mb_strtolower($reply);
+
+        foreach (self::BOOK_WORDS as $word) {
+            if (str_contains($text, $word)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function pendingRequest(): ?BookingRequest

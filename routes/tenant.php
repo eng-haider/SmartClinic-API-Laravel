@@ -21,6 +21,7 @@ use App\Http\Controllers\ClinicExpenseCategoryController;
 use App\Http\Controllers\WarehouseItemController;
 use App\Http\Controllers\CaseCategoryWarehouseController;
 use App\Http\Controllers\ClinicSettingController;
+use App\Http\Controllers\ClinicDataExportController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\MedicationController;
 use App\Http\Controllers\RecipeController;
@@ -264,6 +265,9 @@ Route::middleware([
 
     // Orthodontics module (optional, per clinic) - see app/Modules/Orthodontics
     require base_path('app/Modules/Orthodontics/routes.php');
+
+    // Clinic data export (patients, cases, bills) for Settings → Export data
+    Route::get('clinic-export', [ClinicDataExportController::class, 'index']);
 
     // Clinic settings routes
     Route::middleware('jwt')->prefix('clinic-settings')->group(function () {

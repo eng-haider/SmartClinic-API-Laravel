@@ -15,14 +15,32 @@ class MessagingSettingController extends Controller
     public function __construct()
     {
         $this->middleware('jwt');
+        // Changing, testing and the webhook URL (Gupshup's carries a secret) are for
+        // whoever manages the clinic's WhatsApp setup only
+        $this->middleware('permission:edit-messaging-settings')
+            ->only(['upsert', 'testConnection', 'webhookInfo']);
     }
 
     /**
      * Get all messaging settings.
+     *
+     * Every signed-in user may read whether WhatsApp sends by itself (booking screens
+     * need it), but only settings managers see the account details and secrets.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $settings = MessagingSetting::all();
+
+        if (! $request->user()?->checkPermissionTo('edit-messaging-settings')) {
+            $settings = $settings->map(fn (MessagingSetting $setting) => [
+                'id' => $setting->id,
+                'provider' => $setting->provider,
+                'is_active' => $setting->is_active,
+                'meta' => collect($setting->meta ?? [])
+                    ->only(['driver', 'send_mode', 'booking_bot_enabled', 'booking_reminder_enabled'])
+                    ->all(),
+            ]);
+        }
 
         return response()->json([
             'success' => true,
