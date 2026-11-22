@@ -94,6 +94,8 @@ Route::middleware(['api', InitializeTenancyByPatientToken::class])
         Route::post('/booking-requests', [PublicBookingController::class, 'store'])
             ->middleware('throttle:5,1');
         Route::get('/clinic-info', [PublicBookingController::class, 'clinicInfo']);
+        Route::get('/booking-slots', [PublicBookingController::class, 'slots'])
+            ->middleware('throttle:30,1');
     });
 
 // ============================================

@@ -111,6 +111,11 @@ Route::post('auth/smart-login', [AuthController::class, 'smartLogin']); // â† Ø
 Route::get('public/app-versions/latest', [AppVersionController::class, 'latest'])
     ->middleware('throttle:60,1');
 
+// The phone app's live Google Play / App Store version, from the central
+// app_store_releases table, so the app can offer an update to the store.
+Route::get('public/app-store-releases/latest', [\App\Http\Controllers\AppStoreReleaseController::class, 'latest'])
+    ->middleware('throttle:60,1');
+
 // Protected auth routes (JWT required)
 Route::middleware('jwt')->group(function () {
     Route::get('auth/me', [AuthController::class, 'me']);

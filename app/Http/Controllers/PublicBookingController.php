@@ -6,6 +6,7 @@ use App\Http\Requests\StoreBookingRequestRequest;
 use App\Repositories\ClinicSettingRepository;
 use App\Http\Resources\BookingRequestResource;
 use App\Repositories\BookingRequestRepository;
+use App\Services\BookingSlotService;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -19,7 +20,8 @@ class PublicBookingController extends Controller
 {
     public function __construct(
         private BookingRequestRepository $bookingRequests,
-        private ClinicSettingRepository $clinicSettings
+        private ClinicSettingRepository $clinicSettings,
+        private BookingSlotService $slots
     ) {
     }
 
@@ -50,6 +52,33 @@ class PublicBookingController extends Controller
         return response()->json([
             'success' => true,
             'data' => $this->clinicSettings->publicIdentity(),
+        ]);
+    }
+
+    /**
+     * Free appointment times for the booking page: the next days that still have
+     * a free time (up to 14, within 21 days), each with its free start times ("H:i").
+     * Same source as the WhatsApp booking bot, so both offer the same times.
+     */
+    public function slots(): JsonResponse
+    {
+        $days = [];
+
+        for ($offset = 0; $offset < 21 && count($days) < 14; $offset++) {
+            $day = today()->addDays($offset);
+            $times = $this->slots->freeTimes($day);
+
+            if ($times !== []) {
+                $days[] = ['date' => $day->toDateString(), 'times' => $times];
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'duration' => $this->slots->duration(),
+                'days' => $days,
+            ],
         ]);
     }
 }
