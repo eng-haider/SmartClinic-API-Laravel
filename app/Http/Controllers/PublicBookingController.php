@@ -18,6 +18,9 @@ use Illuminate\Http\JsonResponse;
  */
 class PublicBookingController extends Controller
 {
+    /** Parts of the day a patient can pick in "period" mode (booking_time_mode setting). */
+    public const PERIODS = ['morning' => 'صباحاً', 'afternoon' => 'ظهراً وعصراً', 'evening' => 'مساءً'];
+
     public function __construct(
         private BookingRequestRepository $bookingRequests,
         private ClinicSettingRepository $clinicSettings,
@@ -30,7 +33,17 @@ class PublicBookingController extends Controller
      */
     public function store(StoreBookingRequestRequest $request): JsonResponse
     {
-        $bookingRequest = $this->bookingRequests->create($request->validated());
+        $data = $request->validated();
+
+        // A chosen period (no exact time) is kept at the top of the note, where
+        // staff read it when they review the request and pick the time.
+        if ($period = $data['preferred_period'] ?? null) {
+            $line = 'الفترة المفضلة: ' . self::PERIODS[$period];
+            $data['note'] = trim($line . "\n" . ($data['note'] ?? ''));
+        }
+        unset($data['preferred_period']);
+
+        $bookingRequest = $this->bookingRequests->create($data);
 
         return response()->json([
             'success' => true,
@@ -77,6 +90,8 @@ class PublicBookingController extends Controller
             'success' => true,
             'data' => [
                 'duration' => $this->slots->duration(),
+                // How the page asks for the time: an exact time ("time") or a part of the day ("period")
+                'time_mode' => $this->clinicSettings->getByKey('booking_time_mode')?->getValue() === 'period' ? 'period' : 'time',
                 'days' => $days,
             ],
         ]);

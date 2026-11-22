@@ -60,6 +60,11 @@ class PatientResource extends JsonResource
             
             // Counts (when loaded with withCount)
             'cases_count' => $this->when(isset($this->cases_count), $this->cases_count),
+            // Newest case date (or creation date) - only on the patient list.
+            'last_visit' => $this->when(
+                array_key_exists('last_visit', $this->resource->getAttributes()),
+                fn () => $this->resource->getAttributes()['last_visit'],
+            ),
             'recipes_count' => $this->when(isset($this->recipes_count), $this->recipes_count),
             'reservations_count' => $this->when(isset($this->reservations_count), $this->reservations_count),
             'bills_count' => $this->when(isset($this->bills_count), $this->bills_count),

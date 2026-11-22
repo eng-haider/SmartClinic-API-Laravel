@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Models\Patient;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Spatie\QueryBuilder\QueryBuilder;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -61,7 +62,12 @@ class PatientRepository
      */
     public function getAllWithFilters(array $filters, int $perPage = 15): LengthAwarePaginator
     {
-        $query = $this->queryBuilder()->with('profilePhoto');
+        $query = $this->queryBuilder()
+            ->with('profilePhoto')
+            // The list's "last visit", as one sub-select: the mobile app used to
+            // ask for include=cases and download every case of every patient on
+            // the page only to read this date.
+            ->withMax('cases as last_visit', DB::raw('COALESCE(cases.case_date, cases.created_at)'));
 
         // Apply search filter
         if (!empty($filters['search'])) {

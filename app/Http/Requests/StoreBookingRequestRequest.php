@@ -32,6 +32,8 @@ class StoreBookingRequestRequest extends FormRequest
             'phone' => 'required|string|max:33',
             'preferred_date' => 'required|date|after_or_equal:today',
             'preferred_time' => 'nullable|date_format:H:i',
+            // Booking page in "period" mode: the patient picks a part of the day instead of a time
+            'preferred_period' => 'nullable|in:morning,afternoon,evening',
             'note' => 'nullable|string|max:1000',
         ];
     }

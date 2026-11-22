@@ -65,6 +65,25 @@ class PatientPhotoTest extends TestCase
             ->assertOk()->json('data.0.profile_photo_url'));
     }
 
+    public function test_list_gives_the_last_visit_without_loading_cases(): void
+    {
+        $seen = $this->patient();
+        $never = DB::table('patients')->insertGetId(['name' => 'New', 'phone' => '0771111']);
+        DB::table('cases')->insert([
+            ['patient_id' => $seen, 'case_date' => '2026-03-01 10:00:00', 'created_at' => '2026-03-01 10:00:00', 'deleted_at' => null],
+            // Older imported case without a date: its creation date counts.
+            ['patient_id' => $seen, 'case_date' => null, 'created_at' => '2026-05-02 09:00:00', 'deleted_at' => null],
+            // A deleted case is not a visit.
+            ['patient_id' => $seen, 'case_date' => '2026-09-09 09:00:00', 'created_at' => '2026-09-09 09:00:00', 'deleted_at' => '2026-09-10 00:00:00'],
+        ]);
+
+        $rows = collect($this->getJson('/api/patients')->assertOk()->json('data'))->keyBy('id');
+
+        $this->assertSame('2026-05-02 09:00:00', $rows[$seen]['last_visit']);
+        $this->assertNull($rows[$never]['last_visit']);
+        $this->assertArrayNotHasKey('cases', $rows[$seen]);
+    }
+
     public function test_other_patient_images_are_not_the_profile_photo(): void
     {
         $patient = $this->patient();
@@ -140,6 +159,14 @@ class PatientPhotoTest extends TestCase
             $table->string('public_token')->nullable();
             $table->boolean('is_public_profile_enabled')->default(true);
             $table->text('tooth_details')->nullable();
+            $table->timestamps();
+            $table->softDeletes();
+        });
+        // Only what the list's last_visit sub-select reads.
+        Schema::create('cases', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('patient_id');
+            $table->dateTime('case_date')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

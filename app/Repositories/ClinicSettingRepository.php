@@ -425,7 +425,7 @@ class ClinicSettingRepository extends BaseRepository
         }
 
         // Appointment category
-        if (in_array($key, ['appointment_duration', 'working_hours', 'enable_online_booking', 'max_appointments_per_day'])) {
+        if (in_array($key, ['appointment_duration', 'working_hours', 'enable_online_booking', 'max_appointments_per_day', 'booking_time_mode'])) {
             return 'appointment';
         }
 
