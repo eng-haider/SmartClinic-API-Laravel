@@ -91,9 +91,13 @@ class SecretaryRepository
             ]);
         }
 
-        // Assign custom permissions if provided
-        if (!empty($data['permissions'])) {
-            $secretary->givePermissionTo($data['permissions']);
+        // The permissions ticked in the dialog. A client that sends no list
+        // (the mobile app) gets the usual ones, which the role used to grant.
+        $permissions = array_key_exists('permissions', $data)
+            ? ($data['permissions'] ?? [])
+            : $this->getDefaultPermissions();
+        if (!empty($permissions)) {
+            $secretary->givePermissionTo($permissions);
         }
 
         // Also create user in central database for smart login (if in tenant context)
@@ -178,6 +182,14 @@ class SecretaryRepository
         $secretary->update($updateData);
 
         return $secretary->fresh(['permissions', 'roles']);
+    }
+
+    /**
+     * What a new secretary gets unless the clinic ticks otherwise.
+     */
+    public function getDefaultPermissions(): array
+    {
+        return config('rolesAndPermissions.roles.secretary.default_permissions', []);
     }
 
     /**

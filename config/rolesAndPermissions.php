@@ -351,7 +351,14 @@ return [
         'secretary' => [
             'display_name' => 'Secretary',
             'description' => 'Can manage patients and reservations, view basic information',
+            // Only what every secretary needs to sign in. Everything else is
+            // granted per secretary (default_permissions below, ticked when one
+            // is added), so the clinic can take any of it away from the
+            // permissions dialog - role permissions could not be unticked.
             'permissions' => [
+                'view-own-clinic',
+            ],
+            'default_permissions' => [
                 // Patient permissions
                 'view-clinic-patients',
                 'create-patient',
@@ -368,7 +375,6 @@ return [
                 // when adding one).
 
                 // Clinic permissions
-                'view-own-clinic',
 
                 // Reservations
                 'view-clinic-reservations',
@@ -406,6 +412,10 @@ return [
                 'view-automation-targets',
                 'view-conversations',
                 'send-conversation-message',
+                // Bills, as DEFAULT_SECRETARY_PERMISSIONS on the web had them.
+                'view-clinic-bills',
+                'create-bill',
+                'mark-bill-paid',
             ],
         ],
     ],

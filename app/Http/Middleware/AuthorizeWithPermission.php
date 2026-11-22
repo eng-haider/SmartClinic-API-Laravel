@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Symfony\Component\HttpFoundation\Response;
 
 class AuthorizeWithPermission
@@ -25,8 +26,17 @@ class AuthorizeWithPermission
             ], 401);
         }
 
-        // Check if user has required permission
-        if (!Auth::user()->hasPermissionTo($permission)) {
+        // "a|b" passes with any one of them. A name this clinic's database has
+        // never seeded counts as not held, instead of a 500.
+        $allowed = collect(explode('|', $permission))->contains(function (string $name) {
+            try {
+                return Auth::user()->hasPermissionTo($name);
+            } catch (PermissionDoesNotExist) {
+                return false;
+            }
+        });
+
+        if (!$allowed) {
             return response()->json([
                 'success' => false,
                 'message' => 'You do not have permission to perform this action',

@@ -18,6 +18,11 @@ class BookingRequestController extends Controller
 {
     public function __construct(private BookingRequestRepository $bookingRequests)
     {
+        // Requests become bookings, so they follow the booking permissions.
+        $this->middleware('permission:' . ReservationController::VIEW)->only(['index', 'show']);
+        // Approving or refusing is answering one (the app's rule too).
+        $this->middleware('permission:create-reservation')->only(['approve', 'reject']);
+        $this->middleware('permission:delete-reservation')->only(['destroy']);
     }
 
     /**

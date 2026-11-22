@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\Auth;
 
 class ReservationController extends Controller
 {
+    /** Any one of these lets a user see bookings. */
+    public const VIEW = 'view-clinic-reservations|view-all-reservations|view-own-reservations';
+
     /**
      * Create a new controller instance
      */
@@ -21,10 +24,14 @@ class ReservationController extends Controller
         private ReservationRepository $reservationRepository,
         private BookingRequestMessenger $bookingMessenger,
     ) {
-        // $this->middleware('permission:view-clinic-reservations')->only(['index', 'show']);
-        // $this->middleware('permission:create-reservation')->only(['store']);
-        // $this->middleware('permission:edit-reservation')->only(['update']);
-        // $this->middleware('permission:delete-reservation')->only(['destroy']);
+        // These were commented out, so any signed-in user could read and change
+        // the whole appointment book whatever the clinic had ticked for them.
+        // A doctor's view-own-reservations still lists only their own
+        // bookings (see getDoctorIdFilter).
+        $this->middleware('permission:' . self::VIEW)->only(['index', 'show']);
+        $this->middleware('permission:create-reservation')->only(['store']);
+        $this->middleware('permission:edit-reservation')->only(['update', 'changeStatus']);
+        $this->middleware('permission:delete-reservation')->only(['destroy']);
     }
 
     /**
