@@ -41,6 +41,7 @@ class ClinicDisplaySettingsTest extends TestCase
             ['setting_key' => 'patient_age_input', 'setting_value' => 'age', 'setting_type' => 'string'],
             ['setting_key' => 'waiting_list_style', 'setting_value' => 'cards', 'setting_type' => 'string'],
             ['setting_key' => 'enable_departments', 'setting_value' => '1', 'setting_type' => 'boolean'],
+            ['setting_key' => 'balance_per_patient', 'setting_value' => '1', 'setting_type' => 'boolean'],
             ['setting_key' => 'tax_rate', 'setting_value' => '15', 'setting_type' => 'integer'],
             ['setting_key' => 'whatsapp_number', 'setting_value' => '07700000000', 'setting_type' => 'string'],
             ['setting_key' => 'clinic_name', 'setting_value' => 'North Clinic', 'setting_type' => 'string'],
@@ -68,6 +69,7 @@ class ClinicDisplaySettingsTest extends TestCase
         $this->assertSame('age', $values['patient_age_input']);
         $this->assertSame('cards', $values['waiting_list_style']);
         $this->assertTrue($values['enable_departments']);
+        $this->assertTrue($values['balance_per_patient']); // the patient page counts the remaining with it
     }
 
     public function test_it_returns_nothing_outside_the_display_category(): void

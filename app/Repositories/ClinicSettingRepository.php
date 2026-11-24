@@ -72,9 +72,10 @@ class ClinicSettingRepository extends BaseRepository
 
     /**
      * When on, a patient's payments on one case also settle their other cases with
-     * the same doctor: the Bills page then shows the remaining the patient page shows.
-     * Off (and missing) keeps a balance per case, where overpaying one case never
-     * settles another. Set with: php artisan clinic:balance-per-patient
+     * the same doctor, on the Bills page and on the patient page (so it is a display
+     * setting, which every signed-in user can read). Off (and missing) keeps a balance
+     * per case, where overpaying one case never settles another.
+     * Set with: php artisan clinic:balance-per-patient
      */
     public const BALANCE_PER_PATIENT_KEY = 'balance_per_patient';
 
@@ -443,12 +444,12 @@ class ClinicSettingRepository extends BaseRepository
         }
 
         // Financial category
-        if (in_array($key, ['tax_rate', 'enable_invoicing', 'default_payment_method', 'doctor_bills_isolation', self::BALANCE_PER_PATIENT_KEY])) {
+        if (in_array($key, ['tax_rate', 'enable_invoicing', 'default_payment_method', 'doctor_bills_isolation'])) {
             return 'financial';
         }
 
         // Display category
-        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY, self::HIDE_DASHBOARD_NUMBERS_KEY, self::PATIENT_AGE_INPUT_KEY, self::ENABLE_DEPARTMENTS_KEY, self::ENABLE_ORTHODONTICS_KEY, self::WAITING_LIST_STYLE_KEY, self::CASE_DIALOG_ON_CATEGORY_KEY, self::SHOW_PATIENT_PHONE2_KEY])) {
+        if (in_array($key, ['show_image_case', 'show_rx_id', 'teeth_v2', 'tooth_colors', self::BABY_TEETH_NOTATION_KEY, self::HIDE_DASHBOARD_NUMBERS_KEY, self::PATIENT_AGE_INPUT_KEY, self::ENABLE_DEPARTMENTS_KEY, self::ENABLE_ORTHODONTICS_KEY, self::WAITING_LIST_STYLE_KEY, self::CASE_DIALOG_ON_CATEGORY_KEY, self::SHOW_PATIENT_PHONE2_KEY, self::BALANCE_PER_PATIENT_KEY])) {
             return 'display';
         }
 
@@ -502,7 +503,6 @@ class ClinicSettingRepository extends BaseRepository
             'enable_invoicing' => 20,
             'default_payment_method' => 21,
             'doctor_bills_isolation' => 22,
-            'balance_per_patient' => 23,
 
             // Display (22-25)
             'show_image_case' => 22,
@@ -517,6 +517,7 @@ class ClinicSettingRepository extends BaseRepository
             'case_dialog_on_category' => 31,
             'enable_orthodontics' => 32,
             'show_patient_phone2' => 33,
+            'balance_per_patient' => 34,
 
             // Social (26-28)
             'facebook_url' => 26,
