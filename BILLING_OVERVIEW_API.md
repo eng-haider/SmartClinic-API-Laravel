@@ -2,6 +2,8 @@
 
 These read-only endpoints support the single patient table and inline payment details. They are registered under both `/api/bills` and `/api/tenant/bills`. Tenant requests use the existing `X-Tenant-ID` or `X-Clinic-ID` header. All endpoints require a valid JWT and `view-all-bills` permission.
 
+While the clinic's `doctor_bills_isolation` setting is on, a plain doctor only gets their own cases from these endpoints: the API sets `doctor_id` to the signed-in doctor and ignores the one sent. Super admins, clinic super doctors and secretaries see the whole clinic and may filter with `doctor_id`. With the setting off, doctors may filter too. The bills list and `statistics/summary` follow the same rule.
+
 All lists return `success`, `data`, and `pagination` (`total`, `per_page`, `current_page`, `last_page`, `from`, `to`). Summary values cover **all matching records**, regardless of the current page. Amounts are integers in the same currency units as `cases.price` and `bills.price`.
 
 ## Patient balances

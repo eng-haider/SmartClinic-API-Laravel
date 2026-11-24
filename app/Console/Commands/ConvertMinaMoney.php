@@ -13,19 +13,35 @@ use Illuminate\Console\Command;
  *   php artisan money:mina                    # report only, changes nothing
  *   php artisan money:mina --apply            # convert (saves a backup first)
  *   php artisan money:mina --restore=<file>   # undo with that backup
+ *   php artisan money:mina --repair           # report; with --apply, puts back the amounts converted twice
+ *
+ * Before the 2026-11-03 run staff had already retyped some old cases in thousands
+ * (1,725,000 as 1725), so it turned those into 2. --repair puts them back.
  */
 class ConvertMinaMoney extends Command
 {
     protected $signature = 'money:mina
                             {--apply : Change the data; without it only a report is printed}
-                            {--restore= : Put back the amounts saved in this backup file}';
+                            {--restore= : Put back the amounts saved in this backup file}
+                            {--repair= : Put back only the amounts that were converted twice, from this backup file or else the one the conversion saved}';
 
     protected $description = 'Clinic _mina only: divide doctor #8\'s amounts from before 2025 by 1000';
 
     public function handle(): int
     {
-        if ($this->option('restore')) {
+        // Not option(): it is null for a --repair without a file, which must never convert
+        if ($this->input->hasParameterOption('--restore')) {
             return $this->call('money:thousands', ['tenant' => '_mina', '--restore' => $this->option('restore')]);
+        }
+
+        if ($this->input->hasParameterOption('--repair')) {
+            return $this->call('money:thousands', [
+                'tenant' => '_mina',
+                '--repair' => $this->option('repair'),
+                // Payments that really were 10,000 and 5,000 dinars: 10 and 5 are right
+                '--keep' => 'bills:10005,bills:22653',
+                '--apply' => $this->option('apply'),
+            ]);
         }
 
         return $this->call('money:thousands', array_filter([

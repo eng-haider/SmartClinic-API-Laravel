@@ -319,9 +319,12 @@ class BillRepository
         // total_paid_price = paid CASE bills within the requested date range (money collected
         // in that period). The bills table is polymorphic, so restrict to case billable types
         // (the morph map is non-enforcing; the DB trigger stores 'App\Models\Case').
+        // Deleting a case keeps its bills; its price is not in total_price, so its payments
+        // are left out too (as in patient-balances and payments).
         $paidCaseBillsQuery = Bill::query()
             ->where('is_paid', true)
-            ->whereIn('billable_type', $caseBillableTypes);
+            ->whereIn('billable_type', $caseBillableTypes)
+            ->whereIn('billable_id', CaseModel::query()->select('id'));
 
         if ($doctorId !== null) {
             $paidCaseBillsQuery->where('doctor_id', $doctorId);

@@ -29,7 +29,15 @@ use Illuminate\Support\Facades\Schema;
  *   php artisan money:thousands _clinic --before=2026-10-15           # report for records before that day
  *   php artisan money:thousands _clinic --before=2026-10-15 --apply   # convert (saves a backup first)
  *   php artisan money:thousands _clinic --doctor=8 --before=2025-01-01 # one doctor's cases dated before 2025
- *   php artisan money:thousands _clinic --restore=storage/app/money-backups/....json
+ *   php artisan money:thousands _clinic --restore=storage/tenant_clinic/app/money-backups/....json
+ *   php artisan money:thousands _clinic --repair                       # report (add --apply to save)
+ *
+ * --repair undoes part of a conversion: the amounts that were already in thousands when
+ * it ran, because someone had retyped an old 1,725,000 as 1725, and so became 2. They
+ * are the ones under --under in the backup: no real fee is that small in full dinars.
+ * Check the report, and --keep any that really were full dinars (a 5,000 payment).
+ * It reads the backup the conversion saved in storage/tenant<ID>/app/money-backups, or
+ * the one given as --repair=<file>.
  *
  * With --doctor, only that doctor's cases (by case date) and every payment on them
  * change, whatever the payment's date or who took it, so each case stays in one unit.
@@ -49,7 +57,9 @@ class ConvertMoneyToThousands extends Command
                             {--keep= : Rows to leave alone, comma separated table:id (e.g. bills:40801, already typed in thousands)}
                             {--again : Run although this clinic was converted before (only for a different doctor or date)}
                             {--apply : Change the data; without it only a report is printed}
-                            {--restore= : Put back the amounts saved in this backup file}';
+                            {--restore= : Put back the amounts saved in this backup file}
+                            {--repair= : Put back only the amounts that were already in thousands when converted (1725 that became 2), from this backup file or else the clinic\'s own}
+                            {--under=15000 : With --repair, a backed up amount below this was already in thousands}';
 
     protected $description = 'Divide a clinic\'s old amounts by 1000 after its doctor switched to typing prices in thousands';
 
@@ -83,9 +93,12 @@ class ConvertMoneyToThousands extends Command
         tenancy()->initialize($tenant);
 
         try {
-            return $this->option('restore')
-                ? $this->restore($tenant, $this->option('restore'))
-                : $this->convert($tenant);
+            // Not option(): it is null for a --repair without a file, which must never convert
+            return match (true) {
+                $this->input->hasParameterOption('--restore') => $this->restore($tenant, (string) $this->option('restore')),
+                $this->input->hasParameterOption('--repair') => $this->repair($tenant, $this->option('repair') ?: $this->conversionBackup($tenant)),
+                default => $this->convert($tenant),
+            };
         } finally {
             tenancy()->end();
         }
@@ -238,11 +251,7 @@ class ConvertMoneyToThousands extends Command
         }
 
         // Backup first: if it can't be written, nothing is changed
-        $backup = storage_path('app/money-backups/' . $tenant->id . '-' . now()->format('Ymd-His') . '.json');
-        if (!is_dir(dirname($backup))) {
-            mkdir(dirname($backup), 0755, true);
-        }
-        file_put_contents($backup, json_encode(['tenant' => $tenant->id, 'doctor' => $doctor, 'before' => $before, 'changes' => $changes], JSON_PRETTY_PRINT), LOCK_EX);
+        $backup = $this->writeBackup($tenant, ['tenant' => $tenant->id, 'doctor' => $doctor, 'before' => $before, 'changes' => $changes]);
 
         DB::transaction(function () use ($changes) {
             foreach ($changes as $key => $list) {
@@ -270,11 +279,9 @@ class ConvertMoneyToThousands extends Command
 
     private function restore(Tenant $tenant, string $file): int
     {
-        $backup = is_file($file) ? json_decode(file_get_contents($file), true) : null;
+        $backup = $this->readBackup($tenant, $file);
 
-        if (!$backup || ($backup['tenant'] ?? null) !== $tenant->id) {
-            $this->error("{$file} is not a backup of clinic {$tenant->id}.");
-
+        if (!$backup) {
             return self::FAILURE;
         }
 
@@ -290,13 +297,157 @@ class ConvertMoneyToThousands extends Command
             }
         });
 
-        $this->syncPaid();
+        $this->syncPaidOf($this->changedCases($backup['changes']));
 
         // Undone, so it no longer counts as a conversion of this clinic
         rename($file, "{$file}.restored");
         $this->info("Restored {$count} amount(s) from {$file}.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Put back the amounts that were already in thousands when the conversion ran.
+     * One edited since is left alone: it no longer holds the converted value.
+     */
+    private function repair(Tenant $tenant, ?string $file): int
+    {
+        $backup = $file ? $this->readBackup($tenant, $file) : null;
+
+        if (!$backup) {
+            return self::FAILURE;
+        }
+
+        $under = (float) $this->option('under');
+        $keep = array_filter(array_map('trim', explode(',', (string) $this->option('keep'))));
+        $changes = [];
+        $rows = [];
+        $edited = [];
+        $caseIds = [];
+
+        foreach ($backup['changes'] as $key => $list) {
+            [$table, $column] = explode('.', $key);
+            $list = array_filter($list, fn ($row) => abs((float) $row['old']) < $under && !in_array("{$table}:{$row['id']}", $keep, true));
+            $current = DB::table($table)->whereIn('id', array_column($list, 'id'))->get()->keyBy('id');
+
+            foreach ($list as $row) {
+                $record = $current->get($row['id']);
+
+                if (!$record || (float) $record->{$column} !== (float) $row['new']) {
+                    $edited[] = "{$table}:{$row['id']}";
+                    continue;
+                }
+
+                // Same shape as a conversion's backup, so --restore can undo the repair
+                $changes[$key][] = ['id' => $row['id'], 'old' => $record->{$column}, 'new' => $row['old']];
+
+                $caseId = match (true) {
+                    $table === 'cases' => $record->id,
+                    $table === 'bills' && in_array($record->billable_type, CaseModel::BILLABLE_TYPES, true) => $record->billable_id,
+                    default => null,
+                };
+                if ($caseId) {
+                    $caseIds[$caseId] = $caseId;
+                }
+
+                $rows[] = ["{$table}:{$row['id']}", $column, $caseId ?? '-', $record->{$column}, $row['old']];
+            }
+        }
+
+        $this->info("Clinic: {$tenant->id} ({$tenant->name})");
+        $this->line("Backup: {$file}");
+        $this->table(['Row', 'Amount', 'Case', 'Now', 'Put back'], $rows);
+
+        if ($keep) {
+            $this->line('Left alone: ' . implode(', ', $keep));
+        }
+        if ($edited) {
+            $this->line('Edited or removed since the conversion, left alone: ' . implode(', ', $edited));
+        }
+
+        $total = count($rows);
+
+        if ($total === 0) {
+            $this->info('Nothing to repair.');
+
+            return self::SUCCESS;
+        }
+
+        if (!$this->option('apply')) {
+            $this->info("Report only. {$total} amount(s) would be put back. Add --apply to save them.");
+
+            return self::SUCCESS;
+        }
+
+        $undo = $this->writeBackup($tenant, ['tenant' => $tenant->id, 'repair' => basename($file), 'changes' => $changes]);
+
+        DB::transaction(function () use ($changes) {
+            foreach ($changes as $key => $list) {
+                [$table, $column] = explode('.', $key);
+                foreach ($list as $change) {
+                    DB::table($table)->where('id', $change['id'])->update([$column => $change['new']]);
+                }
+            }
+        });
+
+        $this->syncPaidOf($caseIds);
+
+        $this->info("Put back {$total} amount(s).");
+        $this->line("To undo: php artisan money:thousands {$tenant->id} --restore={$undo}");
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * The backup this clinic's conversion saved. A repair's own backup, kept to undo it, is not one.
+     */
+    private function conversionBackup(Tenant $tenant): ?string
+    {
+        $folder = storage_path('app/money-backups');
+        $files = array_values(array_filter(
+            glob("{$folder}/{$tenant->id}-*.json") ?: [],
+            fn ($file) => !isset(json_decode((string) file_get_contents($file), true)['repair'])
+        ));
+
+        if (count($files) === 1) {
+            return $files[0];
+        }
+
+        $this->error($files ? 'This clinic has several backups. Choose one with --repair=<file>:' : "No backup of clinic {$tenant->id} in {$folder}.");
+        foreach ($files as $file) {
+            $this->line("  {$file}");
+        }
+
+        return null;
+    }
+
+    private function readBackup(Tenant $tenant, string $file): ?array
+    {
+        $backup = is_file($file) ? json_decode(file_get_contents($file), true) : null;
+
+        if (!$backup || ($backup['tenant'] ?? null) !== $tenant->id) {
+            $this->error("{$file} is not a backup of clinic {$tenant->id}.");
+
+            return null;
+        }
+
+        return $backup;
+    }
+
+    /**
+     * Saved before anything changes: if it can't be written, the run stops here.
+     */
+    private function writeBackup(Tenant $tenant, array $data): string
+    {
+        $file = storage_path('app/money-backups/' . $tenant->id . '-' . now()->format('Ymd-His') . '.json');
+        if (!is_dir(dirname($file))) {
+            mkdir(dirname($file), 0755, true);
+        }
+        if (file_put_contents($file, json_encode($data, JSON_PRETTY_PRINT), LOCK_EX) === false) {
+            throw new \RuntimeException("Could not write the backup {$file}.");
+        }
+
+        return $file;
     }
 
     /**
@@ -357,6 +508,31 @@ class ConvertMoneyToThousands extends Command
         }
 
         return $query;
+    }
+
+    /**
+     * The cases whose price or payments are in these changes.
+     */
+    private function changedCases(array $changes): array
+    {
+        $cases = array_column($changes['cases.price'] ?? [], 'id');
+
+        foreach (array_chunk(array_column($changes['bills.price'] ?? [], 'id'), 1000) as $bills) {
+            array_push($cases, ...DB::table('bills')->whereIn('id', $bills)
+                ->whereIn('billable_type', CaseModel::BILLABLE_TYPES)->pluck('billable_id'));
+        }
+
+        return array_unique($cases);
+    }
+
+    /**
+     * syncPaid() for these cases only; the clinic's other cases keep their flag.
+     */
+    private function syncPaidOf(array $caseIds): void
+    {
+        foreach (array_chunk($caseIds, 1000) as $ids) {
+            $this->syncPaid($ids);
+        }
     }
 
     /**

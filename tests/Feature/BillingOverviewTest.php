@@ -218,6 +218,18 @@ class BillingOverviewTest extends TestCase
         $this->assertSame(0, app(BillRepository::class)->getStatisticsWithFilters(['date_from' => '2026-09-02'], 15, 1)['total_unpaid_price']);
     }
 
+    public function test_statistics_leave_out_payments_of_deleted_cases(): void
+    {
+        $patient = $this->patient('Deleted case', '0770999');
+        $this->billFor($this->caseFor($patient, 100, 1), 60, true, '2026-09-01 10:00:00', ['doctor_id' => 1]);
+        $deleted = $this->caseFor($patient, 500, 1);
+        $this->billFor($deleted, 500, true, '2026-09-01 10:00:00', ['doctor_id' => 1]);
+        DB::table('cases')->where('id', $deleted)->update(['deleted_at' => '2026-09-02 10:00:00']);
+
+        $stats = app(BillRepository::class)->getStatisticsWithFilters([], 15, 1);
+        $this->assertSame([100, 60, 40], [(int) $stats['total_price'], (int) $stats['total_paid_price'], $stats['total_unpaid_price']]);
+    }
+
     public function test_oldest_payment_sort_also_keeps_patients_without_payments_last(): void
     {
         $unbilled = $this->patient('Unbilled', '0770000');
@@ -384,6 +396,46 @@ class BillingOverviewTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors(['case_date_from']);
     }
 
+    public function test_isolated_doctor_only_gets_own_cases_whatever_doctor_is_requested(): void
+    {
+        $this->setDoctorIsolation(true);
+        $own = $this->patient('Own patient', '0770001');
+        $this->billFor($this->caseFor($own, 100, 1), 40, true, '2026-09-01 10:00:00');
+        $other = $this->patient('Other patient', '0770002');
+        $this->billFor($this->caseFor($other, 500, 2), 50, true, '2026-09-02 10:00:00');
+
+        $this->authorizeBilling(true, 'doctor');
+        foreach (['', '&doctor_id=2'] as $sent) {
+            $this->getJson('/api/tenant/bills/patient-balances?payment_status=unpaid&sort=-unpaid_amount'.$sent)->assertOk()
+                ->assertJsonPath('pagination.total', 1)->assertJsonPath('data.0.id', $own)
+                ->assertJsonPath('summary.unpaid_amount', 60);
+            $this->getJson('/api/tenant/bills/payments?sort=-price'.$sent)->assertOk()
+                ->assertJsonPath('pagination.total', 1)->assertJsonPath('summary.paid_amount', 40);
+            $this->getJson('/api/tenant/bills/patient-balances/'.$other.'/bills?sort=-price'.$sent)->assertOk()
+                ->assertJsonPath('data', [])->assertJsonPath('patient_balance.total_price', 0);
+        }
+
+        foreach (['super_admin', 'clinic_super_doctor', 'secretary'] as $role) {
+            $this->authorizeBilling(true, $role);
+            $this->getJson('/api/tenant/bills/patient-balances')->assertOk()->assertJsonPath('pagination.total', 2);
+            $this->getJson('/api/tenant/bills/patient-balances?doctor_id=2')->assertOk()
+                ->assertJsonPath('pagination.total', 1)->assertJsonPath('data.0.id', $other);
+        }
+    }
+
+    public function test_doctor_sees_every_doctor_while_isolation_is_off(): void
+    {
+        $this->setDoctorIsolation(false);
+        $this->caseFor($this->patient('Own patient', '0770001'), 100, 1);
+        $other = $this->patient('Other patient', '0770002');
+        $this->caseFor($other, 500, 2);
+
+        $this->authorizeBilling(true, 'doctor');
+        $this->getJson('/api/tenant/bills/patient-balances')->assertOk()->assertJsonPath('pagination.total', 2);
+        $this->getJson('/api/tenant/bills/patient-balances?doctor_id=2')->assertOk()
+            ->assertJsonPath('pagination.total', 1)->assertJsonPath('data.0.id', $other);
+    }
+
     public function test_every_overview_endpoint_requires_billing_permission(): void
     {
         $this->authorizeBilling(false);
@@ -404,12 +456,29 @@ class BillingOverviewTest extends TestCase
             ->assertJsonPath('success', false);
     }
 
-    private function authorizeBilling(bool $allowed): void
+    private function authorizeBilling(bool $allowed, string $role = 'clinic_super_doctor'): void
     {
         $user = Mockery::mock(User::class)->makePartial();
         $user->forceFill(['id' => 1, 'name' => 'Doctor One']);
         $user->shouldReceive('hasPermissionTo')->with('view-all-bills')->andReturn($allowed);
+        $user->shouldReceive('hasRole')->andReturnUsing(fn ($name) => $name === $role);
         $this->actingAs($user);
+    }
+
+    private function setDoctorIsolation(bool $on): void
+    {
+        Schema::create('clinic_settings', function (Blueprint $table) {
+            $table->id();
+            $table->string('setting_key');
+            $table->string('setting_value')->nullable();
+            $table->string('setting_type')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->softDeletes();
+            $table->timestamps();
+        });
+        DB::table('clinic_settings')->insert([
+            'setting_key' => 'doctor_bills_isolation', 'setting_value' => $on ? '1' : '0', 'setting_type' => 'boolean',
+        ]);
     }
 
     private function patient(string $name, string $phone): int

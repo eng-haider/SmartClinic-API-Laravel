@@ -31,17 +31,34 @@ class BillController extends Controller
 
     public function patientBalances(BillingOverviewRequest $request, BillingOverviewRepository $overview): JsonResponse
     {
-        return $this->overviewResponse($overview->patientBalances($request->validated()));
+        return $this->overviewResponse($overview->patientBalances($this->overviewFilters($request)));
     }
 
     public function payments(BillingOverviewRequest $request, BillingOverviewRepository $overview): JsonResponse
     {
-        return $this->overviewResponse($overview->payments($request->validated()), true);
+        return $this->overviewResponse($overview->payments($this->overviewFilters($request)), true);
     }
 
     public function patientBillHistory(BillingOverviewRequest $request, int $patientId, BillingOverviewRepository $overview): JsonResponse
     {
-        return $this->overviewResponse($overview->patientBills($patientId, $request->validated()), true);
+        return $this->overviewResponse($overview->patientBills($patientId, $this->overviewFilters($request)), true);
+    }
+
+    /**
+     * The overview filters, limited to the doctor's own cases when the clinic's
+     * doctor_bills_isolation setting applies to them, whatever doctor_id they send
+     * (as in index() and statistics()). Everyone else may use ?doctor_id=.
+     */
+    private function overviewFilters(BillingOverviewRequest $request): array
+    {
+        $filters = $request->validated();
+        $ownDoctorId = $this->getBillsDoctorIdFilter();
+
+        if ($ownDoctorId !== null) {
+            $filters['doctor_id'] = $ownDoctorId;
+        }
+
+        return $filters;
     }
 
     private function overviewResponse(array $result, bool $bills = false): JsonResponse
