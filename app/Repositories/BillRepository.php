@@ -2,6 +2,7 @@
 
 namespace App\Repositories;
 
+use App\Http\Helpers\PatientBalanceHelper;
 use App\Models\Bill;
 use App\Models\CaseCategory;
 use App\Models\CaseModel;
@@ -278,8 +279,9 @@ class BillRepository
         // total_price        = sum of case prices (cases table) in the range.
         // total_paid_price   = paid CASE bills within the requested date range (money collected).
         // total_unpaid_price = remaining on the cases in range: per case, price minus every
-        //                      paid bill recorded for it (any date), clamped at zero. This is the
-        //                      same math as bills/patient-balances, so the card matches that list.
+        //                      paid bill recorded for it (any date), clamped at zero - or per
+        //                      patient and doctor with balance_per_patient. This is the same
+        //                      math as bills/patient-balances, so the card matches that list.
         //                      It is NOT total_price - total_paid_price: a payment collected in
         //                      the period may belong to a case created outside it.
         $caseBillableTypes = ['Case', 'CaseModel', 'App\\Models\\Case', 'App\\Models\\CaseModel'];
@@ -337,7 +339,7 @@ class BillRepository
         $totalPaidPrice = $paidCaseBillsQuery->sum('price') ?? 0;
 
         // Remaining on the cases in range (lifetime payments per case, clamped per case so an
-        // overpaid case never settles another one).
+        // overpaid case never settles another one; per patient and doctor with balance_per_patient).
         $paymentsByCase = DB::table('bills')
             ->select('billable_id')
             ->selectRaw('SUM(price) AS paid_amount')
@@ -346,11 +348,12 @@ class BillRepository
             ->whereNull('deleted_at')
             ->groupBy('billable_id');
 
-        $totalUnpaidPrice = (int) (clone $casesQuery)->toBase()
+        $balances = (clone $casesQuery)->toBase()
             ->leftJoinSub($paymentsByCase, 'payments', 'payments.billable_id', '=', 'cases.id')
-            ->selectRaw('COALESCE(SUM(CASE WHEN COALESCE(cases.price, 0) > COALESCE(payments.paid_amount, 0)
-                THEN COALESCE(cases.price, 0) - COALESCE(payments.paid_amount, 0) ELSE 0 END), 0) AS remaining')
-            ->value('remaining');
+            ->selectRaw('SUM(COALESCE(cases.price, 0)) - SUM(COALESCE(payments.paid_amount, 0)) AS balance')
+            ->groupBy(PatientBalanceHelper::isPerPatient() ? ['cases.patient_id', 'cases.doctor_id'] : 'cases.id');
+
+        $totalUnpaidPrice = (int) DB::query()->fromSub($balances, 'balances')->where('balance', '>', 0)->sum('balance');
 
         // Get expenses with same date filter
         $expensesQuery = ClinicExpense::query();

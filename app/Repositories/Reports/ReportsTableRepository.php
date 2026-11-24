@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Reports;
 
+use App\Http\Helpers\PatientBalanceHelper;
 use App\Models\CaseModel;
 use App\Models\ClinicExpense;
 use App\Models\Reservation;
@@ -22,7 +23,9 @@ use Illuminate\Support\Facades\DB;
  * BillingOverviewRepository owns the single authoritative "outstanding
  * balance" calculation (per-case clamped, so an overpayment on one case never
  * offsets another case's balance) and every "remaining" figure in this class
- * is built the same way.
+ * is built the same way. With the balance_per_patient setting, balances and the
+ * doctors report are clamped per patient and doctor instead; figures of a single
+ * case or of a case category stay per case.
  */
 class ReportsTableRepository
 {
@@ -122,6 +125,19 @@ class ReportsTableRepository
             ->selectRaw('MAX(cases.created_at) as last_case_at')
             ->groupBy('cases.doctor_id');
 
+        // With balance_per_patient: what each patient owes the doctor over all these cases
+        $perPatient = PatientBalanceHelper::isPerPatient();
+        $owedByPatient = DB::table('cases')
+            ->leftJoinSub($paymentsByCase, 'payments', 'payments.billable_id', '=', 'cases.id')
+            ->tap($casesInPeriod)
+            ->select('cases.doctor_id')
+            ->selectRaw('GREATEST(SUM(COALESCE(cases.price, 0)) - SUM(COALESCE(payments.paid_amount, 0)), 0) as owed')
+            ->groupBy('cases.doctor_id', 'cases.patient_id');
+        $owedByDoctor = DB::query()->fromSub($owedByPatient, 'patient_balances')
+            ->select('doctor_id')
+            ->selectRaw('SUM(owed) as remaining_amount')
+            ->groupBy('doctor_id');
+
         $reservationsAgg = DB::table('reservations')
             ->whereNull('deleted_at')
             ->when(! empty($filters['date_from']), fn ($q) => $q->where('reservation_start_date', '>=', CarbonImmutable::parse($filters['date_from'])->startOfDay()))
@@ -153,6 +169,7 @@ class ReportsTableRepository
         $query = DB::table('users')
             ->whereIn('users.id', $doctorIds)
             ->leftJoinSub($casesAgg, 'agg', 'agg.doctor_id', '=', 'users.id')
+            ->when($perPatient, fn ($q) => $q->leftJoinSub($owedByDoctor, 'owed', 'owed.doctor_id', '=', 'users.id'))
             ->leftJoinSub($paymentsByDoctor, 'paid', 'paid.doctor_id', '=', 'users.id')
             ->leftJoinSub($reservationsAgg, 'resv', 'resv.doctor_id', '=', 'users.id')
             ->whereNull('users.deleted_at')
@@ -166,7 +183,7 @@ class ReportsTableRepository
                 DB::raw('COALESCE(agg.in_progress_count, 0) as in_progress_count'),
                 DB::raw('COALESCE(agg.total_value, 0) as total_value'),
                 DB::raw('COALESCE(paid.paid_amount, 0) as paid_amount'),
-                DB::raw('COALESCE(agg.remaining_amount, 0) as remaining_amount'),
+                DB::raw('COALESCE('.($perPatient ? 'owed' : 'agg').'.remaining_amount, 0) as remaining_amount'),
                 'agg.last_case_at',
                 DB::raw('COALESCE(resv.reservation_count, 0) as reservation_count')
             );

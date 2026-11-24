@@ -147,11 +147,13 @@ class CaseModel extends Model
     }
 
     /**
-     * Get all of the case's bills.
+     * Get all of the case's bills. Not morphMany(): that only matches getMorphClass()
+     * ('App\Models\Case'), so it missed the payments migrated from the old system,
+     * which are stored as 'App\Models\CaseModel'.
      */
     public function bills()
     {
-        return $this->morphMany(Bill::class, 'billable');
+        return $this->hasMany(Bill::class, 'billable_id')->whereIn('billable_type', self::BILLABLE_TYPES);
     }
 
     /**
@@ -195,11 +197,7 @@ class CaseModel extends Model
      */
     public function syncIsPaid(): void
     {
-        // Queried directly: bills() only sees the morph class, not migrated bills.
-        $paid = (int) Bill::query()
-            ->whereIn('billable_type', self::BILLABLE_TYPES)
-            ->where('billable_id', $this->id)
-            ->sum('price');
+        $paid = (int) $this->bills()->sum('price');
 
         $this->updateQuietly(['is_paid' => $paid >= (int) $this->price]);
     }

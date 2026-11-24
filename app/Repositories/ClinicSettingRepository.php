@@ -70,6 +70,14 @@ class ClinicSettingRepository extends BaseRepository
     public const WAITING_LIST_STYLES = ['table', 'cards'];
     public const DEFAULT_WAITING_LIST_STYLE = 'table';
 
+    /**
+     * When on, a patient's payments on one case also settle their other cases with
+     * the same doctor: the Bills page then shows the remaining the patient page shows.
+     * Off (and missing) keeps a balance per case, where overpaying one case never
+     * settles another. Set with: php artisan clinic:balance-per-patient
+     */
+    public const BALANCE_PER_PATIENT_KEY = 'balance_per_patient';
+
     public function __construct(ClinicSetting $model)
     {
         parent::__construct($model);
@@ -435,7 +443,7 @@ class ClinicSettingRepository extends BaseRepository
         }
 
         // Financial category
-        if (in_array($key, ['tax_rate', 'enable_invoicing', 'default_payment_method', 'doctor_bills_isolation'])) {
+        if (in_array($key, ['tax_rate', 'enable_invoicing', 'default_payment_method', 'doctor_bills_isolation', self::BALANCE_PER_PATIENT_KEY])) {
             return 'financial';
         }
 
@@ -494,6 +502,7 @@ class ClinicSettingRepository extends BaseRepository
             'enable_invoicing' => 20,
             'default_payment_method' => 21,
             'doctor_bills_isolation' => 22,
+            'balance_per_patient' => 23,
 
             // Display (22-25)
             'show_image_case' => 22,

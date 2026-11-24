@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Middleware\InitializeTenancyByHeader;
 use App\Http\Middleware\JwtMiddleware;
+use App\Models\CaseModel;
 use App\Models\User;
 use App\Repositories\BillRepository;
 use Illuminate\Database\Schema\Blueprint;
@@ -230,6 +231,60 @@ class BillingOverviewTest extends TestCase
         $this->assertSame([100, 60, 40], [(int) $stats['total_price'], (int) $stats['total_paid_price'], $stats['total_unpaid_price']]);
     }
 
+    public function test_balance_per_patient_settles_a_patients_other_cases_with_the_same_doctor_only(): void
+    {
+        $settled = $this->patient('Paid on a free visit', '0770001');
+        $this->billFor($this->caseFor($settled, 2000, 1), 1700, true, '2026-01-01 10:00:00', ['billable_type' => 'App\\Models\\CaseModel']);
+        $this->billFor($this->caseFor($settled, 0, 1), 300, true, '2026-02-18 10:00:00');
+        $twoDoctors = $this->patient('Overpaid doctor 1, owes doctor 2', '0770002');
+        $this->billFor($this->caseFor($twoDoctors, 100, 1), 150, true, '2026-01-01 10:00:00');
+        $this->caseFor($twoDoctors, 80, 2);
+        $partly = $this->patient('Overpaid one of two cases', '0770003');
+        $this->billFor($this->caseFor($partly, 500, 1), 100, true, '2026-01-01 10:00:00');
+        $this->billFor($this->caseFor($partly, 300, 1), 350, true, '2026-01-01 10:00:00');
+        $overpaid = $this->patient('Overpaid everything', '0770004');
+        $this->billFor($this->caseFor($overpaid, 10, 1), 900, true, '2026-01-01 10:00:00');
+
+        $unpaid = fn (string $query = '') => collect($this->getJson('/api/bills/patient-balances?payment_status=unpaid&sort=name'.$query)
+            ->assertOk()->json('data'))->pluck('unpaid_amount', 'id')->all();
+        $remaining = fn (?int $doctorId = null) => app(BillRepository::class)->getStatisticsWithFilters([], 15, $doctorId)['total_unpaid_price'];
+
+        // Off: every case on its own
+        $this->assertEqualsCanonicalizing([$settled => 300, $twoDoctors => 80, $partly => 400], $unpaid());
+        $this->assertSame([780, 700, 80], [$remaining(), $remaining(1), $remaining(2)]);
+
+        $this->setClinicSetting('balance_per_patient', true);
+        $this->assertSame([$twoDoctors => 80, $partly => 350], $unpaid());
+        $this->assertSame([$partly => 350], $unpaid('&doctor_id=1'));
+        $this->assertSame([$twoDoctors => 80], $unpaid('&doctor_id=2'));
+        $this->assertSame([430, 350, 80], [$remaining(), $remaining(1), $remaining(2)]);
+
+        // Totals, paid amounts and the count of unpaid cases stay right per patient
+        $this->getJson('/api/bills/patient-balances/'.$partly.'/bills')->assertOk()
+            ->assertJsonPath('patient_balance.total_price', 800)->assertJsonPath('patient_balance.paid_amount', 450)
+            ->assertJsonPath('patient_balance.unpaid_amount', 350)->assertJsonPath('patient_balance.unpaid_case_count', 1)
+            ->assertJsonPath('patient_balance.case_count', 2);
+        $this->getJson('/api/bills/patient-balances/'.$settled.'/bills')->assertOk()
+            ->assertJsonPath('patient_balance.unpaid_amount', 0)->assertJsonPath('patient_balance.payment_status', 'paid');
+        $this->getJson('/api/bills/patient-balances')->assertOk()
+            ->assertJsonPath('summary.total_price', 2990)->assertJsonPath('summary.paid_amount', 3500)
+            ->assertJsonPath('summary.unpaid_amount', 430)->assertJsonPath('summary.patient_count', 4);
+    }
+
+    public function test_case_bills_include_payments_migrated_from_the_old_system(): void
+    {
+        $case = $this->caseFor($this->patient('Migrated', '0770001'), 2000, 1);
+        foreach (['App\\Models\\CaseModel', 'App\\Models\\Case', 'CaseModel', 'Case'] as $i => $type) {
+            $this->billFor($case, 100 + $i, true, '2026-01-01 10:00:00', ['billable_type' => $type]);
+        }
+        $this->billFor($case, 999, true, '2026-01-01 10:00:00', ['billable_type' => 'App\\Models\\ClinicExpense']);
+        $this->billFor($case, 999, true, '2026-01-01 10:00:00', ['deleted_at' => '2026-01-02 10:00:00']);
+        $this->billFor($this->caseFor($this->patient('Other', '0770002'), 50, 1), 50, true, '2026-01-01 10:00:00');
+
+        $this->assertSame([100, 101, 102, 103], CaseModel::with('bills')->find($case)->bills->sortBy('id')->pluck('price')->values()->all());
+        $this->assertSame(406, (int) CaseModel::find($case)->bills()->sum('price'));
+    }
+
     public function test_oldest_payment_sort_also_keeps_patients_without_payments_last(): void
     {
         $unbilled = $this->patient('Unbilled', '0770000');
@@ -398,7 +453,7 @@ class BillingOverviewTest extends TestCase
 
     public function test_isolated_doctor_only_gets_own_cases_whatever_doctor_is_requested(): void
     {
-        $this->setDoctorIsolation(true);
+        $this->setClinicSetting('doctor_bills_isolation', true);
         $own = $this->patient('Own patient', '0770001');
         $this->billFor($this->caseFor($own, 100, 1), 40, true, '2026-09-01 10:00:00');
         $other = $this->patient('Other patient', '0770002');
@@ -425,7 +480,7 @@ class BillingOverviewTest extends TestCase
 
     public function test_doctor_sees_every_doctor_while_isolation_is_off(): void
     {
-        $this->setDoctorIsolation(false);
+        $this->setClinicSetting('doctor_bills_isolation', false);
         $this->caseFor($this->patient('Own patient', '0770001'), 100, 1);
         $other = $this->patient('Other patient', '0770002');
         $this->caseFor($other, 500, 2);
@@ -465,7 +520,7 @@ class BillingOverviewTest extends TestCase
         $this->actingAs($user);
     }
 
-    private function setDoctorIsolation(bool $on): void
+    private function setClinicSetting(string $key, bool $on): void
     {
         Schema::create('clinic_settings', function (Blueprint $table) {
             $table->id();
@@ -477,7 +532,7 @@ class BillingOverviewTest extends TestCase
             $table->timestamps();
         });
         DB::table('clinic_settings')->insert([
-            'setting_key' => 'doctor_bills_isolation', 'setting_value' => $on ? '1' : '0', 'setting_type' => 'boolean',
+            'setting_key' => $key, 'setting_value' => $on ? '1' : '0', 'setting_type' => 'boolean',
         ]);
     }
 

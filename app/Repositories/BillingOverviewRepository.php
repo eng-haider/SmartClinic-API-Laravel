@@ -2,6 +2,7 @@
 
 namespace App\Repositories;
 
+use App\Http\Helpers\PatientBalanceHelper;
 use App\Models\Bill;
 use App\Models\CaseCategory;
 use App\Models\Patient;
@@ -46,24 +47,37 @@ class BillingOverviewRepository
             ->selectRaw("SUM(CASE WHEN {$period} THEN 1 ELSE 0 END) AS period_payment_count", $bindings)
             ->selectRaw("MAX(CASE WHEN {$period} THEN created_at ELSE NULL END) AS period_last_payment_at", $bindings);
 
+        // Clamp per case: overpaying one case must not settle another case.
+        $price = 'COALESCE(cases.price, 0)';
+        $paid = 'COALESCE(payments.paid_amount, 0)';
+        $unpaid = "SUM(CASE WHEN {$price} > {$paid} THEN {$price} - {$paid} ELSE 0 END)";
+        $unpaidCases = "SUM(CASE WHEN {$price} > {$paid} THEN 1 ELSE 0 END)";
+
+        // Clinics with balance_per_patient clamp per patient and doctor instead: all the
+        // patient paid the doctor counts against all their cases with that doctor.
+        $perPatient = PatientBalanceHelper::isPerPatient();
+        if ($perPatient) {
+            $net = "SUM({$price}) - SUM({$paid})";
+            $unpaid = "CASE WHEN {$net} > 0 THEN {$net} ELSE 0 END";
+            $unpaidCases = "CASE WHEN {$net} > 0 THEN {$unpaidCases} ELSE 0 END";
+        }
+
         $caseBalances = DB::table('cases')
             ->leftJoinSub($paymentsByCase, 'payments', 'payments.billable_id', '=', 'cases.id')
             ->whereNull('cases.deleted_at')
             ->select('cases.patient_id')
             ->selectRaw('COUNT(*) AS case_count, SUM(COALESCE(cases.price, 0)) AS total_price')
             ->selectRaw('SUM(COALESCE(payments.paid_amount, 0)) AS paid_amount')
-            // Clamp per case: overpaying one case must not settle another case.
-            ->selectRaw('SUM(CASE WHEN COALESCE(cases.price, 0) > COALESCE(payments.paid_amount, 0)
-                THEN COALESCE(cases.price, 0) - COALESCE(payments.paid_amount, 0) ELSE 0 END) AS unpaid_amount')
+            ->selectRaw("{$unpaid} AS unpaid_amount")
             // Count of this patient's cases that still carry a balance (Reports:
             // Outstanding Balances "عدد الحالات غير المسددة").
-            ->selectRaw('SUM(CASE WHEN COALESCE(cases.price, 0) > COALESCE(payments.paid_amount, 0) THEN 1 ELSE 0 END) AS unpaid_case_count')
+            ->selectRaw("{$unpaidCases} AS unpaid_case_count")
             ->selectRaw('SUM(COALESCE(payments.period_paid_amount, 0)) AS period_paid_amount')
             ->selectRaw('SUM(COALESCE(payments.period_payment_count, 0)) AS period_payment_count')
             ->selectRaw('MAX(payments.period_last_payment_at) AS last_payment_at')
             // Last visit = most recent case opened for the patient (Reports: "آخر زيارة").
             ->selectRaw('MAX(cases.created_at) AS last_visit_at')
-            ->groupBy('cases.patient_id');
+            ->groupBy($perPatient ? ['cases.patient_id', 'cases.doctor_id'] : 'cases.patient_id');
 
         if (! empty($filters['doctor_id'])) {
             $caseBalances->where('cases.doctor_id', $filters['doctor_id']);
@@ -82,6 +96,17 @@ class BillingOverviewRepository
         // Internal history lookup; the public balances request does not expose this filter.
         if (! empty($filters['patient_id'])) {
             $caseBalances->where('cases.patient_id', $filters['patient_id']);
+        }
+
+        // One row per patient again: overpaying one doctor never settles another's cases
+        if ($perPatient) {
+            $caseBalances = DB::query()->fromSub($caseBalances, 'doctor_balances')
+                ->select('patient_id')
+                ->selectRaw('SUM(case_count) AS case_count, SUM(total_price) AS total_price, SUM(paid_amount) AS paid_amount,
+                    SUM(unpaid_amount) AS unpaid_amount, SUM(unpaid_case_count) AS unpaid_case_count,
+                    SUM(period_paid_amount) AS period_paid_amount, SUM(period_payment_count) AS period_payment_count,
+                    MAX(last_payment_at) AS last_payment_at, MAX(last_visit_at) AS last_visit_at')
+                ->groupBy('patient_id');
         }
 
         $query = DB::table('patients')
