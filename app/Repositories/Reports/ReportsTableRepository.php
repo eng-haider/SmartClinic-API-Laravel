@@ -121,6 +121,9 @@ class ReportsTableRepository
             ->selectRaw('SUM(CASE WHEN cases.status_id = ? THEN 1 ELSE 0 END) as completed_count', [CaseModel::COMPLETED_STATUS_ID])
             ->selectRaw('SUM(CASE WHEN cases.status_id IS NULL OR cases.status_id <> ? THEN 1 ELSE 0 END) as in_progress_count', [CaseModel::COMPLETED_STATUS_ID])
             ->selectRaw('SUM(COALESCE(cases.price, 0)) as total_value')
+            // Paid on the doctor's own cases, whoever took it: total_value minus this is what
+            // remains (more when a case is overpaid). paid_amount is what the doctor took.
+            ->selectRaw('SUM(COALESCE(payments.paid_amount, 0)) as own_paid_amount')
             ->selectRaw('SUM(GREATEST(COALESCE(cases.price, 0) - COALESCE(payments.paid_amount, 0), 0)) as remaining_amount')
             ->selectRaw('MAX(cases.created_at) as last_case_at')
             ->groupBy('cases.doctor_id');
@@ -183,6 +186,7 @@ class ReportsTableRepository
                 DB::raw('COALESCE(agg.in_progress_count, 0) as in_progress_count'),
                 DB::raw('COALESCE(agg.total_value, 0) as total_value'),
                 DB::raw('COALESCE(paid.paid_amount, 0) as paid_amount'),
+                DB::raw('COALESCE(agg.own_paid_amount, 0) as own_paid_amount'),
                 DB::raw('COALESCE('.($perPatient ? 'owed' : 'agg').'.remaining_amount, 0) as remaining_amount'),
                 'agg.last_case_at',
                 DB::raw('COALESCE(resv.reservation_count, 0) as reservation_count')
@@ -198,13 +202,14 @@ class ReportsTableRepository
         $totals = DB::query()->fromSub((clone $query), 'doctors_filtered')
             ->selectRaw('COUNT(*) as doctor_count, COALESCE(SUM(case_count),0) as case_count,
                 COALESCE(SUM(total_value),0) as total_value, COALESCE(SUM(paid_amount),0) as paid_amount,
-                COALESCE(SUM(remaining_amount),0) as remaining_amount')
+                COALESCE(SUM(own_paid_amount),0) as own_paid_amount, COALESCE(SUM(remaining_amount),0) as remaining_amount')
             ->first();
 
         $sortMap = [
             'case_count' => 'case_count',
             'total_value' => 'total_value',
             'paid_amount' => 'paid_amount',
+            'own_paid_amount' => 'own_paid_amount',
             'remaining_amount' => 'remaining_amount',
             'name' => 'users.name',
         ];
@@ -226,6 +231,7 @@ class ReportsTableRepository
                 'in_progress_count' => (int) $row->in_progress_count,
                 'total_value' => (int) $row->total_value,
                 'paid_amount' => (int) $row->paid_amount,
+                'own_paid_amount' => (int) $row->own_paid_amount,
                 'remaining_amount' => (int) $row->remaining_amount,
                 'avg_case_value' => $caseCount > 0 ? (int) round($row->total_value / $caseCount) : 0,
                 'reservation_count' => (int) $row->reservation_count,
@@ -240,6 +246,7 @@ class ReportsTableRepository
                 'case_count' => (int) $totals->case_count,
                 'total_value' => (int) $totals->total_value,
                 'paid_amount' => (int) $totals->paid_amount,
+                'own_paid_amount' => (int) $totals->own_paid_amount,
                 'remaining_amount' => (int) $totals->remaining_amount,
             ],
         ];
