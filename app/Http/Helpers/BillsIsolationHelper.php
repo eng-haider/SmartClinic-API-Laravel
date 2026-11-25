@@ -3,6 +3,7 @@
 namespace App\Http\Helpers;
 
 use App\Models\ClinicSetting;
+use App\Models\User;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -11,6 +12,23 @@ use Illuminate\Support\Facades\Log;
  */
 class BillsIsolationHelper
 {
+    /**
+     * Whether the user may see (and so change) the price and payments of a doctor's case:
+     * always, except a plain doctor on another doctor's case while isolation is on.
+     */
+    public static function canSeeCaseMoney(?User $user, ?int $caseDoctorId): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        if ($user->hasRole('clinic_super_doctor') || $user->hasRole('secretary') || $user->hasRole('super_admin')) {
+            return true;
+        }
+
+        return !self::isEnabled() || (int) $caseDoctorId === (int) $user->id;
+    }
+
     /**
      * Returns true if the clinic has enabled doctor_bills_isolation.
      * Safe default: false (no behavior change until clinic opts in).

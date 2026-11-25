@@ -2,11 +2,14 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Helpers\BillsIsolationHelper;
 use App\Models\CaseCategory;
 use App\Models\CaseModel;
 use App\Models\User;
+use App\Services\CasePaymentGuard;
 use App\Services\SpecialtyManager;
 use Closure;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 
@@ -138,6 +141,34 @@ class CaseRequest extends FormRequest
             'status_id' => $this->status_id ?? 2,
             'case_date' => $this->case_date ?? now()->toDateTimeString(),
         ]);
+
+        // A doctor who isn't shown the case's price gets it back as empty, so editing
+        // the case (its notes, say) must not save that as price 0 and unpaid.
+        $caseId = $this->route('case');
+        if ($caseId !== null && !BillsIsolationHelper::canSeeCaseMoney($user, CaseModel::query()->whereKey($caseId)->value('doctor_id'))) {
+            foreach (['price', 'item_cost', 'is_paid'] as $field) {
+                $this->offsetUnset($field);
+            }
+        }
+    }
+
+    /**
+     * Clinics with strict_payments don't lower a price below what was paid.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $caseId = $this->route('case');
+
+            if ($caseId === null || !$this->has('price') || $validator->errors()->isNotEmpty() || !CasePaymentGuard::isOn()) {
+                return;
+            }
+
+            $refused = (new CasePaymentGuard($this->header('Accept-Language')))->price((int) $caseId, (int) $this->input('price'));
+            if ($refused) {
+                $validator->errors()->add('price', $refused);
+            }
+        });
     }
 
     /**

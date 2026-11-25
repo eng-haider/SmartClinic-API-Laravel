@@ -2,6 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Bill;
+use App\Models\CaseModel;
+use App\Services\CasePaymentGuard;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 class BillRequest extends FormRequest
@@ -61,6 +65,35 @@ class BillRequest extends FormRequest
         if (!empty($data)) {
             $this->merge($data);
         }
+    }
+
+    /**
+     * Clinics with strict_payments only accept a payment its case has room for.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            if ($validator->errors()->isEmpty() && CasePaymentGuard::isOn() && ($refused = $this->refusal())) {
+                $validator->errors()->add('price', $refused);
+            }
+        });
+    }
+
+    private function refusal(): ?string
+    {
+        $guard = new CasePaymentGuard($this->header('Accept-Language'));
+
+        if ($this->isMethod('POST')) {
+            return in_array($this->input('billable_type'), CaseModel::BILLABLE_TYPES, true)
+                ? $guard->newPayment((int) $this->input('billable_id'), (int) $this->input('price'))
+                : null;
+        }
+
+        $bill = Bill::find($this->route('bill'));
+
+        return $bill && in_array($bill->billable_type, CaseModel::BILLABLE_TYPES, true)
+            ? $guard->changedPayment($bill, (int) $this->input('price', $bill->price), $this->filled('billable_id') ? (int) $this->input('billable_id') : null)
+            : null;
     }
 
     /**

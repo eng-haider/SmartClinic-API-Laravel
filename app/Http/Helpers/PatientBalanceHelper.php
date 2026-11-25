@@ -2,9 +2,7 @@
 
 namespace App\Http\Helpers;
 
-use App\Models\ClinicSetting;
 use App\Repositories\ClinicSettingRepository;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Shared helper for the balance_per_patient clinic setting: whether a patient's payments
@@ -17,19 +15,6 @@ class PatientBalanceHelper
      */
     public static function isPerPatient(): bool
     {
-        try {
-            return filter_var(
-                ClinicSetting::where('setting_key', ClinicSettingRepository::BALANCE_PER_PATIENT_KEY)
-                    ->where('is_active', true)
-                    ->value('setting_value'),
-                FILTER_VALIDATE_BOOLEAN
-            );
-        } catch (\Exception $e) {
-            Log::warning('PatientBalanceHelper: Could not read balance_per_patient setting', [
-                'error' => $e->getMessage(),
-            ]);
-
-            return false;
-        }
+        return ClinicSwitch::isOn(ClinicSettingRepository::BALANCE_PER_PATIENT_KEY);
     }
 }

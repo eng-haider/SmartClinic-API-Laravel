@@ -120,28 +120,7 @@ class CaseResource extends JsonResource
      */
     private function canViewCasePrice(): bool
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
-
-        if (!$user) {
-            return false;
-        }
-
-        // Admins always see price
-        if (
-            $user->hasRole('clinic_super_doctor') ||
-            $user->hasRole('secretary') ||
-            $user->hasRole('super_admin')
-        ) {
-            return true;
-        }
-
-        // If isolation is OFF, everyone sees price
-        if (!BillsIsolationHelper::isEnabled()) {
-            return true;
-        }
-
-        // Isolation is ON: doctor can only see price for their own cases
-        return (int) $this->doctor_id === (int) $user->id;
+        return BillsIsolationHelper::canSeeCaseMoney(\Illuminate\Support\Facades\Auth::user(), $this->doctor_id);
     }
 }
 

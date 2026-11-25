@@ -79,6 +79,13 @@ class ClinicSettingRepository extends BaseRepository
      */
     public const BALANCE_PER_PATIENT_KEY = 'balance_per_patient';
 
+    /**
+     * When on, the API refuses a payment on a case without a price, payments over the
+     * price and a price below what was paid (CasePaymentGuard). Off (and missing)
+     * accepts them. Set with: php artisan clinic:strict-payments
+     */
+    public const STRICT_PAYMENTS_KEY = 'strict_payments';
+
     public function __construct(ClinicSetting $model)
     {
         parent::__construct($model);
@@ -444,7 +451,7 @@ class ClinicSettingRepository extends BaseRepository
         }
 
         // Financial category
-        if (in_array($key, ['tax_rate', 'enable_invoicing', 'default_payment_method', 'doctor_bills_isolation'])) {
+        if (in_array($key, ['tax_rate', 'enable_invoicing', 'default_payment_method', 'doctor_bills_isolation', self::STRICT_PAYMENTS_KEY])) {
             return 'financial';
         }
 
@@ -503,6 +510,7 @@ class ClinicSettingRepository extends BaseRepository
             'enable_invoicing' => 20,
             'default_payment_method' => 21,
             'doctor_bills_isolation' => 22,
+            'strict_payments' => 23,
 
             // Display (22-25)
             'show_image_case' => 22,
