@@ -219,7 +219,7 @@ class BillingOverviewTest extends TestCase
         $this->assertSame(0, app(BillRepository::class)->getStatisticsWithFilters(['date_from' => '2026-09-02'], 15, 1)['total_unpaid_price']);
     }
 
-    public function test_statistics_leave_out_payments_of_deleted_cases(): void
+    public function test_statistics_leave_out_payments_of_deleted_cases_only_with_balance_per_patient(): void
     {
         $patient = $this->patient('Deleted case', '0770999');
         $this->billFor($this->caseFor($patient, 100, 1), 60, true, '2026-09-01 10:00:00', ['doctor_id' => 1]);
@@ -227,8 +227,15 @@ class BillingOverviewTest extends TestCase
         $this->billFor($deleted, 500, true, '2026-09-01 10:00:00', ['doctor_id' => 1]);
         DB::table('cases')->where('id', $deleted)->update(['deleted_at' => '2026-09-02 10:00:00']);
 
-        $stats = app(BillRepository::class)->getStatisticsWithFilters([], 15, 1);
-        $this->assertSame([100, 60, 40], [(int) $stats['total_price'], (int) $stats['total_paid_price'], $stats['total_unpaid_price']]);
+        $stats = function () {
+            $stats = app(BillRepository::class)->getStatisticsWithFilters([], 15, 1);
+
+            return [(int) $stats['total_price'], (int) $stats['total_paid_price'], $stats['total_unpaid_price']];
+        };
+        $this->assertSame([100, 560, 40], $stats());
+
+        $this->setClinicSetting('balance_per_patient', true);
+        $this->assertSame([100, 60, 40], $stats());
     }
 
     public function test_balance_per_patient_settles_a_patients_other_cases_with_the_same_doctor_only(): void

@@ -321,12 +321,14 @@ class BillRepository
         // total_paid_price = paid CASE bills within the requested date range (money collected
         // in that period). The bills table is polymorphic, so restrict to case billable types
         // (the morph map is non-enforcing; the DB trigger stores 'App\Models\Case').
-        // Deleting a case keeps its bills; its price is not in total_price, so its payments
-        // are left out too (as in patient-balances and payments).
+        // Deleting a case keeps its bills; its price is not in total_price. Clinics with
+        // balance_per_patient leave its payments out too (as patient-balances and payments
+        // do); the others keep counting all the money collected.
+        $perPatient = PatientBalanceHelper::isPerPatient();
         $paidCaseBillsQuery = Bill::query()
             ->where('is_paid', true)
             ->whereIn('billable_type', $caseBillableTypes)
-            ->whereIn('billable_id', CaseModel::query()->select('id'));
+            ->when($perPatient, fn ($q) => $q->whereIn('billable_id', CaseModel::query()->select('id')));
 
         if ($doctorId !== null) {
             $paidCaseBillsQuery->where('doctor_id', $doctorId);
@@ -351,7 +353,7 @@ class BillRepository
         $balances = (clone $casesQuery)->toBase()
             ->leftJoinSub($paymentsByCase, 'payments', 'payments.billable_id', '=', 'cases.id')
             ->selectRaw('SUM(COALESCE(cases.price, 0)) - SUM(COALESCE(payments.paid_amount, 0)) AS balance')
-            ->groupBy(PatientBalanceHelper::isPerPatient() ? ['cases.patient_id', 'cases.doctor_id'] : 'cases.id');
+            ->groupBy($perPatient ? ['cases.patient_id', 'cases.doctor_id'] : 'cases.id');
 
         $totalUnpaidPrice = (int) DB::query()->fromSub($balances, 'balances')->where('balance', '>', 0)->sum('balance');
 
